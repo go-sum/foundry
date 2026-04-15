@@ -1,0 +1,11 @@
+version: '3'
+
+dotenv:
+  - '.versions'
+
+
+tasks:
+  default:
+    desc: "List all available tasks"
+    silent: true
+    cmd: task --list
