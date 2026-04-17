@@ -128,6 +128,21 @@ Dependencies should be explicit and constructor-injected.
 - Feature code should receive collaborators through constructors, not by reading package globals.
 - Hidden global state should be the exception, not the default.
 
+### Config defaults
+
+Use `cmp.Or` to apply zero-value defaults in constructors:
+
+```go
+cfg.TokenTTL = cmp.Or(cfg.TokenTTL, time.Hour)
+cfg.HeaderName = cmp.Or(cfg.HeaderName, "X-CSRF-Token")
+```
+
+Do not use `if x == "" { x = "default" }` blocks — they add visual noise with no semantic gain.
+
+`cmp.Or` applies to any `comparable` type whose zero value means "unset": `string`, `int`,
+`time.Duration`, etc. It does **not** apply to `func` fields or nil-sentinel interface fields;
+guard those with explicit `!= nil` checks.
+
 ### Singletons
 
 Use the Singleton pattern sparingly and intentionally.
