@@ -9,6 +9,24 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+var validationPhrases = map[string]func(validator.FieldError) string{
+	"required": func(_ validator.FieldError) string {
+		return "is required"
+	},
+	"min": func(fe validator.FieldError) string {
+		return fmt.Sprintf("must be at least %s", fe.Param())
+	},
+	"max": func(fe validator.FieldError) string {
+		return fmt.Sprintf("must be at most %s", fe.Param())
+	},
+	"len": func(fe validator.FieldError) string {
+		return fmt.Sprintf("must have length %s", fe.Param())
+	},
+	"oneof": func(fe validator.FieldError) string {
+		return fmt.Sprintf("must be one of [%s]", fe.Param())
+	},
+}
+
 func Validate[T any](cfg T, registrars ...func(*validator.Validate)) error {
 	v := validator.New(validator.WithRequiredStructEnabled())
 	for _, r := range registrars {
@@ -47,20 +65,10 @@ func Validate[T any](cfg T, registrars ...func(*validator.Validate)) error {
 }
 
 func phraseFor(fe validator.FieldError) string {
-	switch fe.Tag() {
-	case "required":
-		return "is required"
-	case "min":
-		return fmt.Sprintf("must be at least %s", fe.Param())
-	case "max":
-		return fmt.Sprintf("must be at most %s", fe.Param())
-	case "len":
-		return fmt.Sprintf("must have length %s", fe.Param())
-	case "oneof":
-		return fmt.Sprintf("must be one of [%s]", fe.Param())
-	default:
-		return fmt.Sprintf("failed validation %q", fe.Tag())
+	if phrase, ok := validationPhrases[fe.Tag()]; ok {
+		return phrase(fe)
 	}
+	return fmt.Sprintf("failed validation %q", fe.Tag())
 }
 
 func findFieldTag(t reflect.Type, parts []string, tag string) string {

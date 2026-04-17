@@ -15,15 +15,17 @@ const (
 	Testing     Env = "testing"
 )
 
+var currentEnvMap = map[Env]Env{
+	Development: Development,
+	Testing:     Testing,
+	Production:  Production,
+}
+
 func CurrentEnv() Env {
-	switch Env(os.Getenv("APP_ENV")) {
-	case Development:
-		return Development
-	case Testing:
-		return Testing
-	default:
-		return Production
+	if env, ok := currentEnvMap[Env(os.Getenv("APP_ENV"))]; ok {
+		return env
 	}
+	return Production
 }
 
 var envPattern = regexp.MustCompile(`\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}`)
