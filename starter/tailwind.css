@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Scan Go source files for Tailwind class names */
+@source "./**/*.go";
