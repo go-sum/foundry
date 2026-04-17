@@ -9,6 +9,7 @@ weight: 20
 > This guide is the authoritative source for the current architecture and ownership rules.
 >
 > Read this together with [`CLAUDE.md`](../CLAUDE.md),
+> [`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md),
 > [`PATTERNS_PRINCIPLES.md`](./PATTERNS_PRINCIPLES.md), and
 > [`UI_GUIDE.md`](./UI_GUIDE.md).
 
@@ -99,6 +100,9 @@ Use the decision docs this way:
 
 - [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md): where code belongs and how the app is
   assembled
+- [`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md): how unexpected
+  behavior should be returned, logged, classified, and considered for
+  notification
 - [`PATTERNS_PRINCIPLES.md`](./PATTERNS_PRINCIPLES.md): how new code should be
   structured and maintained
 - [`UI_GUIDE.md`](./UI_GUIDE.md): visual and UI composition guidance

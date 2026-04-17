@@ -10,7 +10,8 @@ weight: 25
 > and features should be structured and maintained in this application.
 >
 > It complements [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md), which defines
-> architecture and ownership.
+> architecture and ownership, and [`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md),
+> which defines how unexpected behavior should be handled and logged.
 >
 > This guide is derived from:
 >

@@ -26,6 +26,7 @@
 ## Guide Index
 > Before writing code, depending on the requirement consult:
 - [`DESIGN_GUIDE.md`](.decisions/DESIGN_GUIDE.md): authoritative source for the current architecture and ownership rules.
+- [`ERROR_HANDLING_GUIDE.md`](.decisions/ERROR_HANDLING_GUIDE.md): authoritative source for classifying, logging, and notifying on unexpected behavior.
 - [`PATTERNS_PRINCIPLES.md`](.decisions/PATTERNS_PRINCIPLES.md): authoritative source for how new functions, types, packages, and features should be structured and maintained.
 - [`UI_GUIDE.md`](.decisions/UI_GUIDE.md): defines how UI should be designed and composed.
 
