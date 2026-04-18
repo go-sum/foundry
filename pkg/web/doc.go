@@ -11,7 +11,7 @@
 //   - pkg/web/session — session management with fixation protection
 //   - pkg/web/secure — CSRF, CORS, COP, rate-limit, security headers
 //   - pkg/web/htmx — HTMX request detection and response header helpers
-//   - pkg/web/adapt — net/http bridge and production server configuration
+//   - pkg/web/serve — net/http bridge and production server configuration
 //   - pkg/web/auth — PKCE, OAuth transaction, SanitizeReturnTo
 //   - pkg/web/router — specificity-sorted pattern router with secure-by-default middleware
 package web

@@ -1,4 +1,4 @@
-package adapt_test
+package serve_test
 
 import (
 	"bufio"
@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-sum/web"
-	"github.com/go-sum/web/adapt"
+	"github.com/go-sum/web/serve"
 )
 
 // TestSwitching_HijackCalled verifies that a 101 response causes the
@@ -31,13 +31,13 @@ func TestSwitching_HijackCalled(t *testing.T) {
 	}
 
 	handler := func(c *web.Context) (web.Response, error) {
-		resp := adapt.Switching(fn)
+		resp := serve.Switching(fn)
 		resp.Headers.Set("Upgrade", "websocket")
 		resp.Headers.Set("Connection", "Upgrade")
 		return resp, nil
 	}
 
-	srv := httptest.NewServer(adapt.ToHTTPHandler(handler))
+	srv := httptest.NewServer(serve.ToHTTPHandler(handler))
 	defer srv.Close()
 
 	conn, err := net.Dial("tcp", srv.Listener.Addr().String())
@@ -72,11 +72,11 @@ func TestSwitching_HijackCalled(t *testing.T) {
 // reports an error via OnError instead of hanging.
 func TestSwitching_NilFn(t *testing.T) {
 	var errs []error
-	resp := adapt.Switching(nil)
+	resp := serve.Switching(nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	adapt.WriteHTTPResponse(rec, req, resp, adapt.Config{
+	serve.WriteHTTPResponse(rec, req, resp, serve.Config{
 		OnError: func(err error) {
 			errs = append(errs, err)
 		},
@@ -99,7 +99,7 @@ func TestNon101ResponseRegression(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	adapt.ToHTTPHandler(handler).ServeHTTP(rec, req)
+	serve.ToHTTPHandler(handler).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -121,13 +121,13 @@ func TestSwitching_ErrorPropagated(t *testing.T) {
 	}
 
 	handler := func(c *web.Context) (web.Response, error) {
-		resp := adapt.Switching(fn)
+		resp := serve.Switching(fn)
 		resp.Headers.Set("Upgrade", "websocket")
 		resp.Headers.Set("Connection", "Upgrade")
 		return resp, nil
 	}
 
-	srv := httptest.NewServer(adapt.ToHTTPHandlerWithConfig(handler, adapt.Config{
+	srv := httptest.NewServer(serve.ToHTTPHandlerWithConfig(handler, serve.Config{
 		OnError: func(err error) {
 			select {
 			case errCh <- err:

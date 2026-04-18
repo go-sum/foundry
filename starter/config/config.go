@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	cfgpkg "github.com/go-sum/config"
-	"github.com/go-sum/web/adapt"
+	"github.com/go-sum/web/serve"
 	"github.com/go-sum/web/secure"
 	"github.com/go-sum/web/session"
 	"github.com/go-sum/web/site"
@@ -19,7 +19,7 @@ type Config struct {
 	Env       Env
 	Headers   secure.HeadersConfig
 	RateLimit secure.RateLimitProfile
-	Server    adapt.ServerConfig
+	Server    serve.ServerConfig
 	Session   session.Settings
 	Site      site.Config
 }
@@ -51,7 +51,7 @@ func defaultProduction() (Config, error) {
 		Env:       Production,
 		Headers:   secure.DefaultHeadersConfig(),
 		RateLimit: secure.DefaultRateLimitProfile(),
-		Server:    adapt.DefaultServerConfig(),
+		Server:    serve.DefaultServerConfig(),
 		Session:   session.DefaultSettings(),
 		Site:      site.Config{BaseURL: cfgpkg.ExpandEnv("SITE_BASE_URL", "")},
 	}, nil

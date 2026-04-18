@@ -38,7 +38,7 @@ This repository maintains building blocks for structured handling:
 
 - `pkg/web/errors.go` defines transport-facing error categories and the `*web.Error` transport primitive (see 3.5)
 - `pkg/web/boundary.go` defines HTTP boundary classification, panic recovery, and rendering
-- `pkg/web/adapt/logging.go` defines a baseline request log
+- `pkg/web/serve/logging.go` defines a baseline request log
 
 The rendering half of the contract lives in `UI_GUIDE.md` and its reference
 implementation at `starter/internal/view/errorpage/`. The server produces a
@@ -382,7 +382,7 @@ Current reference implementation:
 
 - `pkg/web/boundary.go`
 - `pkg/web/errors.go`
-- `pkg/web/adapt/logging.go`
+- `pkg/web/serve/logging.go`
 
 ### Boundary two-signal design
 
@@ -395,7 +395,7 @@ preserved:
   correlation. Emitted by `pkg/web/boundary.go`.
 - **Access log** (`http.request`): captures method, path, latency, and status
   for every request. Used for traffic analysis and audit. Emitted by
-  `pkg/web/adapt/logging.go`.
+  `pkg/web/serve/logging.go`.
 
 The "do not log at every stack frame" rule in 4 applies to *intermediate*
 layers (packages, services, handlers). It means: do not log a returned error
@@ -1070,7 +1070,7 @@ When adding or refactoring behavior, confirm:
 
 - `pkg/web/errors.go` — sentinels, `*web.Error`, `Classify`, constructors
 - `pkg/web/boundary.go` — `ErrorBoundary`, `BoundaryConfig`
-- `pkg/web/adapt/logging.go` — access log (`http.request`)
+- `pkg/web/serve/logging.go` — access log (`http.request`)
 - `pkg/web/retry` — `retry.Do`, `retry.Policy` (11.1)
 - `pkg/web/breaker` — `breaker.Breaker` (11a)
 - `pkg/web/bulkhead` — `bulkhead.Bulkhead` (11a)

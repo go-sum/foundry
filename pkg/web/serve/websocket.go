@@ -1,4 +1,4 @@
-package adapt
+package serve
 
 import (
 	"bufio"

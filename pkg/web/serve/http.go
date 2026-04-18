@@ -1,6 +1,6 @@
 // Package adapt bridges web.Handler to net/http, allowing any web.Handler
 // to be served by net/http.ListenAndServe or any standard Go HTTP server.
-package adapt
+package serve
 
 import (
 	"fmt"

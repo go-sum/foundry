@@ -1,11 +1,11 @@
-package adapt_test
+package serve_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-sum/web/adapt"
+	"github.com/go-sum/web/serve"
 )
 
 // fakeInfoResponder is a mock http.ResponseWriter that also implements the
@@ -27,7 +27,7 @@ func (f *fakeInfoResponder) WriteInfoHeader(statusCode int, header http.Header) 
 func TestWriteEarlyHints_NilLinks(t *testing.T) {
 	rec := httptest.NewRecorder()
 	// Must not panic and must be a no-op.
-	adapt.WriteEarlyHints(rec, nil)
+	serve.WriteEarlyHints(rec, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d (recorder default)", rec.Code, http.StatusOK)
@@ -36,7 +36,7 @@ func TestWriteEarlyHints_NilLinks(t *testing.T) {
 
 func TestWriteEarlyHints_EmptyLinks(t *testing.T) {
 	rec := httptest.NewRecorder()
-	adapt.WriteEarlyHints(rec, []string{})
+	serve.WriteEarlyHints(rec, []string{})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d (recorder default)", rec.Code, http.StatusOK)
@@ -47,7 +47,7 @@ func TestWriteEarlyHints_StandardRecorder_NoOp(t *testing.T) {
 	// httptest.ResponseRecorder does not implement informationalResponder,
 	// so WriteEarlyHints must be a no-op — no status change, no body write.
 	rec := httptest.NewRecorder()
-	adapt.WriteEarlyHints(rec, []string{`</static/app.css>; rel=preload; as=style`})
+	serve.WriteEarlyHints(rec, []string{`</static/app.css>; rel=preload; as=style`})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d (recorder default)", rec.Code, http.StatusOK)
@@ -61,7 +61,7 @@ func TestWriteEarlyHints_InformationalResponder_SingleLink(t *testing.T) {
 	fake := &fakeInfoResponder{ResponseRecorder: httptest.NewRecorder()}
 	link := `</static/app.css>; rel=preload; as=style`
 
-	adapt.WriteEarlyHints(fake, []string{link})
+	serve.WriteEarlyHints(fake, []string{link})
 
 	if fake.callCount != 1 {
 		t.Fatalf("WriteInfoHeader called %d times, want 1", fake.callCount)
@@ -83,7 +83,7 @@ func TestWriteEarlyHints_InformationalResponder_MultipleLinks(t *testing.T) {
 	linkCSS := `</static/app.css>; rel=preload; as=style`
 	linkJS := `</static/app.js>; rel=preload; as=script`
 
-	adapt.WriteEarlyHints(fake, []string{linkCSS, linkJS})
+	serve.WriteEarlyHints(fake, []string{linkCSS, linkJS})
 
 	if fake.callCount != 1 {
 		t.Fatalf("WriteInfoHeader called %d times, want 1", fake.callCount)

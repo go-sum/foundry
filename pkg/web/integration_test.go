@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/go-sum/web"
-	"github.com/go-sum/web/adapt"
+	"github.com/go-sum/web/serve"
 	"github.com/go-sum/web/htmx"
 	"github.com/go-sum/web/router"
 	"github.com/go-sum/web/secure"
@@ -43,7 +43,7 @@ func (a integrationApp) url(name string, params map[string]string) string {
 func newServerAndClient(t *testing.T, r *router.Router) integrationApp {
 	t.Helper()
 
-	srv := httptest.NewServer(adapt.ToHTTPHandler(r.Serve))
+	srv := httptest.NewServer(serve.ToHTTPHandler(r.Serve))
 	t.Cleanup(srv.Close)
 
 	jar, err := cookiejar.New(nil)
@@ -932,7 +932,7 @@ func TestIntegration_MaxBodyBytes413(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	srv := httptest.NewServer(adapt.ToHTTPHandlerWithConfig(handler, adapt.Config{
+	srv := httptest.NewServer(serve.ToHTTPHandlerWithConfig(handler, serve.Config{
 		MaxRequestBodyBytes: 100,
 	}))
 	t.Cleanup(srv.Close)

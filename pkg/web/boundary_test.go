@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/go-sum/web"
-	"github.com/go-sum/web/adapt"
+	"github.com/go-sum/web/serve"
 	"github.com/go-sum/web/router"
 )
 
@@ -35,7 +35,7 @@ func newBoundaryServer(t *testing.T, cfg web.BoundaryConfig, handler web.Handler
 	r.Use(web.ErrorBoundary(cfg))
 	r.GET("/test", "test", handler)
 
-	srv = httptest.NewServer(adapt.ToHTTPHandler(r.Serve))
+	srv = httptest.NewServer(serve.ToHTTPHandler(r.Serve))
 	t.Cleanup(srv.Close)
 
 	jar, err := cookiejar.New(nil)
@@ -328,7 +328,7 @@ func TestBoundary_HEADBodyEmpty(t *testing.T) {
 		return web.Response{}, web.ErrNotFound("")
 	})
 
-	srv := httptest.NewServer(adapt.ToHTTPHandler(r.Serve))
+	srv := httptest.NewServer(serve.ToHTTPHandler(r.Serve))
 	t.Cleanup(srv.Close)
 
 	req, err := http.NewRequest(http.MethodHead, srv.URL+"/test", nil)
