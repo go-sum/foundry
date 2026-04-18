@@ -93,7 +93,7 @@ func TestAccessLogMiddleware_NilURL(t *testing.T) {
 	// Build a context with a nil URL to exercise graceful handling.
 	webReq := web.NewRequest(http.MethodGet, &url.URL{})
 	c := web.NewContext(context.Background(), webReq)
-	c.URL = nil
+	c.Request.URL = nil
 
 	// Should not panic.
 	_, _ = chained(c)

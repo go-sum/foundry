@@ -78,7 +78,7 @@ func Middleware(cfg Config) web.Middleware {
 			tag := computeETag(buf.Bytes(), cfg.Weak)
 
 			// Conditional GET: check If-None-Match.
-			ifNoneMatch := c.Headers.Get("If-None-Match")
+			ifNoneMatch := c.Headers().Get("If-None-Match")
 			if ifNoneMatch != "" {
 				parsed, parseErr := headers.ParseIfNoneMatch(ifNoneMatch)
 				if parseErr == nil {

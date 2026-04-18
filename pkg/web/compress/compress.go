@@ -73,7 +73,7 @@ func Middleware(cfg Config) web.Middleware {
 			}
 
 			// Negotiate encoding from Accept-Encoding header.
-			ae, _ := headers.ParseAcceptEncoding(c.Headers.Get("Accept-Encoding"))
+			ae, _ := headers.ParseAcceptEncoding(c.Headers().Get("Accept-Encoding"))
 			encoding := ae.Negotiate("gzip", "deflate", "identity")
 			if encoding != "gzip" && encoding != "deflate" {
 				return resp, nil

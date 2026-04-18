@@ -91,7 +91,7 @@ func Middleware(cfg Config) web.Middleware {
 
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (resp web.Response, herr error) {
-			sess, err := loadSession(c.Context(), c.Headers.Get("Cookie"), cfg)
+			sess, err := loadSession(c.Context(), c.Headers().Get("Cookie"), cfg)
 			if err != nil {
 				return web.Response{}, web.ErrInternal(err)
 			}

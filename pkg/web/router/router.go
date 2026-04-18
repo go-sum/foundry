@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -156,17 +157,6 @@ func NewWithoutSecureDefaults() *Router {
 	return &Router{names: make(map[string]*routeEntry)}
 }
 
-// Mount grafts a sub-router's routes onto this router under the given prefix.
-// All routes from sub are registered with prefix prepended to their pattern.
-// Sub's middleware is NOT carried over; apply it on the parent if needed.
-func (r *Router) Mount(prefix string, sub *Router) {
-	sub.mu.RLock()
-	defer sub.mu.RUnlock()
-	for _, rt := range sub.routes {
-		r.Handle(rt.method, prefix+rt.pattern, rt.name, rt.handler)
-	}
-}
-
 // Freeze pre-compiles global middleware into all registered routes and builds
 // the dispatch trie. Called automatically by Serve on the first request.
 func (r *Router) Freeze() { r.freeze() }
@@ -256,11 +246,6 @@ func (r *Router) GET(pattern, name string, h web.Handler, mw ...web.Middleware) 
 	r.Handle(http.MethodGet, pattern, name, h, mw...)
 }
 
-// HEAD registers a HEAD route.
-func (r *Router) HEAD(pattern, name string, h web.Handler, mw ...web.Middleware) {
-	r.Handle(http.MethodHead, pattern, name, h, mw...)
-}
-
 // POST registers a POST route.
 func (r *Router) POST(pattern, name string, h web.Handler, mw ...web.Middleware) {
 	r.Handle(http.MethodPost, pattern, name, h, mw...)
@@ -281,17 +266,143 @@ func (r *Router) DELETE(pattern, name string, h web.Handler, mw ...web.Middlewar
 	r.Handle(http.MethodDelete, pattern, name, h, mw...)
 }
 
+// HEAD registers a HEAD route.
+func (r *Router) HEAD(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	r.Handle(http.MethodHead, pattern, name, h, mw...)
+}
+
 // OPTIONS registers an OPTIONS route.
 func (r *Router) OPTIONS(pattern, name string, h web.Handler, mw ...web.Middleware) {
 	r.Handle(http.MethodOptions, pattern, name, h, mw...)
 }
 
-// Group creates a Group with the given path prefix and optional middleware.
-func (r *Router) Group(prefix string, mw ...web.Middleware) *Group {
-	return &Group{
-		router:     r,
-		prefix:     prefix,
-		middleware: mw,
+// standardMethods are the HTTP methods registered by Any.
+var standardMethods = []string{
+	http.MethodGet,
+	http.MethodHead,
+	http.MethodPost,
+	http.MethodPut,
+	http.MethodPatch,
+	http.MethodDelete,
+}
+
+// Any registers h for all standard HTTP methods (GET, HEAD, POST, PUT, PATCH, DELETE).
+// If name is non-empty, each method's route name is suffixed: name + "." + lowercase(method).
+func (r *Router) Any(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	for _, m := range standardMethods {
+		routeName := ""
+		if name != "" {
+			routeName = name + "." + strings.ToLower(m)
+		}
+		r.Handle(m, pattern, routeName, h, mw...)
+	}
+}
+
+// Match registers h for the specified HTTP methods.
+// If name is non-empty, each method's route name is suffixed: name + "." + lowercase(method).
+func (r *Router) Match(methods []string, pattern, name string, h web.Handler, mw ...web.Middleware) {
+	for _, m := range methods {
+		routeName := ""
+		if name != "" {
+			routeName = name + "." + strings.ToLower(m)
+		}
+		r.Handle(m, pattern, routeName, h, mw...)
+	}
+}
+
+// RouteGroup is a set of routes sharing a common path prefix and middleware.
+// Create one via Router.Group. Sub-groups are created via RouteGroup.Group.
+type RouteGroup struct {
+	router *Router
+	prefix string
+	mw     []web.Middleware
+}
+
+// Group creates a RouteGroup with the given path prefix and optional scoped middleware.
+// Routes registered on the group have the prefix prepended and the group middleware
+// applied before any route-level middleware. Panics if the router is frozen.
+func (r *Router) Group(prefix string, mw ...web.Middleware) *RouteGroup {
+	return &RouteGroup{router: r, prefix: prefix, mw: slices.Clone(mw)}
+}
+
+// Group creates a sub-group that inherits this group's prefix and middleware.
+func (g *RouteGroup) Group(prefix string, mw ...web.Middleware) *RouteGroup {
+	combined := make([]web.Middleware, 0, len(g.mw)+len(mw))
+	combined = append(combined, g.mw...)
+	combined = append(combined, mw...)
+	return &RouteGroup{router: g.router, prefix: g.prefix + prefix, mw: combined}
+}
+
+// Use appends middleware to this group's scoped middleware chain.
+func (g *RouteGroup) Use(mw ...web.Middleware) {
+	g.mw = append(g.mw, mw...)
+}
+
+// Handle registers a route under this group's prefix with the group's middleware
+// prepended before any route-level middleware.
+func (g *RouteGroup) Handle(method, pattern, name string, h web.Handler, mw ...web.Middleware) {
+	allMW := make([]web.Middleware, 0, len(g.mw)+len(mw))
+	allMW = append(allMW, g.mw...)
+	allMW = append(allMW, mw...)
+	g.router.Handle(method, g.prefix+pattern, name, h, allMW...)
+}
+
+// GET registers a GET route on the group.
+func (g *RouteGroup) GET(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	g.Handle(http.MethodGet, pattern, name, h, mw...)
+}
+
+// POST registers a POST route on the group.
+func (g *RouteGroup) POST(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	g.Handle(http.MethodPost, pattern, name, h, mw...)
+}
+
+// PUT registers a PUT route on the group.
+func (g *RouteGroup) PUT(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	g.Handle(http.MethodPut, pattern, name, h, mw...)
+}
+
+// PATCH registers a PATCH route on the group.
+func (g *RouteGroup) PATCH(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	g.Handle(http.MethodPatch, pattern, name, h, mw...)
+}
+
+// DELETE registers a DELETE route on the group.
+func (g *RouteGroup) DELETE(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	g.Handle(http.MethodDelete, pattern, name, h, mw...)
+}
+
+// HEAD registers a HEAD route on the group.
+func (g *RouteGroup) HEAD(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	g.Handle(http.MethodHead, pattern, name, h, mw...)
+}
+
+// OPTIONS registers an OPTIONS route on the group.
+func (g *RouteGroup) OPTIONS(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	g.Handle(http.MethodOptions, pattern, name, h, mw...)
+}
+
+// Any registers h for all standard HTTP methods on this group.
+// If name is non-empty, each method's route name is suffixed: name + "." + lowercase(method).
+func (g *RouteGroup) Any(pattern, name string, h web.Handler, mw ...web.Middleware) {
+	for _, m := range standardMethods {
+		routeName := ""
+		if name != "" {
+			routeName = name + "." + strings.ToLower(m)
+		}
+		g.Handle(m, pattern, routeName, h, mw...)
+	}
+}
+
+// Match registers h for the specified HTTP methods on this group.
+// If name is non-empty, each method's route name is suffixed: name + "." + lowercase(method).
+func (g *RouteGroup) Match(methods []string, pattern, name string, h web.Handler, mw ...web.Middleware) {
+	for _, m := range methods {
+		routeName := ""
+		if name != "" {
+			routeName = name + "." + strings.ToLower(m)
+		}
+		g.Handle(m, pattern, routeName, h, mw...)
 	}
 }
 
@@ -303,9 +414,9 @@ func (r *Router) Serve(c *web.Context) (web.Response, error) {
 	path := ""
 	method := ""
 	if c != nil {
-		method = c.Method
-		if c.URL != nil {
-			path = c.URL.Path
+		method = c.Method()
+		if c.URL() != nil {
+			path = c.URL().Path
 		}
 	}
 
@@ -343,9 +454,7 @@ func (r *Router) Serve(c *web.Context) (web.Response, error) {
 	}
 
 	// 405 — path matched but method not registered.
-	resp, err := web.MethodNotAllowedHandler()(c)
-	resp.Headers.Set("Allow", buildAllowHeader(node.methodSet()))
-	return resp, err
+	return web.Response{}, web.ErrMethodNotAllowed("").WithHeader("Allow", buildAllowHeader(node.methodSet()))
 }
 
 // Reverse returns the URL path for a named route, substituting named
@@ -394,6 +503,17 @@ func (r *Router) MustReverse(name string, params map[string]string) string {
 	return path
 }
 
+// Pattern returns the raw URL pattern for a named route.
+func (r *Router) Pattern(name string) (string, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	rt, ok := r.names[name]
+	if !ok {
+		return "", fmt.Errorf("router: unknown route name %q", name)
+	}
+	return rt.pattern, nil
+}
+
 // Routes returns all registered routes.
 func (r *Router) Routes() []Route {
 	r.mu.RLock()
@@ -409,73 +529,6 @@ func (r *Router) Routes() []Route {
 		}
 	}
 	return out
-}
-
-// Group is a group of routes sharing a common prefix and middleware.
-type Group struct {
-	router     *Router
-	prefix     string
-	middleware []web.Middleware
-}
-
-// Use adds middleware to the group.
-func (g *Group) Use(mw ...web.Middleware) {
-	g.middleware = append(g.middleware, mw...)
-}
-
-// Handle registers a route within the group.
-func (g *Group) Handle(method, pattern, name string, h web.Handler, mw ...web.Middleware) {
-	allMW := make([]web.Middleware, 0, len(g.middleware)+len(mw))
-	allMW = append(allMW, g.middleware...)
-	allMW = append(allMW, mw...)
-	g.router.Handle(method, g.prefix+pattern, name, h, allMW...)
-}
-
-// GET registers a GET route within the group.
-func (g *Group) GET(pattern, name string, h web.Handler, mw ...web.Middleware) {
-	g.Handle(http.MethodGet, pattern, name, h, mw...)
-}
-
-// HEAD registers a HEAD route within the group.
-func (g *Group) HEAD(pattern, name string, h web.Handler, mw ...web.Middleware) {
-	g.Handle(http.MethodHead, pattern, name, h, mw...)
-}
-
-// POST registers a POST route within the group.
-func (g *Group) POST(pattern, name string, h web.Handler, mw ...web.Middleware) {
-	g.Handle(http.MethodPost, pattern, name, h, mw...)
-}
-
-// PUT registers a PUT route within the group.
-func (g *Group) PUT(pattern, name string, h web.Handler, mw ...web.Middleware) {
-	g.Handle(http.MethodPut, pattern, name, h, mw...)
-}
-
-// PATCH registers a PATCH route within the group.
-func (g *Group) PATCH(pattern, name string, h web.Handler, mw ...web.Middleware) {
-	g.Handle(http.MethodPatch, pattern, name, h, mw...)
-}
-
-// DELETE registers a DELETE route within the group.
-func (g *Group) DELETE(pattern, name string, h web.Handler, mw ...web.Middleware) {
-	g.Handle(http.MethodDelete, pattern, name, h, mw...)
-}
-
-// OPTIONS registers an OPTIONS route within the group.
-func (g *Group) OPTIONS(pattern, name string, h web.Handler, mw ...web.Middleware) {
-	g.Handle(http.MethodOptions, pattern, name, h, mw...)
-}
-
-// Group creates a sub-group with an additional prefix.
-func (g *Group) Group(prefix string, mw ...web.Middleware) *Group {
-	allMW := make([]web.Middleware, 0, len(g.middleware)+len(mw))
-	allMW = append(allMW, g.middleware...)
-	allMW = append(allMW, mw...)
-	return &Group{
-		router:     g.router,
-		prefix:     g.prefix + prefix,
-		middleware: allMW,
-	}
 }
 
 func routeSpecificity(rt *routeEntry) int {

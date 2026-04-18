@@ -165,8 +165,8 @@ func Reverse(target *url.URL, opts Options) web.Handler {
 		// Set X-Forwarded-Proto from the incoming request scheme when enabled.
 		if opts.ForwardProto && upstreamReq.Header.Get("X-Forwarded-Proto") == "" {
 			scheme := "http"
-			if c.URL != nil && c.URL.Scheme != "" {
-				scheme = c.URL.Scheme
+			if c.URL() != nil && c.URL().Scheme != "" {
+				scheme = c.URL().Scheme
 			} else if proto := c.Request.Headers.Get("X-Forwarded-Proto"); proto != "" {
 				scheme = strings.ToLower(strings.TrimSpace(proto))
 			}
@@ -196,8 +196,8 @@ func Reverse(target *url.URL, opts Options) web.Handler {
 		// Append to any existing Forwarded value rather than replacing it.
 		if clientIP != "" {
 			forwardedProto := "http"
-			if c.URL != nil && c.URL.Scheme != "" {
-				forwardedProto = c.URL.Scheme
+			if c.URL() != nil && c.URL().Scheme != "" {
+				forwardedProto = c.URL().Scheme
 			} else if proto := c.Request.Headers.Get("X-Forwarded-Proto"); proto != "" {
 				forwardedProto = strings.ToLower(strings.TrimSpace(proto))
 			}

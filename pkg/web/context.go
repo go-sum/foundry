@@ -11,12 +11,18 @@ import (
 type Context struct {
 	ctx     context.Context
 	Request Request
-	URL     *url.URL
-	Method  string
-	Headers Headers
 	params  map[string]string
 	values  map[any]any
 }
+
+// Method returns the HTTP method of the request.
+func (c *Context) Method() string { return c.Request.Method }
+
+// URL returns the URL of the request.
+func (c *Context) URL() *url.URL { return c.Request.URL }
+
+// Headers returns the headers of the request.
+func (c *Context) Headers() Headers { return c.Request.Headers }
 
 // NewContext creates a request context from a parent context and Request.
 //
@@ -29,9 +35,6 @@ func NewContext(parent context.Context, req Request) *Context {
 	return &Context{
 		ctx:     parent,
 		Request: req,
-		URL:     req.URL,
-		Method:  req.Method,
-		Headers: req.Headers,
 		params:  make(map[string]string),
 		values:  make(map[any]any),
 	}
@@ -152,9 +155,6 @@ func AcquireContext(parent context.Context, req Request) *Context {
 	}
 	c.ctx = parent
 	c.Request = req
-	c.URL = req.URL
-	c.Method = req.Method
-	c.Headers = req.Headers
 	// params and values stay nil until first write (lazy init already exists)
 	return c
 }
@@ -168,9 +168,6 @@ func ReleaseContext(c *Context) {
 	}
 	c.ctx = nil
 	c.Request = Request{}
-	c.URL = nil
-	c.Method = ""
-	c.Headers = Headers{}
 	c.params = nil
 	c.values = nil
 	contextPool.Put(c)

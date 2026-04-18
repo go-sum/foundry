@@ -96,7 +96,7 @@ func ErrorBoundary(cfg BoundaryConfig) Middleware {
 					cfg.OnError(c.Context(), e)
 				}
 				resp = renderError(c, cfg.Renderer, typeBase, e)
-				if c.Method == http.MethodHead {
+				if c.Method() == http.MethodHead {
 					resp.Body = nil
 				}
 				herr = nil // boundary consumed the error
@@ -142,7 +142,7 @@ func ErrorBoundary(cfg BoundaryConfig) Middleware {
 				cfg.OnError(c.Context(), e)
 			}
 			resp = renderError(c, cfg.Renderer, typeBase, e)
-			if c.Method == http.MethodHead {
+			if c.Method() == http.MethodHead {
 				resp.Body = nil
 			}
 			return resp, nil // boundary consumed the error
@@ -168,20 +168,26 @@ func renderError(c *Context, renderer ErrorRenderer, typeBase string, e *Error) 
 	if e.TypeURI == "" && typeBase != "" {
 		e.TypeURI = typeBase
 	}
+	var resp Response
 	if renderer != nil && preferHTML(c) {
-		return renderer.RenderError(c, e)
+		resp = renderer.RenderError(c, e)
+	} else {
+		resp = Problem(c, e)
 	}
-	return Problem(c, e)
+	for name, value := range e.ResponseHeaders {
+		resp.Headers.Set(name, value)
+	}
+	return resp
 }
 
 // preferHTML reports whether the client prefers an HTML response based on the
 // HTMX request header and the Accept header.
 func preferHTML(c *Context) bool {
-	if c.Headers.Get("HX-Request") == "true" {
+	if c.Headers().Get("HX-Request") == "true" {
 		return true
 	}
-	accept := c.Headers.Get("Accept")
-	if accept == "" || strings.Contains(accept, "text/html") {
+	accept := c.Headers().Get("Accept")
+	if strings.Contains(accept, "text/html") {
 		return true
 	}
 	return false

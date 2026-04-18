@@ -2,6 +2,8 @@ package serve
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -92,5 +94,107 @@ func TestShutdown_NotListening(t *testing.T) {
 	err := Shutdown(context.Background(), srv)
 	if err != nil {
 		t.Errorf("Shutdown returned error for non-listening server: %v", err)
+	}
+}
+
+func TestListenAndServeGracefully_ServeAndShutdown(t *testing.T) {
+	// Pick a free port.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	ln.Close()
+
+	handler := func(_ *web.Context) (web.Response, error) {
+		return web.Text(http.StatusOK, "hello"), nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan error, 1)
+	go func() {
+		done <- ListenAndServeGracefully(ctx, handler, ServerConfig{
+			Addr:            addr,
+			ShutdownTimeout: 5 * time.Second,
+		})
+	}()
+
+	// Wait for the server to accept connections.
+	var resp *http.Response
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err = http.Get(fmt.Sprintf("http://%s/", addr))
+		if err == nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err != nil {
+		cancel()
+		t.Fatalf("server did not start in time: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		cancel()
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+
+	// Cancel the context to trigger shutdown.
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("ListenAndServeGracefully returned error: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Error("ListenAndServeGracefully did not return after context cancel")
+	}
+}
+
+func TestListenAndServeGracefully_DefaultShutdownTimeout(t *testing.T) {
+	// Pick a free port.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	ln.Close()
+
+	handler := func(_ *web.Context) (web.Response, error) {
+		return web.Text(http.StatusOK, "ok"), nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		// ShutdownTimeout = 0 triggers the default 15s path.
+		done <- ListenAndServeGracefully(ctx, handler, ServerConfig{Addr: addr})
+	}()
+
+	// Wait for the server to be ready.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, httpErr := http.Get(fmt.Sprintf("http://%s/", addr))
+		if httpErr == nil {
+			resp.Body.Close()
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("ListenAndServeGracefully returned error: %v", err)
+		}
+	case <-time.After(20 * time.Second):
+		t.Error("ListenAndServeGracefully did not return after context cancel")
 	}
 }

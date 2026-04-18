@@ -450,19 +450,16 @@ func TestBoundary_AcceptNegotiation(t *testing.T) {
 		}
 	})
 
-	t.Run("Accept wildcard uses renderer", func(t *testing.T) {
+	t.Run("Empty Accept uses problem+json", func(t *testing.T) {
 		t.Parallel()
-		// Empty Accept header (browser-friendly default) should use renderer.
+		// Empty Accept header → problem+json (no renderer called).
 		srv, client := newBoundaryServer(t, web.BoundaryConfig{Renderer: &statusCodeRenderer{}}, handler)
 		resp := doGet(t, client, srv.URL+"/test", nil)
-		body := readAllBody(t, resp)
+		_ = readAllBody(t, resp)
 
 		ct := resp.Header.Get("Content-Type")
-		if !strings.Contains(ct, "text/html") {
-			t.Fatalf("Content-Type = %q, want text/html (renderer used for empty Accept)", ct)
-		}
-		if body != "<p>404</p>" {
-			t.Fatalf("body = %q, want %q — renderer was not called", body, "<p>404</p>")
+		if !strings.Contains(ct, "application/problem+json") {
+			t.Fatalf("Content-Type = %q, want application/problem+json (empty Accept → problem+json)", ct)
 		}
 	})
 }

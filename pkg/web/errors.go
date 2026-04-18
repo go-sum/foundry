@@ -82,8 +82,11 @@ type Error struct {
 	Cause      error
 	Instance   string         // RFC 7807 "instance"; fallback to c.URL.Path
 	TypeURI    string         // RFC 7807 "type"; fallback to DefaultTypeBase
-	RetryAfter time.Duration  // 0 means omit Retry-After header
-	Meta       map[string]any // extension members merged into the problem document
+	RetryAfter      time.Duration     // 0 means omit Retry-After header
+	Meta            map[string]any    // extension members merged into the problem document
+	// ResponseHeaders contains HTTP headers that must be set on the error response
+	// (e.g., Allow for 405, WWW-Authenticate for 401). Not included in the problem document body.
+	ResponseHeaders map[string]string
 }
 
 // Error returns the user-safe message. It prefers Message, then Title.
@@ -197,6 +200,15 @@ func (e *Error) WithMeta(k string, v any) *Error {
 // WithRetryAfter sets the Retry-After duration and returns the same *Error.
 func (e *Error) WithRetryAfter(d time.Duration) *Error {
 	e.RetryAfter = d
+	return e
+}
+
+// WithHeader adds a response header to the error and returns the same *Error.
+func (e *Error) WithHeader(name, value string) *Error {
+	if e.ResponseHeaders == nil {
+		e.ResponseHeaders = make(map[string]string)
+	}
+	e.ResponseHeaders[name] = value
 	return e
 }
 

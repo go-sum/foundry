@@ -124,13 +124,12 @@ func TestMethodOverride(t *testing.T) {
 			}
 
 			c := NewContext(context.Background(), req)
-			c.Method = tt.method
 
 			var gotMethod string
 			var gotBody string
 
 			handler := func(c *Context) (Response, error) {
-				gotMethod = c.Method
+				gotMethod = c.Method()
 				if c.Request.Body != nil {
 					data, _ := c.Request.Text()
 					gotBody = data
@@ -164,11 +163,10 @@ func TestMethodOverride_DefaultConfig(t *testing.T) {
 	req.SetBody(io.NopCloser(strings.NewReader("_method=DELETE&x=1")))
 
 	c := NewContext(context.Background(), req)
-	c.Method = "POST"
 
 	var gotMethod string
 	handler := func(c *Context) (Response, error) {
-		gotMethod = c.Method
+		gotMethod = c.Method()
 		return Respond(200), nil
 	}
 
@@ -188,12 +186,11 @@ func TestMethodOverride_NextHandlerReceivesFullBody(t *testing.T) {
 	req.SetBody(io.NopCloser(strings.NewReader(body)))
 
 	c := NewContext(context.Background(), req)
-	c.Method = "POST"
 
 	var gotMethod string
 	var gotBody string
 	handler := func(c *Context) (Response, error) {
-		gotMethod = c.Method
+		gotMethod = c.Method()
 		data, err := c.Request.Text()
 		if err != nil {
 			t.Errorf("next handler Text() error = %v", err)

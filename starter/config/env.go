@@ -43,6 +43,7 @@ func overlayDevelopment(cfg *Config) {
 
 func overlayTesting(cfg *Config) {
 	cfg.Site.BaseURL = "http://test.local"
+	cfg.CSRF.CookieSecure = false
 	cfg.Session.CookieSecure = false
 	if dir := os.Getenv("TEST_STATIC_DIR"); dir != "" {
 		cfg.Assets.PublicDir = dir

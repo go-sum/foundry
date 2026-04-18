@@ -72,7 +72,7 @@ func acquireContextWithConfig(w http.ResponseWriter, r *http.Request, cfg Config
 //
 // Unlike outbound requests, net/http server requests have a path-only r.URL —
 // Scheme and Host are always empty. This function builds an absolute URL so
-// that middleware (CSRF, COP) can perform same-origin comparisons without
+// that middleware (CSRF, OriginGuard) can perform same-origin comparisons without
 // relying on X-Forwarded-Proto alone. Scheme precedence: r.TLS (direct TLS)
 // → X-Forwarded-Proto header → "http".
 func FromHTTPRequest(r *http.Request) web.Request {

@@ -42,12 +42,12 @@ func Middleware(store Store, ttl time.Duration) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
 			// Only apply to non-idempotent methods.
-			method := c.Method
+			method := c.Method()
 			if method != http.MethodPost && method != http.MethodDelete {
 				return next(c)
 			}
 
-			key := c.Headers.Get("Idempotency-Key")
+			key := c.Headers().Get("Idempotency-Key")
 			if key == "" {
 				return next(c)
 			}

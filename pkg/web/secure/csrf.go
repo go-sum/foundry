@@ -179,7 +179,7 @@ func CSRF(cfg CSRFConfig) web.Middleware {
 				return web.Response{}, web.ErrInternal(err)
 			}
 
-			if isUnsafeMethod(c.Method, cfg.SafeMethods) {
+			if isUnsafeMethod(c.Method(), cfg.SafeMethods) {
 				if !validOrigin(c, cfg) {
 					return web.Response{}, web.ErrForbidden("CSRF origin invalid")
 				}
@@ -277,13 +277,13 @@ func submittedCSRFToken(c *web.Context, cfg CSRFConfig) string {
 	}
 
 	for _, headerName := range cfg.HeaderNames {
-		if token := strings.TrimSpace(c.Headers.Get(headerName)); token != "" {
+		if token := strings.TrimSpace(c.Headers().Get(headerName)); token != "" {
 			return token
 		}
 	}
 
-	if c.URL != nil {
-		if token := strings.TrimSpace(c.URL.Query().Get(cfg.QueryField)); token != "" {
+	if c.URL() != nil {
+		if token := strings.TrimSpace(c.URL().Query().Get(cfg.QueryField)); token != "" {
 			return token
 		}
 	}
@@ -304,7 +304,7 @@ func submittedCSRFToken(c *web.Context, cfg CSRFConfig) string {
 
 func validOrigin(c *web.Context, cfg CSRFConfig) bool {
 	// Sec-Fetch-Site is tamper-proof in modern browsers; use it first.
-	switch strings.ToLower(strings.TrimSpace(c.Headers.Get("Sec-Fetch-Site"))) {
+	switch strings.ToLower(strings.TrimSpace(c.Headers().Get("Sec-Fetch-Site"))) {
 	case "same-origin", "none":
 		return true
 	case "cross-site":
@@ -312,9 +312,9 @@ func validOrigin(c *web.Context, cfg CSRFConfig) bool {
 	}
 
 	requestOrigin := sameOriginBase(c)
-	origin := strings.TrimSpace(c.Headers.Get("Origin"))
+	origin := strings.TrimSpace(c.Headers().Get("Origin"))
 	if origin == "" {
-		referer := strings.TrimSpace(c.Headers.Get("Referer"))
+		referer := strings.TrimSpace(c.Headers().Get("Referer"))
 		if referer == "" {
 			return true
 		}
@@ -343,22 +343,22 @@ func sameOriginBase(c *web.Context) string {
 	if c == nil {
 		return ""
 	}
-	if c.URL != nil && c.URL.Scheme != "" && c.URL.Host != "" {
-		return c.URL.Scheme + "://" + c.URL.Host
+	if c.URL() != nil && c.URL().Scheme != "" && c.URL().Host != "" {
+		return c.URL().Scheme + "://" + c.URL().Host
 	}
 
 	host := c.Request.Host()
-	if host == "" && c.URL != nil {
-		host = c.URL.Host
+	if host == "" && c.URL() != nil {
+		host = c.URL().Host
 	}
 	if host == "" {
 		return ""
 	}
 
 	scheme := "http"
-	if c.URL != nil && c.URL.Scheme != "" {
-		scheme = c.URL.Scheme
-	} else if strings.EqualFold(c.Headers.Get("X-Forwarded-Proto"), "https") {
+	if c.URL() != nil && c.URL().Scheme != "" {
+		scheme = c.URL().Scheme
+	} else if strings.EqualFold(c.Headers().Get("X-Forwarded-Proto"), "https") {
 		scheme = "https"
 	}
 	return scheme + "://" + host

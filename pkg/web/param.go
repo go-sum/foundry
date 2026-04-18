@@ -167,3 +167,16 @@ func ParamEnum(c *Context, name string, allowed ...string) (string, error) {
 		Message: fmt.Sprintf("route parameter %q has invalid value %q", name, raw),
 	}
 }
+
+// PathParam extracts and parses a named route parameter into type T.
+// T must be one of: string, int, int64, float64, bool.
+// Returns a *Error with status 400 if the parameter is missing or cannot be parsed.
+// For richer types (UUID validation, time parsing, enum sets), use the typed Param* functions.
+func PathParam[T Scalar](c *Context, name string) (T, error) {
+	var zero T
+	raw := c.Param(name)
+	if raw == "" {
+		return zero, ErrBadRequest(fmt.Sprintf("route parameter %q is missing or empty", name))
+	}
+	return parseScalar[T](raw, "route parameter", name)
+}

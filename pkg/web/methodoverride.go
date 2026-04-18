@@ -44,15 +44,14 @@ func MethodOverride(cfg MethodOverrideConfig) Middleware {
 
 	return func(next Handler) Handler {
 		return func(c *Context) (Response, error) {
-			if c.Method != "POST" {
+			if c.Method() != "POST" {
 				return next(c)
 			}
 
 			// Header check first — no body read needed.
-			if headerVal := strings.TrimSpace(c.Headers.Get(cfg.Header)); headerVal != "" {
+			if headerVal := strings.TrimSpace(c.Headers().Get(cfg.Header)); headerVal != "" {
 				target := strings.ToUpper(headerVal)
 				if allowed[target] {
-					c.Method = target
 					c.Request.Method = target
 					return next(c)
 				}
@@ -67,7 +66,6 @@ func MethodOverride(cfg MethodOverrideConfig) Middleware {
 						if fieldVal := strings.TrimSpace(values.Get(cfg.FormField)); fieldVal != "" {
 							target := strings.ToUpper(fieldVal)
 							if allowed[target] {
-								c.Method = target
 								c.Request.Method = target
 							}
 						}

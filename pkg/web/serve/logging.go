@@ -21,8 +21,8 @@ func AccessLogMiddleware() web.Middleware {
 			latency := time.Since(start)
 
 			path := ""
-			if c.URL != nil {
-				path = c.URL.Path
+			if c.URL() != nil {
+				path = c.URL().Path
 			}
 
 			status := cmp.Or(resp.Status, http.StatusOK)
@@ -35,7 +35,7 @@ func AccessLogMiddleware() web.Middleware {
 			}
 
 			slog.LogAttrs(c.Context(), level, "http.request",
-				slog.String("method", c.Method),
+				slog.String("method", c.Method()),
 				slog.String("path", path),
 				slog.Int("status", status),
 				slog.Int64("latency_ms", latency.Milliseconds()),

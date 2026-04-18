@@ -2,6 +2,8 @@ package serve
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -107,6 +109,41 @@ func NewServer(handler web.Handler, cfg ServerConfig) *http.Server {
 // Shutdown gracefully drains the server within the context deadline, then closes it.
 func Shutdown(ctx context.Context, srv *http.Server) error {
 	return srv.Shutdown(ctx)
+}
+
+// ListenAndServeGracefully starts the HTTP server and blocks until ctx is canceled,
+// then gracefully shuts down within cfg.ShutdownTimeout (defaulting to 15 seconds).
+// Signal handling is the caller's responsibility — use signal.NotifyContext in main.
+func ListenAndServeGracefully(ctx context.Context, handler web.Handler, cfg ServerConfig) error {
+	srv := NewServer(handler, cfg)
+
+	serveErr := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serveErr <- err
+		}
+		close(serveErr)
+	}()
+
+	select {
+	case err := <-serveErr:
+		return err
+	case <-ctx.Done():
+	}
+
+	timeout := cfg.ShutdownTimeout
+	if timeout == 0 {
+		timeout = 15 * time.Second
+	}
+	shutCtx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := Shutdown(shutCtx, srv); err != nil {
+		return fmt.Errorf("web/serve: shutdown: %w", err)
+	}
+	if err, ok := <-serveErr; ok {
+		return fmt.Errorf("web/serve: listen: %w", err)
+	}
+	return nil
 }
 
 // logWriter bridges the ErrorLog interface to log.Logger's io.Writer interface.

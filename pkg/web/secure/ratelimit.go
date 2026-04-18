@@ -188,7 +188,7 @@ func RealIPFromTrustedXFF(trustedProxies ...string) (func(c *web.Context) string
 			return c.Request.RemoteAddr()
 		}
 
-		xff := c.Headers.Get("X-Forwarded-For")
+		xff := c.Headers().Get("X-Forwarded-For")
 		if xff == "" {
 			return remoteIP.String()
 		}
@@ -220,7 +220,7 @@ func RealIPFromForwarded(trustedProxies ...string) (func(c *web.Context) string,
 			return c.Request.RemoteAddr()
 		}
 
-		fwdHeader := c.Headers.Get("Forwarded")
+		fwdHeader := c.Headers().Get("Forwarded")
 		if fwdHeader == "" {
 			return remoteIP.String()
 		}

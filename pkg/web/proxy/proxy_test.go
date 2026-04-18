@@ -436,7 +436,7 @@ func TestReverse_ForwardProto(t *testing.T) {
 		h := Reverse(target, Options{ForwardProto: true})
 		c := newTestContext(http.MethodGet, "/")
 		// Simulate an HTTPS request by setting URL.Scheme on the context.
-		c.URL.Scheme = "https"
+		c.Request.URL.Scheme = "https"
 
 		resp, _ := h(c)
 		if resp.Body != nil {
@@ -453,7 +453,7 @@ func TestReverse_ForwardProto(t *testing.T) {
 		gotProto = ""
 		h := Reverse(target, Options{ForwardProto: false})
 		c := newTestContext(http.MethodGet, "/")
-		c.URL.Scheme = "https"
+		c.Request.URL.Scheme = "https"
 
 		resp, _ := h(c)
 		if resp.Body != nil {

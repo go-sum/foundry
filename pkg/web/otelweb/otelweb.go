@@ -37,7 +37,7 @@ func Middleware(tracer trace.Tracer) web.Middleware {
 				status = http.StatusOK
 			}
 			span.SetAttributes(
-				attribute.String("http.request.method", c.Method),
+				attribute.String("http.request.method", c.Method()),
 				attribute.Int("http.response.status_code", status),
 			)
 
@@ -94,5 +94,5 @@ func ExtractSpanID() func(*web.Context) string {
 
 // spanName returns a concise name for the server span.
 func spanName(c *web.Context) string {
-	return c.Method + " " + c.URL.Path
+	return c.Method() + " " + c.URL().Path
 }

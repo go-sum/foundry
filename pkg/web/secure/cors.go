@@ -82,7 +82,7 @@ func CORS(cfg CORSConfig) web.Middleware {
 				return next(c)
 			}
 
-			origin := strings.TrimSpace(c.Headers.Get("Origin"))
+			origin := strings.TrimSpace(c.Headers().Get("Origin"))
 			preflight := isPreflight(c)
 			if origin == "" {
 				if preflight && !cfg.PreflightContinue {
@@ -122,7 +122,7 @@ func CORS(cfg CORSConfig) web.Middleware {
 					allowHeaders = normalizeHeaderList(cfg.AllowHeadersFunc(c), false)
 				}
 				if allowHeaders == "" {
-					if requested := strings.TrimSpace(c.Headers.Get("Access-Control-Request-Headers")); requested != "" {
+					if requested := strings.TrimSpace(c.Headers().Get("Access-Control-Request-Headers")); requested != "" {
 						baseHeaders.Set("Access-Control-Allow-Headers", requested)
 						vary.Add("Access-Control-Request-Headers")
 					}
@@ -131,7 +131,7 @@ func CORS(cfg CORSConfig) web.Middleware {
 				}
 
 				if cfg.AllowPrivateNetwork &&
-					strings.EqualFold(c.Headers.Get("Access-Control-Request-Private-Network"), "true") {
+					strings.EqualFold(c.Headers().Get("Access-Control-Request-Private-Network"), "true") {
 					baseHeaders.Set("Access-Control-Allow-Private-Network", "true")
 					vary.Add("Access-Control-Request-Private-Network")
 				}
@@ -189,7 +189,7 @@ func allowOriginHeader(allowedOrigin string, requestOrigin string, allowCredenti
 }
 
 func isPreflight(c *web.Context) bool {
-	return c.Method == http.MethodOptions && c.Headers.Has("Access-Control-Request-Method")
+	return c.Method() == http.MethodOptions && c.Headers().Has("Access-Control-Request-Method")
 }
 
 func normalizeHeaderList(values []string, upper bool) string {

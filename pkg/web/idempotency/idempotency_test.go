@@ -22,7 +22,7 @@ func makeContext(method string) *web.Context {
 
 func makeContextWithHeader(method, headerKey, headerVal string) *web.Context {
 	c := makeContext(method)
-	c.Headers.Set(headerKey, headerVal)
+	c.Request.Headers.Set(headerKey, headerVal)
 	return c
 }
 

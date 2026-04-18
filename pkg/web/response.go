@@ -79,11 +79,7 @@ func JSON(status int, v any) Response {
 	return Response{Status: status, Headers: h, Body: pr}
 }
 
-// StreamJSON returns a JSON response that encodes v lazily in a goroutine.
-// The response body is a streaming io.Pipe reader; encoding errors surface
-// as an abrupt body close after headers have already been sent.
-// Use this when v is large or when avoiding a full marshal-to-buffer allocation matters.
-// For small, error-safe payloads, JSON is identical in behavior.
+// Deprecated: StreamJSON is identical to JSON. Use JSON instead.
 func StreamJSON(status int, v any) Response {
 	return JSON(status, v)
 }
@@ -111,8 +107,8 @@ func Problem(c *Context, e *Error) Response {
 	}
 
 	instance := e.Instance
-	if instance == "" && c != nil && c.URL != nil {
-		instance = c.URL.Path
+	if instance == "" && c != nil && c.URL() != nil {
+		instance = c.URL().Path
 	}
 	if instance != "" {
 		doc["instance"] = instance
