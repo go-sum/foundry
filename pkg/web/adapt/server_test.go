@@ -14,7 +14,7 @@ func TestNewServer_DefaultTimeouts(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	srv := NewServer("", handler, ServerOptions{})
+	srv := NewServer(handler, ServerConfig{})
 
 	if srv.Addr != ":8080" {
 		t.Errorf("Addr = %q, want %q", srv.Addr, ":8080")
@@ -41,7 +41,8 @@ func TestNewServer_CustomTimeouts(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	opts := ServerOptions{
+	cfg := ServerConfig{
+		Addr:              ":9090",
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -49,7 +50,7 @@ func TestNewServer_CustomTimeouts(t *testing.T) {
 		MaxHeaderBytes:    512 * 1024,
 	}
 
-	srv := NewServer(":9090", handler, opts)
+	srv := NewServer(handler, cfg)
 
 	if srv.Addr != ":9090" {
 		t.Errorf("Addr = %q, want %q", srv.Addr, ":9090")
@@ -76,7 +77,7 @@ func TestNewServer_HandlerNotNil(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	srv := NewServer("", handler, ServerOptions{})
+	srv := NewServer(handler, ServerConfig{})
 	if srv.Handler == nil {
 		t.Error("Handler = nil, want non-nil http.Handler")
 	}
@@ -87,7 +88,7 @@ func TestShutdown_NotListening(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	srv := NewServer("", handler, ServerOptions{})
+	srv := NewServer(handler, ServerConfig{})
 	err := Shutdown(context.Background(), srv)
 	if err != nil {
 		t.Errorf("Shutdown returned error for non-listening server: %v", err)

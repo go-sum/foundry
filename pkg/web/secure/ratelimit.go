@@ -268,3 +268,14 @@ func trustedProxy(addr netip.Addr, prefixes []netip.Prefix) bool {
 	}
 	return false
 }
+
+// RateLimitProfile is the env-facing shape for rate limit configuration.
+type RateLimitProfile struct {
+	Capacity  int
+	RefillPer time.Duration
+}
+
+// DefaultRateLimitProfile returns a zero-valued rate limit profile.
+func DefaultRateLimitProfile() RateLimitProfile {
+	return RateLimitProfile{}
+}

@@ -4,9 +4,9 @@ import (
 	"github.com/go-sum/web"
 )
 
-// defaultCSPWithNonce is the CSP policy used by SecureDefaults. It includes
+// DefaultCSPTemplate is the CSP policy used by SecureDefaults. It includes
 // 'nonce-{nonce}' placeholders that CSPNonce replaces with a fresh per-request value.
-const defaultCSPWithNonce = "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+const DefaultCSPTemplate = "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 
 // SecureDefaults returns a composite middleware that installs a production-ready
 // security baseline in a single call. It chains, in order:
@@ -23,7 +23,7 @@ const defaultCSPWithNonce = "default-src 'self'; script-src 'self' 'nonce-{nonce
 func SecureDefaults() web.Middleware {
 	async := web.AsyncContext()
 	hdrs := Headers(DefaultHeadersConfig())
-	nonce := CSPNonce(CSPNonceConfig{CSPTemplate: defaultCSPWithNonce})
+	nonce := CSPNonce(CSPNonceConfig{CSPTemplate: DefaultCSPTemplate})
 
 	return func(next web.Handler) web.Handler {
 		// Execution order on request:  async → hdrs → nonce → handler

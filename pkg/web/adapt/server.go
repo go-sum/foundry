@@ -17,8 +17,10 @@ const (
 	defaultMaxHeaderBytes    = 1 << 20 // 1 MiB
 )
 
-// ServerOptions configures NewServer.
-type ServerOptions struct {
+// ServerConfig configures NewServer.
+type ServerConfig struct {
+	// Addr is the TCP address for the server to listen on. Defaults to ":8080".
+	Addr string
 	// ReadHeaderTimeout is the max time to read request headers. Defaults to 10s.
 	ReadHeaderTimeout time.Duration
 	// ReadTimeout is the max time to read the full request (headers + body). Defaults to 30s.
@@ -27,49 +29,67 @@ type ServerOptions struct {
 	WriteTimeout time.Duration
 	// IdleTimeout is the max time an idle keep-alive connection may linger. Defaults to 120s.
 	IdleTimeout time.Duration
+	// ShutdownTimeout is the max time to wait for active connections to drain on shutdown.
+	ShutdownTimeout time.Duration
 	// MaxHeaderBytes limits the request header size. Defaults to 1 MiB.
 	MaxHeaderBytes int
+	// TrustedProxies lists CIDR prefixes of trusted reverse proxies.
+	TrustedProxies []string
 	// ErrorLog is used for http.Server.ErrorLog. If nil, output goes to stderr via log package.
 	ErrorLog interface{ Printf(format string, v ...any) }
 }
 
+// DefaultServerConfig returns production-grade server defaults.
+func DefaultServerConfig() ServerConfig {
+	return ServerConfig{
+		Addr:              ":8080",
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		ShutdownTimeout:   15 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
+}
+
 // NewServer creates a *http.Server with handler adapted via ToHTTPHandler, using
-// production-safe timeouts and the given options. Addr defaults to ":8080".
+// production-safe timeouts and the given config. cfg.Addr defaults to ":8080".
 //
 // Use Shutdown to drain active connections gracefully.
-func NewServer(addr string, handler web.Handler, opts ServerOptions) *http.Server {
+func NewServer(handler web.Handler, cfg ServerConfig) *http.Server {
+	addr := cfg.Addr
 	if addr == "" {
 		addr = ":8080"
 	}
 
-	readHeaderTimeout := opts.ReadHeaderTimeout
+	readHeaderTimeout := cfg.ReadHeaderTimeout
 	if readHeaderTimeout == 0 {
 		readHeaderTimeout = defaultReadHeaderTimeout
 	}
 
-	readTimeout := opts.ReadTimeout
+	readTimeout := cfg.ReadTimeout
 	if readTimeout == 0 {
 		readTimeout = defaultReadTimeout
 	}
 
-	writeTimeout := opts.WriteTimeout
+	writeTimeout := cfg.WriteTimeout
 	if writeTimeout == 0 {
 		writeTimeout = defaultWriteTimeout
 	}
 
-	idleTimeout := opts.IdleTimeout
+	idleTimeout := cfg.IdleTimeout
 	if idleTimeout == 0 {
 		idleTimeout = defaultIdleTimeout
 	}
 
-	maxHeaderBytes := opts.MaxHeaderBytes
+	maxHeaderBytes := cfg.MaxHeaderBytes
 	if maxHeaderBytes == 0 {
 		maxHeaderBytes = defaultMaxHeaderBytes
 	}
 
 	var errorLog *log.Logger
-	if opts.ErrorLog != nil {
-		errorLog = log.New(logWriter{opts.ErrorLog}, "", 0)
+	if cfg.ErrorLog != nil {
+		errorLog = log.New(logWriter{cfg.ErrorLog}, "", 0)
 	}
 
 	return &http.Server{

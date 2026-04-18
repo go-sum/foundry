@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	cfgpkg "github.com/go-sum/config"
 	"github.com/go-sum/foundry/config"
 )
 
@@ -13,32 +12,34 @@ const validCSRFHex = "0000000000000000000000000000000000000000000000000000000000
 func TestLoad_UnsetEnv_UsesProduction_CookieSecureTrue(t *testing.T) {
 	t.Setenv("APP_ENV", "")
 	t.Setenv("SECURITY_CSRF_KEY", validCSRFHex)
+	t.Setenv("SITE_BASE_URL", "http://example.com")
 
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Env != cfgpkg.Production {
-		t.Errorf("cfg.Env = %q, want %q", cfg.Env, cfgpkg.Production)
+	if cfg.Env != config.Production {
+		t.Errorf("cfg.Env = %q, want %q", cfg.Env, config.Production)
 	}
-	if !cfg.Security.CSRF.CookieSecure {
-		t.Error("cfg.Security.CSRF.CookieSecure = false, want true for production")
+	if !cfg.CSRF.CookieSecure {
+		t.Error("cfg.CSRF.CookieSecure = false, want true for production")
 	}
 }
 
 func TestLoad_Development_CookieSecureFalse(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("SECURITY_CSRF_KEY", validCSRFHex)
+	t.Setenv("SITE_BASE_URL", "http://example.com")
 
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Env != cfgpkg.Development {
-		t.Errorf("cfg.Env = %q, want %q", cfg.Env, cfgpkg.Development)
+	if cfg.Env != config.Development {
+		t.Errorf("cfg.Env = %q, want %q", cfg.Env, config.Development)
 	}
-	if cfg.Security.CSRF.CookieSecure {
-		t.Error("cfg.Security.CSRF.CookieSecure = true, want false for development")
+	if cfg.CSRF.CookieSecure {
+		t.Error("cfg.CSRF.CookieSecure = true, want false for development")
 	}
 }
 
@@ -50,24 +51,25 @@ func TestLoad_Testing_ReturnsTestingEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Env != cfgpkg.Testing {
-		t.Errorf("cfg.Env = %q, want %q", cfg.Env, cfgpkg.Testing)
+	if cfg.Env != config.Testing {
+		t.Errorf("cfg.Env = %q, want %q", cfg.Env, config.Testing)
 	}
 }
 
-func TestLoad_UnknownEnv_FallsBackToProduction(t *testing.T) {
+func TestLoad_UnknownEnv_PassesThroughWithNoOverlay(t *testing.T) {
 	t.Setenv("APP_ENV", "staging")
 	t.Setenv("SECURITY_CSRF_KEY", validCSRFHex)
+	t.Setenv("SITE_BASE_URL", "http://example.com")
 
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Env != cfgpkg.Production {
-		t.Errorf("cfg.Env = %q, want %q", cfg.Env, cfgpkg.Production)
+	if cfg.Env != "staging" {
+		t.Errorf("cfg.Env = %q, want %q", cfg.Env, "staging")
 	}
-	if !cfg.Security.CSRF.CookieSecure {
-		t.Error("cfg.Security.CSRF.CookieSecure = false, want true for production fallback")
+	if !cfg.CSRF.CookieSecure {
+		t.Error("cfg.CSRF.CookieSecure = false, want true (no overlay applied for unknown env)")
 	}
 }
 
@@ -123,12 +125,13 @@ func TestLoad_MissingCSRFKey_ErrorMentionsEnvVar(t *testing.T) {
 func TestLoad_ValidConfig_EnvFieldSet(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("SECURITY_CSRF_KEY", validCSRFHex)
+	t.Setenv("SITE_BASE_URL", "http://example.com")
 
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Env != cfgpkg.Development {
-		t.Errorf("cfg.Env = %q, want %q", cfg.Env, cfgpkg.Development)
+	if cfg.Env != config.Development {
+		t.Errorf("cfg.Env = %q, want %q", cfg.Env, config.Development)
 	}
 }

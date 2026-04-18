@@ -16,6 +16,40 @@ const (
 	defaultMaxSize = 4096
 )
 
+// Settings is the env-facing shape for session configuration.
+type Settings struct {
+	CookieName   string        `validate:"required"`
+	IdleTTL      time.Duration
+	AbsoluteTTL  time.Duration
+	CookieSecure bool
+}
+
+// DefaultSettings returns production-grade session defaults.
+func DefaultSettings() Settings {
+	return Settings{
+		CookieName:   "session",
+		IdleTTL:      30 * time.Minute,
+		AbsoluteTTL:  24 * time.Hour,
+		CookieSecure: true,
+	}
+}
+
+// NewConfig builds a session Config from Settings and a Store.
+func NewConfig(s Settings, store Store) Config {
+	return Config{
+		Store: store,
+		CookieTemplate: web.Cookie{
+			Name:     s.CookieName,
+			Path:     "/",
+			HTTPOnly: true,
+			SameSite: "Lax",
+			Secure:   s.CookieSecure,
+		},
+		TTL:     s.AbsoluteTTL,
+		IdleTTL: s.IdleTTL,
+	}
+}
+
 // Config configures the session Middleware.
 type Config struct {
 	// Store handles session persistence. Required.

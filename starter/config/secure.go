@@ -8,27 +8,18 @@ import (
 	"github.com/go-sum/web/secure"
 )
 
-type SecureConfig struct {
-	CSRF secure.CSRFConfig
-}
-
-func defaultSecure() (SecureConfig, error) {
+func defaultCSRF() (secure.CSRFConfig, error) {
 	keyHex := cfgpkg.ExpandSecret("SECURITY_CSRF_KEY")
 	if keyHex == "" {
-		return SecureConfig{}, fmt.Errorf("%w: set SECURITY_CSRF_KEY environment variable", ErrCSRFKeyMissing)
+		return secure.CSRFConfig{}, fmt.Errorf("%w: set SECURITY_CSRF_KEY environment variable", ErrCSRFKeyMissing)
 	}
-
-	csrf, err := secure.NewCSRFConfigFromHex(
-		keyHex,
-		cfgpkg.ExpandSecret("SECURITY_CSRF_KEY_PREVIOUS"),
-	)
+	csrf, err := secure.NewCSRFConfigFromHex(keyHex, cfgpkg.ExpandSecret("SECURITY_CSRF_KEY_PREVIOUS"))
 	if err != nil {
 		if errors.Is(err, secure.ErrCSRFPreviousKeys) {
-			return SecureConfig{}, fmt.Errorf("%w: %w", ErrCSRFPrevKeysInvalid, err)
+			return secure.CSRFConfig{}, fmt.Errorf("%w: %w", ErrCSRFPrevKeysInvalid, err)
 		}
-		return SecureConfig{}, fmt.Errorf("%w: %w", ErrCSRFKeyInvalid, err)
+		return secure.CSRFConfig{}, fmt.Errorf("%w: %w", ErrCSRFKeyInvalid, err)
 	}
 	csrf.CookieSecure = true
-	return SecureConfig{CSRF: csrf}, nil
+	return csrf, nil
 }
-

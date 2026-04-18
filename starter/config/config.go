@@ -4,42 +4,55 @@ import (
 	"fmt"
 
 	cfgpkg "github.com/go-sum/config"
+	"github.com/go-sum/web/adapt"
+	"github.com/go-sum/web/secure"
+	"github.com/go-sum/web/session"
+	"github.com/go-sum/web/site"
+	"github.com/go-sum/web/static"
 )
 
+// Config is the complete application configuration.
 type Config struct {
-	Env      cfgpkg.Env
-	Security SecureConfig
-}
-
-var envOverlays = map[cfgpkg.Env]func(*Config){
-	cfgpkg.Development: devOverlay,
-	cfgpkg.Testing:     testOverlay,
+	Assets    static.AssetsConfig
+	CSP       secure.CSPNonceConfig
+	CSRF      secure.CSRFConfig
+	Env       Env
+	Headers   secure.HeadersConfig
+	RateLimit secure.RateLimitProfile
+	Server    adapt.ServerConfig
+	Session   session.Settings
+	Site      site.Config
 }
 
 func Load() (*Config, error) {
-	cfg, err := productionDefault()
+	cfg, err := LoadEnv()
 	if err != nil {
 		return nil, err
 	}
-	cfg.Env = cfgpkg.CurrentEnv()
-
-	if apply, ok := envOverlays[cfg.Env]; ok {
-		apply(&cfg)
-	}
 
 	if err := cfgpkg.Validate(cfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config: %w", err)
 	}
 	return &cfg, nil
 }
 
-func productionDefault() (Config, error) {
-	sec, err := defaultSecure()
+func defaultProduction() (Config, error) {
+	csrf, err := defaultCSRF()
 	if err != nil {
 		return Config{}, fmt.Errorf("config: security: %w", err)
 	}
+	assets := static.DefaultAssetsConfig()
+	assets.PublicDir = "starter/public/static"
+
 	return Config{
-		Env:      cfgpkg.Production,
-		Security: sec,
+		Assets:    assets,
+		CSP:       secure.CSPNonceConfig{CSPTemplate: secure.DefaultCSPTemplate},
+		CSRF:      csrf,
+		Env:       Production,
+		Headers:   secure.DefaultHeadersConfig(),
+		RateLimit: secure.DefaultRateLimitProfile(),
+		Server:    adapt.DefaultServerConfig(),
+		Session:   session.DefaultSettings(),
+		Site:      site.Config{BaseURL: cfgpkg.ExpandEnv("SITE_BASE_URL", "")},
 	}, nil
 }

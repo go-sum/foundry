@@ -12,6 +12,20 @@ import (
 	"github.com/go-sum/web/headers"
 )
 
+// AssetsConfig is the env-facing shape for static asset serving.
+type AssetsConfig struct {
+	PublicDir string `validate:"required"`
+	URLPrefix string `validate:"required"`
+}
+
+// DefaultAssetsConfig returns generic static asset defaults.
+func DefaultAssetsConfig() AssetsConfig {
+	return AssetsConfig{
+		PublicDir: "public/static",
+		URLPrefix: "/static",
+	}
+}
+
 // Options configures the Static handler.
 type Options struct {
 	// IndexFiles is the list of filenames to serve for directory requests.
