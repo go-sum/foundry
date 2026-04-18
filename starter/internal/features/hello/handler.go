@@ -24,7 +24,7 @@ func NewHandler(getRoutes func() []router.Route) *Handler {
 // Greeting renders just the greeting fragment for HTMX partial swaps.
 // It reads the name from the query parameter sent by hx-include.
 func (h *Handler) Greeting(c *web.Context) (web.Response, error) {
-	name := c.URL.Query().Get("name")
+	name := c.URL().Query().Get("name")
 	if name == "" {
 		name = "World"
 	}
@@ -37,7 +37,6 @@ func (h *Handler) Show(c *web.Context) (web.Response, error) {
 	if name == "" {
 		name = "World"
 	}
-	// Canonical validation pattern — copy this in new features.
 	if !isValidName(name) {
 		return web.Response{}, web.ErrBadRequest("name must be 1–64 letters only")
 	}
@@ -45,7 +44,6 @@ func (h *Handler) Show(c *web.Context) (web.Response, error) {
 	return view.Render(vr, page.HelloPage(vr, name), page.HelloPartial(name))
 }
 
-// isValidName is unexported — validate inputs at handler boundaries.
 func isValidName(name string) bool {
 	if len(name) == 0 || len(name) > 64 {
 		return false

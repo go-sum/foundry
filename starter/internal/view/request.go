@@ -6,6 +6,8 @@ import (
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/render"
 	"github.com/go-sum/web/router"
+	"github.com/go-sum/web/secure"
+	"github.com/go-sum/web/session"
 
 	g "maragu.dev/gomponents"
 )
@@ -55,20 +57,35 @@ func WithFlash(messages ...string) RequestOption {
 }
 
 // NewRequest builds request-scoped presentation state from a web.Context.
+// Fields are auto-populated from context values (RequestID, CSRFToken, Nonce,
+// Flash); explicit WithX options run after and override auto-populated values.
 func NewRequest(c *web.Context, routes []router.Route, opts ...RequestOption) Request {
 	currentPath := ""
 	headers := web.NewHeaders()
-	if c != nil && c.URL != nil {
-		currentPath = c.URL.Path
+	if c != nil && c.URL() != nil {
+		currentPath = c.URL().Path
 	}
 	if c != nil {
-		headers = c.Headers
+		headers = c.Headers()
 	}
+
 	r := Request{
 		CurrentPath: currentPath,
 		HTMX:        NewHTMXRequest(headers),
 		Routes:      routes,
 	}
+
+	if c != nil {
+		r.RequestID = web.RequestID(c)
+		r.CSRFToken = secure.CSRFToken(c)
+		r.Nonce = secure.Nonce(c)
+		if sess, ok := session.FromContext(c); ok {
+			if msgs, popped, _ := session.FlashPop[[]string](sess, "flash"); popped {
+				r.Flash = msgs
+			}
+		}
+	}
+
 	for _, opt := range opts {
 		opt(&r)
 	}
@@ -96,8 +113,11 @@ func (r Request) IsPartial() bool {
 // Page wraps children with the shared application layout.
 func (r Request) Page(title string, children ...g.Node) g.Node {
 	return layout.Page(layout.Props{
-		Title:    title,
-		Children: children,
+		Title:     title,
+		Nonce:     r.Nonce,
+		CSRFToken: r.CSRFToken,
+		Flash:     r.Flash,
+		Children:  children,
 	})
 }
 

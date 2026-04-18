@@ -1,6 +1,7 @@
 go 1.26.0
 
 use (
+	./pkg/componentry
 	./pkg/config
 	./pkg/web
 	./pkg/web/render

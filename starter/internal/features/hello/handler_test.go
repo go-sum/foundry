@@ -33,6 +33,23 @@ func TestHandlerGreeting(t *testing.T) {
 	}
 }
 
+func TestHandlerGreeting_EmptyName_DefaultsToWorld(t *testing.T) {
+	h := NewHandler(func() []router.Route { return nil })
+
+	u, _ := url.Parse("/hello/greeting")
+	req := web.NewRequest(http.MethodGet, u)
+	resp, err := h.Greeting(web.NewContext(context.Background(), req))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	want := render.RenderNode(t, page.HelloPartial("World"))
+	if string(body) != want {
+		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", string(body), want)
+	}
+}
+
 func TestHandlerShow(t *testing.T) {
 	h := NewHandler(func() []router.Route { return nil })
 

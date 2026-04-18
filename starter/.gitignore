@@ -1,6 +1,7 @@
 .DS_Store
 
 bin/
+public/static/
 tmp/
 
 .env

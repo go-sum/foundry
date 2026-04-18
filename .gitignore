@@ -6,6 +6,7 @@
 .projects/
 
 bin/
+public/static/
 tmp/
 
 *.test

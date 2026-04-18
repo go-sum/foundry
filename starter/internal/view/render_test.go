@@ -77,3 +77,22 @@ func TestRenderWithStatus(t *testing.T) {
 		t.Errorf("Status = %d, want %d", resp.Status, http.StatusCreated)
 	}
 }
+
+func TestRenderWithStatus_Partial(t *testing.T) {
+	full := h.Div(g.Text("full"))
+	partial := h.Span(g.Text("partial"))
+
+	req := Request{HTMX: HTMXRequest{Enabled: true}}
+	resp := RenderWithStatus(req, http.StatusCreated, full, partial)
+
+	if resp.Status != http.StatusCreated {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusCreated)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	want := render.RenderNode(t, partial)
+	if string(body) != want {
+		t.Errorf("partial body = %q, want %q", string(body), want)
+	}
+}
