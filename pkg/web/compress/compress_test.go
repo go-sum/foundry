@@ -7,9 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/andybalholm/brotli"
 	"github.com/go-sum/web"
 )
 
@@ -68,6 +70,17 @@ func decompressDeflate(t *testing.T, r io.Reader) string {
 	return string(data)
 }
 
+// decompressBrotli decompresses brotli-encoded data.
+func decompressBrotli(t *testing.T, r io.Reader) string {
+	t.Helper()
+	br := brotli.NewReader(r)
+	data, err := io.ReadAll(br)
+	if err != nil {
+		t.Fatalf("reading brotli: %v", err)
+	}
+	return string(data)
+}
+
 // largeBody produces a string of length > 1024 bytes.
 func largeBody() string {
 	return strings.Repeat("Hello, World! This is compressible text content. ", 30)
@@ -116,6 +129,24 @@ func TestMiddleware(t *testing.T) {
 		wantCompressed bool
 		wantBody       string
 	}{
+		{
+			name:           "brotli accepted compresses html",
+			acceptEncoding: "br",
+			handler:        htmlHandler(body),
+			wantEncoding:   "br",
+			wantVary:       true,
+			wantCompressed: true,
+			wantBody:       body,
+		},
+		{
+			name:           "brotli preferred over gzip when both accepted",
+			acceptEncoding: "br, gzip",
+			handler:        htmlHandler(body),
+			wantEncoding:   "br",
+			wantVary:       true,
+			wantCompressed: true,
+			wantBody:       body,
+		},
 		{
 			name:           "gzip accepted compresses html",
 			acceptEncoding: "gzip",
@@ -261,6 +292,11 @@ func TestMiddleware(t *testing.T) {
 			if tt.wantCompressed {
 				var got string
 				switch tt.wantEncoding {
+				case "br":
+					got = decompressBrotli(t, resp.Body)
+					if resp.Body != nil {
+						resp.Body.Close()
+					}
 				case "gzip":
 					got = decompressGzip(t, resp.Body)
 					if resp.Body != nil {
@@ -340,6 +376,88 @@ func TestIsCompressible(t *testing.T) {
 			got := isCompressible(tt.ct, allowed)
 			if got != tt.want {
 				t.Errorf("isCompressible(%q) = %v, want %v", tt.ct, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMiddlewareContentLengthShortcut(t *testing.T) {
+	body := largeBody()
+	minSize := 1024
+
+	tests := []struct {
+		name           string
+		contentLength  string
+		bodyStr        string
+		wantEncoding   string
+		wantCompressed bool
+	}{
+		{
+			name:           "content-length >= minsize compresses without buffering",
+			contentLength:  strconv.Itoa(len(body)),
+			bodyStr:        body,
+			wantEncoding:   "gzip",
+			wantCompressed: true,
+		},
+		{
+			name:          "content-length < minsize skips compression",
+			contentLength: strconv.Itoa(minSize - 1),
+			bodyStr:       smallBody(),
+			wantEncoding:  "",
+		},
+		{
+			name:          "content-length equal to minsize compresses",
+			contentLength: strconv.Itoa(minSize),
+			bodyStr:       body,
+			wantEncoding:  "gzip",
+			wantCompressed: true,
+		},
+		{
+			name:          "malformed content-length falls back to buffering",
+			contentLength: "not-a-number",
+			bodyStr:       body,
+			wantEncoding:  "gzip",
+			wantCompressed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := func(c *web.Context) (web.Response, error) {
+				h := web.NewHeaders()
+				h.Set("Content-Type", "text/html; charset=UTF-8")
+				if tt.contentLength != "" {
+					h.Set("Content-Length", tt.contentLength)
+				}
+				return web.Response{
+					Status:  http.StatusOK,
+					Headers: h,
+					Body:    io.NopCloser(strings.NewReader(tt.bodyStr)),
+				}, nil
+			}
+
+			mw := Middleware(Config{})
+			c := makeContext("gzip")
+			resp, _ := mw(handler)(c)
+
+			gotEncoding := resp.Headers.Get("Content-Encoding")
+			if gotEncoding != tt.wantEncoding {
+				t.Errorf("Content-Encoding = %q, want %q", gotEncoding, tt.wantEncoding)
+			}
+
+			if tt.wantCompressed {
+				got := decompressGzip(t, resp.Body)
+				if resp.Body != nil {
+					resp.Body.Close()
+				}
+				if got != tt.bodyStr {
+					t.Errorf("decompressed body = %q, want %q", got, tt.bodyStr)
+				}
+			} else {
+				got := bodyString(t, resp)
+				if got != tt.bodyStr {
+					t.Errorf("body = %q, want %q", got, tt.bodyStr)
+				}
 			}
 		})
 	}

@@ -3,12 +3,13 @@ module github.com/go-sum/web
 go 1.26.0
 
 require (
+	github.com/andybalholm/brotli v1.2.1
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/gorilla/schema v1.4.1
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
 	golang.org/x/crypto v0.50.0
-	golang.org/x/net v0.52.0
+	golang.org/x/net v0.53.0
 )
 
 require (

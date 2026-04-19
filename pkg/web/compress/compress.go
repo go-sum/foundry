@@ -1,5 +1,5 @@
 // Package compress provides a compression middleware for the web package.
-// It supports gzip and deflate encoding negotiated via Accept-Encoding.
+// It supports brotli, gzip, and deflate encoding negotiated via Accept-Encoding.
 package compress
 
 import (
@@ -7,9 +7,11 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/andybalholm/brotli"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/headers"
 )
@@ -29,6 +31,8 @@ var defaultAllowedTypes = []string{
 type Config struct {
 	// Level is the gzip/deflate compression level. Defaults to -1 (default compression).
 	Level int
+	// BrotliLevel is the brotli compression level (0–11). Defaults to brotli.DefaultCompression.
+	BrotliLevel int
 	// MinSize is the minimum response body size (in bytes) to compress. Defaults to 1024.
 	MinSize int
 	// AllowedTypes is a list of MIME type prefixes/suffixes to compress.
@@ -46,9 +50,8 @@ var gzipPool = sync.Pool{
 	},
 }
 
-// Middleware returns a web.Middleware that compresses response bodies using gzip
-// or deflate, negotiated via Accept-Encoding. Brotli is not supported (would
-// require a third-party dependency). The middleware:
+// Middleware returns a web.Middleware that compresses response bodies using brotli,
+// gzip, or deflate, negotiated via Accept-Encoding (brotli preferred). The middleware:
 //   - Skips responses with a pre-set Content-Encoding header.
 //   - Skips responses with status 206 (Partial Content).
 //   - Skips responses whose Content-Type does not match AllowedTypes.
@@ -64,6 +67,15 @@ func Middleware(cfg Config) web.Middleware {
 	if cfg.Level == 0 {
 		cfg.Level = gzip.DefaultCompression
 	}
+	if cfg.BrotliLevel == 0 {
+		cfg.BrotliLevel = brotli.DefaultCompression
+	}
+
+	brotliPool := &sync.Pool{
+		New: func() any {
+			return brotli.NewWriterLevel(io.Discard, cfg.BrotliLevel)
+		},
+	}
 
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
@@ -74,8 +86,8 @@ func Middleware(cfg Config) web.Middleware {
 
 			// Negotiate encoding from Accept-Encoding header.
 			ae, _ := headers.ParseAcceptEncoding(c.Headers().Get("Accept-Encoding"))
-			encoding := ae.Negotiate("gzip", "deflate", "identity")
-			if encoding != "gzip" && encoding != "deflate" {
+			encoding := ae.Negotiate("br", "gzip", "deflate", "identity")
+			if encoding != "br" && encoding != "gzip" && encoding != "deflate" {
 				return resp, nil
 			}
 
@@ -100,27 +112,40 @@ func Middleware(cfg Config) web.Middleware {
 				return resp, nil
 			}
 
-			// Buffer up to MinSize bytes to decide whether to compress.
-			buf := make([]byte, cfg.MinSize)
-			n, readErr := io.ReadFull(resp.Body, buf)
-			buf = buf[:n]
+			// Content-Length shortcut: skip buffer probe when body size is already known.
+			var buf []byte
+			if clStr := resp.Headers.Get("Content-Length"); clStr != "" {
+				if cl, err := strconv.ParseInt(clStr, 10, 64); err == nil {
+					if cl < int64(cfg.MinSize) {
+						return resp, nil
+					}
+					// cl >= MinSize: buf stays nil, fall through to compress.
+				}
+			} else {
+				// Buffer up to MinSize bytes to decide whether to compress.
+				probe := make([]byte, cfg.MinSize)
+				n, readErr := io.ReadFull(resp.Body, probe)
+				probe = probe[:n]
 
-			if readErr != nil && readErr != io.ErrUnexpectedEOF {
-				// Read error or EOF before MinSize — emit uncompressed.
-				_ = resp.Body.Close()
-				if n == 0 {
-					resp.Body = nil
+				if readErr != nil && readErr != io.ErrUnexpectedEOF {
+					// Read error or EOF before MinSize — emit uncompressed.
+					_ = resp.Body.Close()
+					if n == 0 {
+						resp.Body = nil
+						return resp, nil
+					}
+					resp.Body = io.NopCloser(strings.NewReader(string(probe)))
 					return resp, nil
 				}
-				resp.Body = io.NopCloser(strings.NewReader(string(buf)))
-				return resp, nil
-			}
 
-			if readErr == io.ErrUnexpectedEOF {
-				// Body was smaller than MinSize — emit uncompressed.
-				_ = resp.Body.Close()
-				resp.Body = io.NopCloser(strings.NewReader(string(buf)))
-				return resp, nil
+				if readErr == io.ErrUnexpectedEOF {
+					// Body was smaller than MinSize — emit uncompressed.
+					_ = resp.Body.Close()
+					resp.Body = io.NopCloser(strings.NewReader(string(probe)))
+					return resp, nil
+				}
+
+				buf = probe
 			}
 
 			// Body is >= MinSize — compress.
@@ -132,6 +157,14 @@ func Middleware(cfg Config) web.Middleware {
 				var werr error
 
 				switch encoding {
+				case "br":
+					bw := brotliPool.Get().(*brotli.Writer)
+					bw.Reset(pw)
+					compressor = bw
+					defer func() {
+						bw.Reset(io.Discard)
+						brotliPool.Put(bw)
+					}()
 				case "gzip":
 					gz := gzipPool.Get().(*gzip.Writer)
 					gz.Reset(pw)
@@ -149,11 +182,13 @@ func Middleware(cfg Config) web.Middleware {
 					}
 				}
 
-				// Write buffered bytes first.
-				if _, werr = compressor.Write(buf); werr != nil {
-					_ = pw.CloseWithError(werr)
-					_ = originalBody.Close()
-					return
+				// Write buffered bytes first (empty when Content-Length shortcut was taken).
+				if len(buf) > 0 {
+					if _, werr = compressor.Write(buf); werr != nil {
+						_ = pw.CloseWithError(werr)
+						_ = originalBody.Close()
+						return
+					}
 				}
 
 				// Stream remainder.
