@@ -122,6 +122,45 @@ func TestLoad_MissingCSRFKey_ErrorMentionsEnvVar(t *testing.T) {
 	}
 }
 
+func TestLoad_DefaultSessionStore_IsMemory(t *testing.T) {
+	t.Setenv("APP_ENV", "testing")
+	t.Setenv("SECURITY_CSRF_KEY", validCSRFHex)
+	t.Setenv("SESSION_STORE", "")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.SessionStore != "memory" {
+		t.Errorf("cfg.SessionStore = %q, want %q", cfg.SessionStore, "memory")
+	}
+}
+
+func TestLoad_SessionStore_Cookie(t *testing.T) {
+	t.Setenv("APP_ENV", "testing")
+	t.Setenv("SECURITY_CSRF_KEY", validCSRFHex)
+	t.Setenv("SESSION_STORE", "cookie")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.SessionStore != "cookie" {
+		t.Errorf("cfg.SessionStore = %q, want %q", cfg.SessionStore, "cookie")
+	}
+}
+
+func TestLoad_SessionStore_Invalid_ReturnsValidationError(t *testing.T) {
+	t.Setenv("APP_ENV", "testing")
+	t.Setenv("SECURITY_CSRF_KEY", validCSRFHex)
+	t.Setenv("SESSION_STORE", "redis")
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("expected validation error for invalid SESSION_STORE, got nil")
+	}
+}
+
 func TestLoad_ValidConfig_EnvFieldSet(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("SECURITY_CSRF_KEY", validCSRFHex)

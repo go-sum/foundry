@@ -13,15 +13,16 @@ import (
 
 // Config is the complete application configuration.
 type Config struct {
-	Assets    static.AssetsConfig
-	CSP       secure.CSPNonceConfig
-	CSRF      secure.CSRFConfig
-	Env       Env
-	Headers   secure.HeadersConfig
-	RateLimit secure.RateLimitProfile
-	Server    serve.ServerConfig
-	Session   session.Settings
-	Site      site.Config
+	Assets       static.AssetsConfig
+	CSP          secure.CSPNonceConfig
+	CSRF         secure.CSRFConfig
+	Env          Env
+	Headers      secure.HeadersConfig
+	RateLimit    secure.RateLimitProfile
+	Server       serve.ServerConfig
+	Session      session.Settings
+	SessionStore string `validate:"oneof=memory cookie"`
+	Site         site.Config
 }
 
 func Load() (*Config, error) {
@@ -46,13 +47,14 @@ func defaultProduction() (Config, error) {
 
 	return Config{
 		Assets:    assets,
-		CSP:       secure.CSPNonceConfig{CSPTemplate: secure.DefaultCSPTemplate},
+		CSP:       secure.DefaultCSPNonceConfig(),
 		CSRF:      csrf,
 		Env:       Production,
 		Headers:   secure.DefaultHeadersConfig(),
 		RateLimit: secure.DefaultRateLimitProfile(),
 		Server:    serve.DefaultServerConfig(),
-		Session:   session.DefaultSettings(),
-		Site:      site.Config{BaseURL: cfgpkg.ExpandEnv("SITE_BASE_URL", "")},
+		Session:      session.DefaultSettings(),
+		SessionStore: cfgpkg.ExpandEnv("SESSION_STORE", "memory"),
+		Site:         site.Config{BaseURL: cfgpkg.ExpandEnv("SITE_BASE_URL", "")},
 	}, nil
 }
