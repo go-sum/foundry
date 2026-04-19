@@ -3,10 +3,8 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"go.opentelemetry.io/otel/trace"
 
@@ -17,6 +15,7 @@ import (
 	"github.com/go-sum/web/secure"
 	"github.com/go-sum/web/serve"
 	"github.com/go-sum/web/session"
+	"github.com/go-sum/web/site"
 
 	config "github.com/go-sum/foundry/config"
 )
@@ -27,7 +26,7 @@ type App struct {
 	Security
 	Services
 	router       *router.Router
-	sessionStore *session.MemoryStore
+	sessionStore session.Store
 }
 
 // Runtime holds cross-cutting infrastructure dependencies.
@@ -41,12 +40,12 @@ type Runtime struct {
 type Security struct {
 	CSRF        secure.CSRFConfig
 	Headers     secure.HeadersConfig
-	CSPTemplate string
+	CSP         secure.CSPNonceConfig
 	Origins     []string
 	Session     session.Config
 }
 
-// Services is a placeholder for application service dependencies (populated from Stage B onward).
+// Services is a placeholder for application services
 type Services struct{}
 
 // New builds and wires the complete application. Returns an error on any
@@ -56,6 +55,8 @@ func New(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("runtime: %w", err)
 	}
+
+	provideAssets(runtime.Config)
 
 	security, store, err := provideSecurity(ctx, runtime)
 	if err != nil {
@@ -67,20 +68,22 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("services: %w", err)
 	}
 
-	routing := router.NewWithoutSecureDefaults()
+	routing := router.New()
 	routing.Use(
+		web.AsyncContext(),
 		otelweb.Middleware(runtime.Tracer),
 		web.WithRequestID(),
 		provideErrorBoundary(runtime, routing),
 		serve.AccessLogMiddleware(),
 		secure.Headers(security.Headers),
-		secure.CSPNonce(secure.CSPNonceConfig{CSPTemplate: security.CSPTemplate}),
+		secure.CSPNonce(security.CSP),
 		session.Middleware(security.Session),
 		secure.CSRF(security.CSRF),
 		htmx.VaryMiddleware(),
 	)
 
-	if err := RegisterRoutes(routing, security, runtime.Config.Assets); err != nil {
+	s := site.New(runtime.Config.Site)
+	if err := RegisterRoutes(routing, security, runtime.Config.Assets, s); err != nil {
 		return nil, fmt.Errorf("routes: %w", err)
 	}
 	routing.Freeze()
@@ -94,37 +97,8 @@ func New(ctx context.Context) (*App, error) {
 	}, nil
 }
 
-// Handler returns the application's root handler.
-func (a *App) Handler() web.Handler {
-	return func(c *web.Context) (web.Response, error) {
-		return a.router.Serve(c)
-	}
-}
-
 // Run starts the HTTP server, waits for ctx to be cancelled, then gracefully
 // shuts down within the configured shutdown timeout.
 func (a *App) Run(ctx context.Context) error {
-	srv := serve.NewServer(a.Handler(), a.Runtime.Config.Server)
-
-	errCh := make(chan error, 1)
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errCh <- err
-		}
-		close(errCh)
-	}()
-
-	<-ctx.Done()
-
-	sctx, cancel := context.WithTimeout(context.Background(), a.Runtime.Config.Server.ShutdownTimeout)
-	defer cancel()
-
-	if err := serve.Shutdown(sctx, srv); err != nil {
-		return fmt.Errorf("shutdown: %w", err)
-	}
-
-	if err, ok := <-errCh; ok {
-		return fmt.Errorf("serve: %w", err)
-	}
-	return nil
+	return serve.ListenAndServeGracefully(ctx, a.router.Serve, a.Runtime.Config.Server)
 }

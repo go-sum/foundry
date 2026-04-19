@@ -2,3 +2,4 @@
 
 /* Scan Go source files for Tailwind class names */
 @source "./**/*.go";
+@source "../pkg/componentry/**/*.go";

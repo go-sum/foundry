@@ -1,0 +1,42 @@
+paths:
+  source_dir: static
+  public_dir: starter/public/static
+  public_prefix: /static
+
+js:
+  downloads:
+    - name: htmx
+      version: "2.0.4"
+      url: "https://unpkg.com/htmx.org@{version}/dist/htmx.min.js"
+      target: js/htmx.min.js
+  bundles: []
+
+css:
+  - tool: tailwindcss
+    input: tailwind.css
+    output: css/app.css
+
+fonts:
+  downloads: []
+
+sprites:
+  lucide-icons:
+    enabled: true
+    target: img/svg/lucide-icons.svg
+    sources:
+      - path: "https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/"
+        files:
+          - "chevron-down.svg"
+          - "chevron-left.svg"
+          - "chevron-right.svg"
+          - "chevrons-up.svg"
+          - "x.svg"
+  theme-icons:
+    enabled: true
+    target: img/svg/theme-icons.svg
+    sources:
+      - path: "static/img/svg/"
+        files:
+          - "sun.svg"
+          - "moon.svg"
+          - "monitor.svg"

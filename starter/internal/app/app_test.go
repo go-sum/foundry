@@ -1,4 +1,4 @@
-package app_test
+package app
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/go-sum/foundry/internal/app"
 	"github.com/go-sum/web/serve"
 )
 
@@ -28,9 +27,9 @@ func setupTestEnv(t *testing.T) {
 	t.Setenv("TEST_STATIC_DIR", dir)
 }
 
-func mustNew(t *testing.T) *app.App {
+func mustNew(t *testing.T) *App {
 	t.Helper()
-	a, err := app.New(context.Background())
+	a, err := New(context.Background())
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -39,7 +38,7 @@ func mustNew(t *testing.T) *app.App {
 
 func TestApp_Healthz_Returns200(t *testing.T) {
 	setupTestEnv(t)
-	h := serve.ToHTTPHandler(mustNew(t).Handler())
+	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 
@@ -56,7 +55,7 @@ func TestApp_Healthz_Returns200(t *testing.T) {
 
 func TestApp_UnknownPath_Returns404(t *testing.T) {
 	setupTestEnv(t)
-	h := serve.ToHTTPHandler(mustNew(t).Handler())
+	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
 	req := httptest.NewRequest(http.MethodGet, "/definitely-does-not-exist", nil)
 	rec := httptest.NewRecorder()
 
@@ -69,7 +68,7 @@ func TestApp_UnknownPath_Returns404(t *testing.T) {
 
 func TestApp_GET_SetsRequestIDHeader(t *testing.T) {
 	setupTestEnv(t)
-	h := serve.ToHTTPHandler(mustNew(t).Handler())
+	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 
@@ -80,12 +79,43 @@ func TestApp_GET_SetsRequestIDHeader(t *testing.T) {
 	}
 }
 
+// TestApp_CookieSessionStore_BootsAndServesRequests verifies that the app starts
+// successfully when SESSION_STORE=cookie with a valid encryption key.
+func TestApp_CookieSessionStore_BootsAndServesRequests(t *testing.T) {
+	setupTestEnv(t)
+	t.Setenv("SESSION_STORE", "cookie")
+	// 32-byte AES key expressed as 64 hex chars.
+	t.Setenv("SECURITY_SESSION_KEY", "0000000000000000000000000000000000000000000000000000000000000002")
+
+	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+// TestApp_CookieSessionStore_MissingKey_ReturnsError verifies that New() returns
+// a descriptive error when SESSION_STORE=cookie but SECURITY_SESSION_KEY is absent.
+func TestApp_CookieSessionStore_MissingKey_ReturnsError(t *testing.T) {
+	setupTestEnv(t)
+	t.Setenv("SESSION_STORE", "cookie")
+	t.Setenv("SECURITY_SESSION_KEY", "")
+
+	_, err := New(context.Background())
+	if err == nil {
+		t.Fatal("expected error for missing SECURITY_SESSION_KEY, got nil")
+	}
+}
+
 // TestApp_GET_SetsSessionCookie verifies that the session middleware issues a
 // session cookie on the first request. CSRF uses session-backed tokens when a
 // session is present (no separate csrf double-submit cookie).
 func TestApp_GET_SetsSessionCookie(t *testing.T) {
 	setupTestEnv(t)
-	h := serve.ToHTTPHandler(mustNew(t).Handler())
+	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 
@@ -106,7 +136,7 @@ func TestApp_GET_SetsSessionCookie(t *testing.T) {
 
 func TestApp_GET_SetsSecurityHeaders(t *testing.T) {
 	setupTestEnv(t)
-	h := serve.ToHTTPHandler(mustNew(t).Handler())
+	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 

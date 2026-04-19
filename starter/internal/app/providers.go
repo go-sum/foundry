@@ -2,12 +2,19 @@ package app
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"strings"
 
 	"go.opentelemetry.io/otel/trace/noop"
 
+	cfgpkg "github.com/go-sum/config"
+	"github.com/go-sum/assets/publish"
+	"github.com/go-sum/componentry/assets/iconset"
+	"github.com/go-sum/componentry/icons"
 	"github.com/go-sum/web"
+	"github.com/go-sum/web/cookiecodec"
 	"github.com/go-sum/web/otelweb"
 	"github.com/go-sum/web/router"
 	"github.com/go-sum/web/session"
@@ -29,7 +36,22 @@ func provideRuntime(_ context.Context) (Runtime, error) {
 	}, nil
 }
 
-func provideSecurity(_ context.Context, runtime Runtime) (Security, *session.MemoryStore, error) {
+func provideAssets(cfg *config.Config) {
+	publish.MustInit(cfg.Assets.PublicDir, cfg.Assets.URLPrefix)
+	publish.RegisterSprites(iconset.Default.Sprites)
+	publish.SetPathFunc(publish.Path)
+
+	resolved := make(map[icons.Key]icons.Ref, len(iconset.Default.Icons))
+	for key, ref := range iconset.Default.Icons {
+		resolved[key] = icons.Ref{
+			Sprite: publish.SpritePath(ref.Sprite),
+			ID:     ref.ID,
+		}
+	}
+	icons.RegisterSet(resolved)
+}
+
+func provideSecurity(_ context.Context, runtime Runtime) (Security, session.Store, error) {
 	cfg := runtime.Config
 
 	origins := make([]string, 0, 1+len(cfg.Site.OriginAllowlist))
@@ -38,21 +60,46 @@ func provideSecurity(_ context.Context, runtime Runtime) (Security, *session.Mem
 	}
 	origins = append(origins, cfg.Site.OriginAllowlist...)
 
-	sessCfg, store := provideSession(runtime)
+	sessCfg, store, err := provideSession(runtime)
+	if err != nil {
+		return Security{}, nil, err
+	}
 
 	sec := Security{
 		CSRF:        cfg.CSRF,
 		Headers:     cfg.Headers,
-		CSPTemplate: cfg.CSP.CSPTemplate,
+		CSP: cfg.CSP,
 		Origins:     origins,
 		Session:     sessCfg,
 	}
 	return sec, store, nil
 }
 
-func provideSession(runtime Runtime) (session.Config, *session.MemoryStore) {
-	store := session.NewMemoryStore()
-	return session.NewConfig(runtime.Config.Session, store), store
+func provideSession(runtime Runtime) (session.Config, session.Store, error) {
+	var store session.Store
+	switch runtime.Config.SessionStore {
+	case "cookie":
+		keyHex := cfgpkg.ExpandSecret("SECURITY_SESSION_KEY")
+		if keyHex == "" {
+			return session.Config{}, nil, config.ErrSessionKeyMissing
+		}
+		key, err := hex.DecodeString(keyHex)
+		if err != nil {
+			return session.Config{}, nil, fmt.Errorf("%w: %w", config.ErrSessionKeyInvalid, err)
+		}
+		codec, err := cookiecodec.New(cookiecodec.Config{
+			Name:    runtime.Config.Session.CookieName,
+			Secrets: [][]byte{key},
+			Mode:    cookiecodec.AEAD,
+		})
+		if err != nil {
+			return session.Config{}, nil, fmt.Errorf("session: cookie store: %w", err)
+		}
+		store = session.NewCookieStore(codec)
+	default: // "memory"
+		store = session.NewMemoryStore()
+	}
+	return session.NewConfig(runtime.Config.Session, store), store, nil
 }
 
 func provideServices(_ context.Context, _ Runtime, _ Security) (Services, error) {
