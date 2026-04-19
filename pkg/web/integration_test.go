@@ -72,6 +72,11 @@ func newSessionRouter(t *testing.T, csrfCfg secure.CSRFConfig) *router.Router {
 	t.Cleanup(store.Stop)
 
 	r := router.New()
+	r.Use(
+		web.AsyncContext(),
+		secure.Headers(secure.DefaultHeadersConfig()),
+		secure.CSPNonce(secure.DefaultCSPNonceConfig()),
+	)
 	r.Use(session.Middleware(session.Config{
 		Store: store,
 		CookieTemplate: web.Cookie{
@@ -793,7 +798,7 @@ func TestIntegration_SessionDestroy(t *testing.T) {
 	store := session.NewMemoryStore()
 	t.Cleanup(store.Stop)
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.Use(session.Middleware(session.Config{
 		Store: store,
 		CookieTemplate: web.Cookie{
@@ -873,7 +878,7 @@ func TestIntegration_RateLimit(t *testing.T) {
 		Burst: 2,
 	})
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.Use(secure.RateLimit(secure.RateLimitConfig{
 		Store:          store,
 		IdentifierFunc: func(_ *web.Context) string { return "test-client" },
@@ -971,7 +976,12 @@ func TestIntegration_MaxBodyBytes413(t *testing.T) {
 func TestIntegration_CSPNonceUniqueness(t *testing.T) {
 	t.Parallel()
 
-	r := router.New() // router.New() installs SecureDefaults which includes CSPNonce
+	r := router.New()
+	r.Use(
+		web.AsyncContext(),
+		secure.Headers(secure.DefaultHeadersConfig()),
+		secure.CSPNonce(secure.DefaultCSPNonceConfig()),
+	)
 	r.GET("/page", "page", func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "hello"), nil
 	})
@@ -1019,10 +1029,15 @@ func TestIntegration_CSPNonceUniqueness(t *testing.T) {
 // Secure defaults headers
 // ---------------------------------------------------------------------------
 
-func TestIntegration_SecureDefaultsHeaders(t *testing.T) {
+func TestIntegration_SecurityHeaders(t *testing.T) {
 	t.Parallel()
 
-	r := router.New() // SecureDefaults installed by New()
+	r := router.New()
+	r.Use(
+		web.AsyncContext(),
+		secure.Headers(secure.DefaultHeadersConfig()),
+		secure.CSPNonce(secure.DefaultCSPNonceConfig()),
+	)
 	r.GET("/check", "check", func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "ok"), nil
 	})
@@ -1176,7 +1191,7 @@ func TestIntegration_SessionLazyEmission(t *testing.T) {
 	store := session.NewMemoryStore()
 	t.Cleanup(store.Stop)
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.Use(session.Middleware(session.Config{
 		Store: store,
 		CookieTemplate: web.Cookie{
@@ -1220,7 +1235,7 @@ func TestIntegration_SessionFlash(t *testing.T) {
 	store := session.NewMemoryStore()
 	t.Cleanup(store.Stop)
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.Use(session.Middleware(session.Config{
 		Store: store,
 		CookieTemplate: web.Cookie{
@@ -1299,7 +1314,7 @@ func TestIntegration_SessionFlash(t *testing.T) {
 func TestIntegration_RouterPathParam(t *testing.T) {
 	t.Parallel()
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.GET("/users/{id}", "user.show", func(c *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, c.Param("id")), nil
 	})
@@ -1323,7 +1338,7 @@ func TestIntegration_RouterPathParam(t *testing.T) {
 func TestIntegration_RouterAllowHeaderExact(t *testing.T) {
 	t.Parallel()
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.GET("/resource", "resource.get", func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "get"), nil
 	})
@@ -1360,7 +1375,7 @@ func TestIntegration_RouterAllowHeaderExact(t *testing.T) {
 func TestIntegration_RouterPUTPATCHDELETE(t *testing.T) {
 	t.Parallel()
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.PUT("/put", "res.put", func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "ok"), nil
 	})
@@ -1402,7 +1417,7 @@ func TestIntegration_RouterPUTPATCHDELETE(t *testing.T) {
 func TestIntegration_HTMXResponseHeaders(t *testing.T) {
 	t.Parallel()
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.GET("/htmx-action", "htmx.action", func(c *web.Context) (web.Response, error) {
 		resp := web.Text(http.StatusOK, "fragment")
 		htmx.SetRedirect(&resp, "/new-url")
@@ -1435,7 +1450,7 @@ func TestIntegration_HTMXResponseHeaders(t *testing.T) {
 func TestIntegration_HTMXVaryMiddleware(t *testing.T) {
 	t.Parallel()
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.Use(htmx.VaryMiddleware())
 	r.GET("/page", "vary.page", func(_ *web.Context) (web.Response, error) {
 		resp := web.Text(http.StatusOK, "content")

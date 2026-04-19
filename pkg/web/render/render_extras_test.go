@@ -1,6 +1,7 @@
 package render
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -20,16 +21,11 @@ func TestCSRFField_RendersHiddenInput(t *testing.T) {
 // ---- NonceAttr ----
 
 func TestNonceAttr_RenderedInsideScript(t *testing.T) {
-	// Non-trivial test: verify attribute renders inside a parent element.
-	// g.Attr always needs a parent element to render.
-	// We use a simple string builder + manual approach.
-	nonce := NonceAttr("abc123")
-	var sb strings.Builder
-	_ = nonce.Render(&sb)
-	// Attributes render as " nonce=\"abc123\"" (with leading space) when placed in an element.
-	// Standalone Attr renders differently; this verifies it compiles and runs without error.
-	// The actual rendering is exercised by integration with gomponents elements.
-	_ = sb.String() // may be empty outside element context
+	got := renderAttrInTag(t, "script", NonceAttr("abc123"))
+	want := `<script nonce="abc123"></script>`
+	if got != want {
+		t.Fatalf("NonceAttr() = %q, want %q", got, want)
+	}
 }
 
 // ---- HXForm ----
@@ -37,14 +33,9 @@ func TestNonceAttr_RenderedInsideScript(t *testing.T) {
 func TestHXForm_ContainsHXPost(t *testing.T) {
 	node := HXForm("/submit")
 	got := RenderNode(t, node)
-	if !strings.Contains(got, `hx-post="/submit"`) {
-		t.Errorf("HXForm missing hx-post: %q", got)
-	}
-	if !strings.Contains(got, `hx-swap="outerHTML"`) {
-		t.Errorf("HXForm missing hx-swap: %q", got)
-	}
-	if !strings.Contains(got, "<form") {
-		t.Errorf("HXForm not a form element: %q", got)
+	want := `<form hx-post="/submit" hx-swap="outerHTML"></form>`
+	if got != want {
+		t.Fatalf("HXForm() = %q, want %q", got, want)
 	}
 }
 
@@ -64,8 +55,9 @@ func TestHXAttributes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := tc.node()
-			if !strings.Contains(got, tc.want) {
-				t.Errorf("%s: rendered %q, want to contain %q", tc.name, got, tc.want)
+			want := `<div ` + tc.want + `></div>`
+			if got != want {
+				t.Errorf("%s: rendered %q, want %q", tc.name, got, want)
 			}
 		})
 	}
@@ -79,47 +71,47 @@ func TestSSEEvent_Encode_BasicEvent(t *testing.T) {
 	if err := ev.Encode(&sb); err != nil {
 		t.Fatalf("Encode: %v", err)
 	}
-	got := sb.String()
-	if !strings.Contains(got, "event: update\n") {
-		t.Errorf("missing event line: %q", got)
-	}
-	if !strings.Contains(got, "data: hello\n") {
-		t.Errorf("missing data line: %q", got)
-	}
-	if !strings.HasSuffix(got, "\n\n") {
-		t.Errorf("missing trailing blank line: %q", got)
+	if got, want := sb.String(), "event: update\ndata: hello\n\n"; got != want {
+		t.Fatalf("Encode() = %q, want %q", got, want)
 	}
 }
 
 func TestSSEEvent_Encode_AllFields(t *testing.T) {
 	ev := SSEEvent{ID: "42", Event: "msg", Data: "line1\nline2", Retry: 3000}
 	var sb strings.Builder
-	_ = ev.Encode(&sb)
-	got := sb.String()
-	if !strings.Contains(got, "id: 42\n") {
-		t.Errorf("missing id: %q", got)
+	if err := ev.Encode(&sb); err != nil {
+		t.Fatalf("Encode() error = %v", err)
 	}
-	if !strings.Contains(got, "retry: 3000\n") {
-		t.Errorf("missing retry: %q", got)
-	}
-	if !strings.Contains(got, "data: line1\n") || !strings.Contains(got, "data: line2\n") {
-		t.Errorf("multiline data not split: %q", got)
+	want := "id: 42\nevent: msg\nretry: 3000\ndata: line1\ndata: line2\n\n"
+	if got := sb.String(); got != want {
+		t.Fatalf("Encode() = %q, want %q", got, want)
 	}
 }
 
 func TestSSEEvent_Encode_NoOptionalFields(t *testing.T) {
 	ev := SSEEvent{Data: "payload"}
 	var sb strings.Builder
-	_ = ev.Encode(&sb)
-	got := sb.String()
-	if strings.Contains(got, "id:") {
-		t.Errorf("unexpected id field: %q", got)
+	if err := ev.Encode(&sb); err != nil {
+		t.Fatalf("Encode() error = %v", err)
 	}
-	if strings.Contains(got, "event:") {
-		t.Errorf("unexpected event field: %q", got)
+	if got, want := sb.String(), "data: payload\n\n"; got != want {
+		t.Fatalf("Encode() = %q, want %q", got, want)
 	}
-	if strings.Contains(got, "retry:") {
-		t.Errorf("unexpected retry field: %q", got)
+}
+
+type errWriter struct {
+	err error
+}
+
+func (w errWriter) Write(_ []byte) (int, error) {
+	return 0, w.err
+}
+
+func TestSSEEvent_Encode_PropagatesWriterError(t *testing.T) {
+	wantErr := errors.New("write failed")
+	err := SSEEvent{Data: "payload"}.Encode(errWriter{err: wantErr})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Encode() error = %v, want %v", err, wantErr)
 	}
 }
 
@@ -150,8 +142,8 @@ func TestNewSSEResponse_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
-	if !strings.Contains(string(data), "event: hello") {
-		t.Errorf("body = %q, want to contain 'event: hello'", string(data))
+	if got, want := string(data), "event: hello\ndata: world\n\n"; got != want {
+		t.Fatalf("body = %q, want %q", got, want)
 	}
 }
 
@@ -159,20 +151,17 @@ func TestNewSSEResponse_RoundTrip(t *testing.T) {
 
 func TestHXCSRFHeaders_BasicToken(t *testing.T) {
 	got := renderAttrInDiv(t, HXCSRFHeaders("abc123"))
-	want := `hx-headers="{&#34;X-CSRF-Token&#34;:&#34;abc123&#34;}"`
-	if !strings.Contains(got, want) {
-		t.Errorf("HXCSRFHeaders = %q, want to contain %q", got, want)
+	want := `<div hx-headers="{&#34;X-CSRF-Token&#34;:&#34;abc123&#34;}"></div>`
+	if got != want {
+		t.Errorf("HXCSRFHeaders = %q, want %q", got, want)
 	}
 }
 
 func TestHXCSRFHeaders_TokenWithQuote(t *testing.T) {
-	// A token containing a double-quote must be JSON-escaped before the
-	// gomponents attribute encoder HTML-encodes the result.
 	got := renderAttrInDiv(t, HXCSRFHeaders(`tok"en`))
-	// The backslash-escaped quote in the JSON string is then HTML-entity-encoded
-	// by gomponents: \" → \&#34;  (gomponents encodes " → &#34; inside attribute values)
-	if !strings.Contains(got, `tok\`) {
-		t.Errorf("HXCSRFHeaders with quote token = %q, want escaped token present", got)
+	want := `<div hx-headers="{&#34;X-CSRF-Token&#34;:&#34;tok\&#34;en&#34;}"></div>`
+	if got != want {
+		t.Errorf("HXCSRFHeaders = %q, want %q", got, want)
 	}
 }
 
@@ -181,35 +170,32 @@ func TestHXCSRFHeaders_TokenWithQuote(t *testing.T) {
 func TestHXCSRFMeta_BasicToken(t *testing.T) {
 	node := HXCSRFMeta("tok")
 	got := RenderNode(t, node)
-	if !strings.Contains(got, `<meta`) {
-		t.Errorf("HXCSRFMeta: missing <meta tag: %q", got)
-	}
-	if !strings.Contains(got, `name="htmx-config"`) {
-		t.Errorf("HXCSRFMeta: missing name attribute: %q", got)
-	}
-	if !strings.Contains(got, `tok`) {
-		t.Errorf("HXCSRFMeta: token not present in output: %q", got)
-	}
-	if !strings.Contains(got, `antiForgery`) {
-		t.Errorf("HXCSRFMeta: missing antiForgery key: %q", got)
+	want := `<meta name="htmx-config" content="{&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;tok&#34;}}">`
+	if got != want {
+		t.Errorf("HXCSRFMeta = %q, want %q", got, want)
 	}
 }
 
 func TestHXCSRFMeta_TokenAppearsInContent(t *testing.T) {
 	node := HXCSRFMeta("mytoken42")
 	got := RenderNode(t, node)
-	if !strings.Contains(got, "mytoken42") {
-		t.Errorf("HXCSRFMeta: token %q not found in output %q", "mytoken42", got)
+	want := `<meta name="htmx-config" content="{&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;mytoken42&#34;}}">`
+	if got != want {
+		t.Errorf("HXCSRFMeta = %q, want %q", got, want)
 	}
 }
 
 // renderAttrInDiv renders an attribute node inside a div to get proper output.
 func renderAttrInDiv(t *testing.T, attr interface{ Render(io.Writer) error }) string {
+	return renderAttrInTag(t, "div", attr)
+}
+
+func renderAttrInTag(t *testing.T, tag string, attr interface{ Render(io.Writer) error }) string {
 	t.Helper()
-	import_ := `<div`
+	import_ := `<` + tag
 	var sb strings.Builder
 	sb.WriteString(import_)
 	_ = attr.Render(&sb)
-	sb.WriteString(`></div>`)
+	sb.WriteString(`></` + tag + `>`)
 	return sb.String()
 }

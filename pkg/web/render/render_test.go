@@ -80,6 +80,28 @@ func TestFragment(t *testing.T) {
 	}
 }
 
+func TestFragmentWithStatus(t *testing.T) {
+	node := h.Span(g.Text("frag"))
+	resp, err := FragmentWithStatus(http.StatusAccepted, node)
+	if err != nil {
+		t.Fatalf("FragmentWithStatus error: %v", err)
+	}
+
+	if resp.Status != http.StatusAccepted {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusAccepted)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading body: %v", err)
+	}
+	resp.Body.Close()
+
+	want := "<span>frag</span>"
+	if string(body) != want {
+		t.Errorf("body = %q, want %q", string(body), want)
+	}
+}
+
 func TestComponentWithStatus_RenderError(t *testing.T) {
 	// errNode is a gomponents node whose Render always returns an error.
 	errNode := g.NodeFunc(func(w io.Writer) error {

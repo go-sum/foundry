@@ -30,7 +30,7 @@ import (
 func newBoundaryServer(t *testing.T, cfg web.BoundaryConfig, handler web.Handler) (srv *httptest.Server, client *http.Client) {
 	t.Helper()
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.Use(web.WithRequestID())
 	r.Use(web.ErrorBoundary(cfg))
 	r.GET("/test", "test", handler)
@@ -322,7 +322,7 @@ func TestBoundary_ProblemJSONIsBuffered(t *testing.T) {
 func TestBoundary_HEADBodyEmpty(t *testing.T) {
 	t.Parallel()
 
-	r := router.NewWithoutSecureDefaults()
+	r := router.New()
 	r.Use(web.ErrorBoundary(web.BoundaryConfig{}))
 	r.GET("/test", "test", func(_ *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrNotFound("")
