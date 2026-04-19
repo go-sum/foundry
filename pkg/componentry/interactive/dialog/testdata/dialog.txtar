@@ -1,0 +1,18 @@
+-- content empty --
+<dialog id="confirm-dialog" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-description" class="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg backdrop:bg-black/50"></dialog>
+-- content with children --
+<dialog id="dlg" aria-labelledby="dlg-title" aria-describedby="dlg-description" class="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg backdrop:bg-black/50">dialog content</dialog>
+-- trigger --
+<div data-dialog-open="confirm-dialog" aria-haspopup="dialog" aria-controls="confirm-dialog" class="contents cursor-pointer">Open</div>
+-- close --
+<div data-dialog-close="" class="contents cursor-pointer">Cancel</div>
+-- title --
+<h2 id="confirm-dialog-title" class="text-lg leading-none font-semibold">Are you sure?</h2>
+-- description --
+<p id="confirm-dialog-description" class="text-muted-foreground text-sm">This action cannot be undone.</p>
+-- header --
+<div class="flex flex-col gap-2 text-center sm:text-left mb-4">header</div>
+-- footer --
+<div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end mt-4">footer</div>
+-- root --
+<div class="contents">content</div>

@@ -1,0 +1,10 @@
+-- theme script --
+<script>(function(){var p=localStorage.getItem('themePreference');if(p==='dark'||(p==='system'||!p)&&window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark')}})();</script>
+-- selector script --
+<script>(function(){var btn=document.querySelector('[data-theme-selector]');if(!btn)return;btn.addEventListener('click',function(){var themes=['light','dark','system'];var cur=localStorage.getItem('themePreference')||'system';var next=themes[(themes.indexOf(cur)+1)%themes.length];localStorage.setItem('themePreference',next);document.documentElement.setAttribute('data-theme-preference',next);if(next==='dark'||(next==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}})})();</script>
+-- theme selector default --
+<button data-theme-selector="" type="button" aria-label="Toggle theme"><span class="theme-light-icon">Light</span><span class="theme-dark-icon">Dark</span><span class="theme-system-icon">System</span></button>
+-- theme selector custom icons --
+<button data-theme-selector="" type="button" aria-label="Toggle theme"><span class="theme-light-icon">sun</span><span class="theme-dark-icon">moon</span><span class="theme-system-icon">monitor</span></button>
+-- theme selector extra nodes --
+<button data-theme-selector="" type="button" aria-label="Toggle theme"><span class="theme-light-icon">Light</span><span class="theme-dark-icon">Dark</span><span class="theme-system-icon">System</span>extra-content</button>

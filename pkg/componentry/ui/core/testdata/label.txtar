@@ -1,0 +1,10 @@
+-- basic label --
+<label class="text-sm font-medium leading-none inline-block" for="email">Email</label>
+-- required label --
+<label class="text-sm font-medium leading-none inline-block" for="name">Name<span class="ml-0.5 text-destructive" aria-hidden="true">*</span></label>
+-- error label --
+<label class="text-sm font-medium leading-none inline-block text-destructive" for="email">Email</label>
+-- required with error --
+<label class="text-sm font-medium leading-none inline-block text-destructive" for="email">Email<span class="ml-0.5 text-destructive" aria-hidden="true">*</span></label>
+-- no for attr --
+<label class="text-sm font-medium leading-none inline-block">Standalone</label>

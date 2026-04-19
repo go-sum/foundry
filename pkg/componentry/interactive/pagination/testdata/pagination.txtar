@@ -1,0 +1,20 @@
+-- root --
+<nav role="navigation" aria-label="pagination" class="flex flex-wrap justify-center"></nav>
+-- content --
+<ul class="flex flex-row items-center gap-1"></ul>
+-- item --
+<li></li>
+-- link active --
+<a class="inline-flex items-center justify-center size-9 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 border border-border bg-background shadow-xs" href="/page/2" aria-current="page"></a>
+-- link inactive --
+<a class="inline-flex items-center justify-center size-9 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:bg-accent hover:text-accent-foreground" href="/page/3"></a>
+-- previous enabled --
+<a class="inline-flex items-center gap-1 px-2.5 h-9 rounded-md text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:bg-accent hover:text-accent-foreground" href="/page/1" aria-label="Go to previous page"><svg class="size-4" aria-hidden="true"><use href="#"></use></svg><span>Previous</span></a>
+-- previous disabled --
+<span class="inline-flex items-center gap-1 px-2.5 h-9 rounded-md text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 pointer-events-none opacity-50" aria-disabled="true" aria-label="Go to previous page"><svg class="size-4" aria-hidden="true"><use href="#"></use></svg><span>Previous</span></span>
+-- next enabled --
+<a class="inline-flex items-center gap-1 px-2.5 h-9 rounded-md text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:bg-accent hover:text-accent-foreground" href="/page/3" aria-label="Go to next page"><span>Next</span><svg class="size-4" aria-hidden="true"><use href="#"></use></svg></a>
+-- next disabled --
+<span class="inline-flex items-center gap-1 px-2.5 h-9 rounded-md text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 pointer-events-none opacity-50" aria-disabled="true" aria-label="Go to next page"><span>Next</span><svg class="size-4" aria-hidden="true"><use href="#"></use></svg></span>
+-- ellipsis --
+<span class="flex size-9 items-center justify-center" aria-hidden="true">…</span>

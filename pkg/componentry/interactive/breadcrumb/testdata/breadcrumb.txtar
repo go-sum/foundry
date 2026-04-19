@@ -1,0 +1,16 @@
+-- root empty --
+<nav aria-label="breadcrumb" class="flex"></nav>
+-- root with children --
+<nav aria-label="breadcrumb" class="flex">content</nav>
+-- list empty --
+<ol class="flex items-center flex-wrap gap-1 text-sm"></ol>
+-- item with children --
+<li class="flex items-center">Home</li>
+-- link --
+<a href="/home" class="text-muted-foreground hover:text-foreground hover:underline flex items-center gap-1.5 transition-colors">Home</a>
+-- separator default --
+<span class="mx-2 text-muted-foreground" aria-hidden="true">/</span>
+-- separator custom --
+<span class="mx-2 text-muted-foreground" aria-hidden="true">&gt;</span>
+-- page --
+<span class="font-medium text-foreground flex items-center gap-1.5" aria-current="page">Dashboard</span>

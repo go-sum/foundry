@@ -1,0 +1,16 @@
+-- trigger attrs --
+<button aria-describedby="my-tooltip"></button>
+-- trigger attrs empty id --
+<button aria-describedby=""></button>
+-- root empty --
+<div class="group relative inline-flex"></div>
+-- root with children --
+<div class="group relative inline-flex">trigger</div>
+-- trigger with children --
+<span class="inline-flex">hover me</span>
+-- content --
+<div id="my-tooltip" role="tooltip" class="absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md pointer-events-none group-hover:block group-focus-within:block">Tooltip text</div>
+-- click root --
+<details data-popover="" class="relative inline-flex"></details>
+-- click content --
+<div id="click-tip" role="tooltip" class="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md">Click tooltip</div>

@@ -1,0 +1,26 @@
+-- text type default --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="text" id="name" name="name">
+-- email type --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="email" id="email" name="email">
+-- password type --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="password" id="password" name="password">
+-- with placeholder --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="email" id="email" name="email" placeholder="you@example.com">
+-- with value --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="text" id="name" name="name" value="Jane Doe">
+-- with error --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1 border-destructive ring-destructive/20" type="text" id="email" name="email" aria-invalid="true">
+-- disabled --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="text" id="name" name="name" disabled>
+-- required --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="text" id="name" name="name" required>
+-- readonly --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="text" id="name" name="name" value="Fixed" readonly>
+-- with extra attrs --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="text" id="name" name="name" data-lpignore="true">
+-- number type --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="number" id="qty" name="qty">
+-- search type --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="search" id="q" name="q">
+-- zero value --
+<input class="flex w-full rounded-md border border-input bg-transparent text-base shadow-xs transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-9 min-w-0 px-3 py-1" type="text">

@@ -1,0 +1,18 @@
+-- root --
+<div id="my-tabs" data-tabs="tab1" class="w-full"></div>
+-- root with children --
+<div id="tabs" data-tabs="t1" class="w-full">content</div>
+-- list empty --
+<div role="tablist" aria-orientation="horizontal" class="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground"></div>
+-- trigger active --
+<button id="my-tabs-tab-tab1" type="button" role="tab" data-tab="tab1" aria-selected="true" aria-controls="my-tabs-panel-tab1" tabindex="0" class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 bg-background text-foreground shadow">Tab 1</button>
+-- trigger inactive --
+<button id="my-tabs-tab-tab2" type="button" role="tab" data-tab="tab2" aria-selected="false" aria-controls="my-tabs-panel-tab2" tabindex="-1" class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50">Tab 2</button>
+-- trigger aria controls --
+<button id="tabs-tab-detail" type="button" role="tab" data-tab="detail" aria-selected="false" aria-controls="tabs-panel-detail" tabindex="-1" class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50"></button>
+-- content default --
+<div id="my-tabs-panel-tab1" role="tabpanel" data-tab="tab1" aria-labelledby="my-tabs-tab-tab1" tabindex="0" class="mt-2">Panel 1</div>
+-- content hidden --
+<div id="my-tabs-panel-tab2" role="tabpanel" data-tab="tab2" aria-labelledby="my-tabs-tab-tab2" tabindex="0" class="mt-2" hidden="">Panel 2</div>
+-- content aria labelledby --
+<div id="tabs-panel-detail" role="tabpanel" data-tab="detail" aria-labelledby="tabs-tab-detail" tabindex="0" class="mt-2" hidden=""></div>
