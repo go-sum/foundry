@@ -1,6 +1,7 @@
 package static
 
 import (
+	"cmp"
 	"mime"
 	"net/http"
 	"os"
@@ -52,9 +53,42 @@ type Options struct {
 	// sidecar file exists in the root and the client Accept-Encoding allows
 	// the encoding. Defaults to false.
 	Precompressed bool
+	// MimeTypes overrides the MIME type for specific file extensions.
+	// Keys must include the leading dot (e.g. ".wasm": "application/wasm").
+	// Entries here take precedence over the standard mime package lookup.
+	MimeTypes map[string]string
 }
 
 var defaultIndexFiles = []string{"index.html", "index.htm"}
+
+// builtinMIME provides cross-platform MIME types for common web assets.
+// mime.TypeByExtension is OS-dependent and absent in minimal containers
+// (Alpine, distroless), so these entries guarantee consistent behaviour
+// regardless of /etc/mime.types or the Windows registry.
+var builtinMIME = map[string]string{
+	".js":    "text/javascript; charset=utf-8",
+	".mjs":   "text/javascript; charset=utf-8",
+	".css":   "text/css; charset=utf-8",
+	".svg":   "image/svg+xml",
+	".woff2": "font/woff2",
+	".wasm":  "application/wasm",
+	".json":  "application/json",
+	".ico":   "image/x-icon",
+}
+
+// mimeFor resolves the MIME type for ext using three-level precedence:
+// caller-supplied MimeTypes → builtinMIME → OS mime package.
+// Returns empty string when nothing matches, causing file.Serve to fall
+// back to the source's own ContentType.
+func mimeFor(ext string, custom map[string]string) string {
+	if ct, ok := custom[ext]; ok {
+		return ct
+	}
+	if ct, ok := builtinMIME[ext]; ok {
+		return ct
+	}
+	return mime.TypeByExtension(ext)
+}
 
 // Handler returns a web.Handler that serves static files from root.
 // It serves GET and HEAD requests only. On any error (not found, permission
@@ -100,6 +134,7 @@ func Handler(root *os.Root, opts Options) web.Handler {
 				if err2 == nil {
 					return file.Serve(req, src2, file.ServeOptions{
 						ETag: opts.ETag, CacheControl: opts.CacheControl,
+						ContentType: mimeFor(path.Ext(idxPath), opts.MimeTypes),
 					})
 				}
 			}
@@ -120,10 +155,7 @@ func Handler(root *os.Root, opts Options) web.Handler {
 				sidecarPath := rel + suffix
 				sidecar, sidecarErr := file.OpenOSFile(root, sidecarPath)
 				if sidecarErr == nil {
-					ct := mime.TypeByExtension(path.Ext(rel))
-					if ct == "" {
-						ct = "application/octet-stream"
-					}
+					ct := cmp.Or(mimeFor(path.Ext(rel), opts.MimeTypes), "application/octet-stream")
 					resp, err := file.Serve(req, sidecar, file.ServeOptions{
 						ETag:         opts.ETag,
 						CacheControl: opts.CacheControl,
@@ -141,6 +173,7 @@ func Handler(root *os.Root, opts Options) web.Handler {
 
 		return file.Serve(req, src, file.ServeOptions{
 			ETag: opts.ETag, CacheControl: opts.CacheControl,
+			ContentType: mimeFor(path.Ext(rel), opts.MimeTypes),
 		})
 	}
 }

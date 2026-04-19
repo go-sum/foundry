@@ -50,6 +50,65 @@ func TestText(t *testing.T) {
 	}
 }
 
+func TestXML(t *testing.T) {
+	xmlBody := []byte(`<?xml version="1.0" encoding="UTF-8"?><root><item>hello</item></root>`)
+	resp := XML(http.StatusOK, xmlBody)
+
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	}
+	if got := resp.Headers.Get("Content-Type"); got != "application/xml; charset=UTF-8" {
+		t.Errorf("Content-Type = %q, want %q", got, "application/xml; charset=UTF-8")
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading body: %v", err)
+	}
+	if string(body) != string(xmlBody) {
+		t.Errorf("Body = %q, want %q", string(body), string(xmlBody))
+	}
+}
+
+func TestXML_EmptyBody(t *testing.T) {
+	resp := XML(http.StatusOK, []byte{})
+
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	}
+	if got := resp.Headers.Get("Content-Type"); got != "application/xml; charset=UTF-8" {
+		t.Errorf("Content-Type = %q, want %q", got, "application/xml; charset=UTF-8")
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading body: %v", err)
+	}
+	if len(body) != 0 {
+		t.Errorf("Body = %q, want empty", body)
+	}
+}
+
+func TestXML_StatusCodes(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+	}{
+		{"200 OK", http.StatusOK},
+		{"201 Created", http.StatusCreated},
+		{"422 Unprocessable Entity", http.StatusUnprocessableEntity},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := XML(tt.status, []byte("<x/>"))
+			if resp.Status != tt.status {
+				t.Errorf("Status = %d, want %d", resp.Status, tt.status)
+			}
+			if got := resp.Headers.Get("Content-Type"); got != "application/xml; charset=UTF-8" {
+				t.Errorf("Content-Type = %q, want %q", got, "application/xml; charset=UTF-8")
+			}
+		})
+	}
+}
+
 func TestHTML(t *testing.T) {
 	html := "<h1>Hello</h1>"
 	resp := HTML(http.StatusOK, html)

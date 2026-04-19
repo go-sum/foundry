@@ -1,5 +1,5 @@
-// Package site holds site-identity configuration (base URL, origin allowlist).
-// Future additions: sitemap.xml and robots.txt helpers.
+// Package site provides site-identity configuration and meta-endpoint
+// handlers (robots.txt, sitemap.xml).
 package site
 
 import (

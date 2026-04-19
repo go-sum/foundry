@@ -57,6 +57,17 @@ func HTMLBytes(status int, body []byte) Response {
 	}
 }
 
+// XML returns an XML response from a byte slice.
+func XML(status int, body []byte) Response {
+	h := NewHeaders()
+	h.Set("Content-Type", "application/xml; charset=UTF-8")
+	return Response{
+		Status:  status,
+		Headers: h,
+		Body:    io.NopCloser(bytes.NewReader(body)),
+	}
+}
+
 // HTMLReader returns an HTML response from a reader.
 func HTMLReader(status int, body io.ReadCloser) Response {
 	h := NewHeaders()

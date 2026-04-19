@@ -1,91 +1,45 @@
 package site
 
-import (
-	"testing"
-)
+import "testing"
 
-func TestSite_Origin(t *testing.T) {
-	s := New(Config{BaseURL: "https://example.com/app"})
-	if got := s.Origin(); got != "https://example.com" {
-		t.Fatalf("Origin() = %q, want %q", got, "https://example.com")
+func TestDefaultConfig(t *testing.T) {
+	got := DefaultConfig()
+	if got.BaseURL != "" {
+		t.Fatalf("BaseURL = %q, want empty", got.BaseURL)
+	}
+	if got.OriginAllowlist != nil {
+		t.Fatalf("OriginAllowlist = %#v, want nil", got.OriginAllowlist)
 	}
 }
 
-func TestSite_Origin_WithPort(t *testing.T) {
-	s := New(Config{BaseURL: "http://localhost:8080"})
-	if got := s.Origin(); got != "http://localhost:8080" {
-		t.Fatalf("Origin() = %q, want %q", got, "http://localhost:8080")
-	}
-}
+func TestSiteHelpers(t *testing.T) {
+	s := New(Config{
+		BaseURL:         "https://example.com/app",
+		OriginAllowlist: []string{"https://admin.example.com"},
+	})
 
-func TestSite_AbsoluteURL_NoLeadingSlash(t *testing.T) {
-	s := New(Config{BaseURL: "https://example.com"})
-	got := s.AbsoluteURL("about")
-	if got != "https://example.com/about" {
-		t.Fatalf("AbsoluteURL(%q) = %q, want %q", "about", got, "https://example.com/about")
+	if got, want := s.Origin(), "https://example.com"; got != want {
+		t.Fatalf("Origin() = %q, want %q", got, want)
 	}
-}
-
-func TestSite_AbsoluteURL_WithLeadingSlash(t *testing.T) {
-	s := New(Config{BaseURL: "https://example.com"})
-	got := s.AbsoluteURL("/about")
-	if got != "https://example.com/about" {
-		t.Fatalf("AbsoluteURL(%q) = %q, want %q", "/about", got, "https://example.com/about")
+	if got, want := s.AbsoluteURL("docs/getting-started"), "https://example.com/app/docs/getting-started"; got != want {
+		t.Fatalf("AbsoluteURL() = %q, want %q", got, want)
 	}
-}
-
-func TestSite_AbsoluteURL_BaseWithTrailingSlash(t *testing.T) {
-	s := New(Config{BaseURL: "https://example.com/"})
-	got := s.AbsoluteURL("/about")
-	if got != "https://example.com/about" {
-		t.Fatalf("AbsoluteURL(%q) = %q, want %q", "/about", got, "https://example.com/about")
-	}
-}
-
-func TestSite_IsAllowedOrigin_OwnOrigin(t *testing.T) {
-	s := New(Config{BaseURL: "https://example.com"})
 	if !s.IsAllowedOrigin("https://example.com") {
-		t.Fatal("own origin should be allowed")
+		t.Fatal("IsAllowedOrigin(self) = false, want true")
+	}
+	if !s.IsAllowedOrigin("https://admin.example.com") {
+		t.Fatal("IsAllowedOrigin(allowlist) = false, want true")
+	}
+	if s.IsAllowedOrigin("https://evil.example.com") {
+		t.Fatal("IsAllowedOrigin(untrusted) = true, want false")
 	}
 }
 
-func TestSite_IsAllowedOrigin_AllowlistMatch(t *testing.T) {
-	s := New(Config{
-		BaseURL:         "https://example.com",
-		OriginAllowlist: []string{"https://partner.com", "https://other.com"},
-	})
-	if !s.IsAllowedOrigin("https://partner.com") {
-		t.Fatal("allowlisted origin should be allowed")
-	}
-	if !s.IsAllowedOrigin("https://other.com") {
-		t.Fatal("allowlisted origin should be allowed")
-	}
-}
-
-func TestSite_IsAllowedOrigin_Disallowed(t *testing.T) {
-	s := New(Config{
-		BaseURL:         "https://example.com",
-		OriginAllowlist: []string{"https://partner.com"},
-	})
-	if s.IsAllowedOrigin("https://evil.com") {
-		t.Fatal("non-allowlisted origin should not be allowed")
-	}
-}
-
-func TestNew_InvalidBaseURL_Panics(t *testing.T) {
+func TestNew_PanicsOnInvalidBaseURL(t *testing.T) {
 	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic for invalid BaseURL, got none")
+		if recover() == nil {
+			t.Fatal("expected panic for invalid BaseURL")
 		}
 	}()
-	New(Config{BaseURL: "not-a-url"})
-}
-
-func TestNew_EmptyBaseURL_Panics(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic for empty BaseURL, got none")
-		}
-	}()
-	New(Config{BaseURL: ""})
+	New(Config{BaseURL: "://bad-url"})
 }

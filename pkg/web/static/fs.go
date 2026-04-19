@@ -1,6 +1,7 @@
 package static
 
 import (
+	"cmp"
 	"io"
 	"io/fs"
 	"mime"
@@ -58,6 +59,7 @@ func FSHandler(fsys fs.FS, opts Options) web.Handler {
 				if err2 == nil {
 					return file.Serve(req, src2, file.ServeOptions{
 						ETag: opts.ETag, CacheControl: opts.CacheControl,
+						ContentType: mimeFor(path.Ext(idxPath), opts.MimeTypes),
 					})
 				}
 			}
@@ -69,6 +71,7 @@ func FSHandler(fsys fs.FS, opts Options) web.Handler {
 
 		return file.Serve(req, src, file.ServeOptions{
 			ETag: opts.ETag, CacheControl: opts.CacheControl,
+			ContentType: mimeFor(path.Ext(rel), opts.MimeTypes),
 		})
 	}
 }
@@ -99,10 +102,7 @@ func openFSFile(fsys fs.FS, rel string) (file.Source, error) {
 		return nil, err
 	}
 
-	ct := mime.TypeByExtension(filepath.Ext(rel))
-	if ct == "" {
-		ct = "application/octet-stream"
-	}
+	ct := cmp.Or(mime.TypeByExtension(filepath.Ext(rel)), "application/octet-stream")
 
 	return file.NewBytesSource(filepath.Base(rel), data, fi.ModTime(), ct), nil
 }
