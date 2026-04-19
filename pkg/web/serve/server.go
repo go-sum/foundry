@@ -1,14 +1,19 @@
 package serve
 
 import (
+	"cmp"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/go-sum/web"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 const (
@@ -37,6 +42,12 @@ type ServerConfig struct {
 	MaxHeaderBytes int
 	// TrustedProxies lists CIDR prefixes of trusted reverse proxies.
 	TrustedProxies []string
+	// H2C enables cleartext HTTP/2 (h2c) by wrapping the handler with h2c.NewHandler.
+	// Use this when terminating TLS at a load balancer that forwards plain HTTP/2.
+	H2C bool
+	// TLSConfig, when non-nil, enables HTTPS. HTTP/2 is negotiated automatically via ALPN.
+	// Mutually exclusive with H2C.
+	TLSConfig *tls.Config
 	// ErrorLog is used for http.Server.ErrorLog. If nil, output goes to stderr via log package.
 	ErrorLog interface{ Printf(format string, v ...any) }
 }
@@ -59,50 +70,38 @@ func DefaultServerConfig() ServerConfig {
 //
 // Use Shutdown to drain active connections gracefully.
 func NewServer(handler web.Handler, cfg ServerConfig) *http.Server {
-	addr := cfg.Addr
-	if addr == "" {
-		addr = ":8080"
-	}
-
-	readHeaderTimeout := cfg.ReadHeaderTimeout
-	if readHeaderTimeout == 0 {
-		readHeaderTimeout = defaultReadHeaderTimeout
-	}
-
-	readTimeout := cfg.ReadTimeout
-	if readTimeout == 0 {
-		readTimeout = defaultReadTimeout
-	}
-
-	writeTimeout := cfg.WriteTimeout
-	if writeTimeout == 0 {
-		writeTimeout = defaultWriteTimeout
-	}
-
-	idleTimeout := cfg.IdleTimeout
-	if idleTimeout == 0 {
-		idleTimeout = defaultIdleTimeout
-	}
-
-	maxHeaderBytes := cfg.MaxHeaderBytes
-	if maxHeaderBytes == 0 {
-		maxHeaderBytes = defaultMaxHeaderBytes
-	}
+	addr := cmp.Or(cfg.Addr, ":8080")
+	readHeaderTimeout := cmp.Or(cfg.ReadHeaderTimeout, defaultReadHeaderTimeout)
+	readTimeout := cmp.Or(cfg.ReadTimeout, defaultReadTimeout)
+	writeTimeout := cmp.Or(cfg.WriteTimeout, defaultWriteTimeout)
+	idleTimeout := cmp.Or(cfg.IdleTimeout, defaultIdleTimeout)
+	maxHeaderBytes := cmp.Or(cfg.MaxHeaderBytes, defaultMaxHeaderBytes)
 
 	var errorLog *log.Logger
 	if cfg.ErrorLog != nil {
 		errorLog = log.New(logWriter{cfg.ErrorLog}, "", 0)
 	}
 
+	var tlsCfg *tls.Config
+	if cfg.TLSConfig != nil {
+		tlsCfg = cfg.TLSConfig.Clone()
+	}
+
+	httpHandler := http.Handler(ToHTTPHandler(handler))
+	if cfg.H2C {
+		httpHandler = h2c.NewHandler(httpHandler, &http2.Server{})
+	}
+
 	return &http.Server{
 		Addr:              addr,
-		Handler:           ToHTTPHandler(handler),
+		Handler:           httpHandler,
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       idleTimeout,
 		MaxHeaderBytes:    maxHeaderBytes,
 		ErrorLog:          errorLog,
+		TLSConfig:         tlsCfg,
 	}
 }
 
@@ -111,15 +110,37 @@ func Shutdown(ctx context.Context, srv *http.Server) error {
 	return srv.Shutdown(ctx)
 }
 
-// ListenAndServeGracefully starts the HTTP server and blocks until ctx is canceled,
-// then gracefully shuts down within cfg.ShutdownTimeout (defaulting to 15 seconds).
+// ListenAndServeGracefully starts the HTTP or HTTPS server and blocks until ctx is
+// canceled, then gracefully shuts down within cfg.ShutdownTimeout (defaulting to 15
+// seconds). When cfg.TLSConfig is non-nil, the server listens over TLS and HTTP/2 is
+// negotiated automatically via ALPN. H2C and TLSConfig are mutually exclusive.
 // Signal handling is the caller's responsibility — use signal.NotifyContext in main.
 func ListenAndServeGracefully(ctx context.Context, handler web.Handler, cfg ServerConfig) error {
+	if cfg.H2C && cfg.TLSConfig != nil {
+		return fmt.Errorf("web/serve: H2C and TLSConfig are mutually exclusive")
+	}
+
 	srv := NewServer(handler, cfg)
+
+	if srv.TLSConfig != nil {
+		if err := http2.ConfigureServer(srv, nil); err != nil {
+			return fmt.Errorf("web/serve: configure http2: %w", err)
+		}
+	}
 
 	serveErr := make(chan error, 1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		var err error
+		if srv.TLSConfig != nil {
+			var ln net.Listener
+			ln, err = net.Listen("tcp", srv.Addr)
+			if err == nil {
+				err = srv.Serve(tls.NewListener(ln, srv.TLSConfig))
+			}
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serveErr <- err
 		}
 		close(serveErr)
@@ -131,10 +152,7 @@ func ListenAndServeGracefully(ctx context.Context, handler web.Handler, cfg Serv
 	case <-ctx.Done():
 	}
 
-	timeout := cfg.ShutdownTimeout
-	if timeout == 0 {
-		timeout = 15 * time.Second
-	}
+	timeout := cmp.Or(cfg.ShutdownTimeout, 15*time.Second)
 	shutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	if err := Shutdown(shutCtx, srv); err != nil {
