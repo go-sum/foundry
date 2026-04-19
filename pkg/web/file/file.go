@@ -1,6 +1,7 @@
 package file
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,10 +37,7 @@ func Serve(req *web.Request, src Source, opts ServeOptions) (web.Response, error
 		}
 	}
 
-	ct := opts.ContentType
-	if ct == "" {
-		ct = src.ContentType()
-	}
+	ct := cmp.Or(opts.ContentType, src.ContentType())
 
 	acceptRanges := true
 	if opts.AcceptRanges != nil {
@@ -62,10 +60,8 @@ func Serve(req *web.Request, src Source, opts ServeOptions) (web.Response, error
 	// Step 2: If-Unmodified-Since (only if If-Match absent) → 412 if modified
 	if req.Headers.Get("If-Match") == "" {
 		if ius := req.Headers.Get("If-Unmodified-Since"); ius != "" {
-			if t, err := http.ParseTime(ius); err == nil {
-				if modTime.After(t) {
-					return web.Response{Status: http.StatusPreconditionFailed}, nil
-				}
+			if t, err := http.ParseTime(ius); err == nil && modTime.After(t) {
+				return web.Response{Status: http.StatusPreconditionFailed}, nil
 			}
 		}
 	}
@@ -84,10 +80,8 @@ func Serve(req *web.Request, src Source, opts ServeOptions) (web.Response, error
 	// Step 4: If-Modified-Since (only if If-None-Match absent) → 304
 	if req.Headers.Get("If-None-Match") == "" {
 		if ims := req.Headers.Get("If-Modified-Since"); ims != "" {
-			if t, err := http.ParseTime(ims); err == nil {
-				if !modTime.After(t) {
-					return buildNotModifiedResponse(etag, modTime, opts.CacheControl), nil
-				}
+			if t, err := http.ParseTime(ims); err == nil && !modTime.After(t) {
+				return buildNotModifiedResponse(etag, modTime, opts.CacheControl), nil
 			}
 		}
 	}
@@ -121,10 +115,8 @@ func Serve(req *web.Request, src Source, opts ServeOptions) (web.Response, error
 			return buildFullResponse(src, h), nil
 		}
 		if len(rng.Ranges) > 1 {
-			// Multi-range: return 416 (we don't support multipart/byteranges)
-			r416 := web.NewHeaders()
-			r416.Set("Content-Range", fmt.Sprintf("bytes */%d", src.Size()))
-			return web.Response{Status: http.StatusRequestedRangeNotSatisfiable, Headers: r416}, nil
+			// Multi-range: serve full content (RFC 7233 §3.1 permits declining multi-range)
+			return buildFullResponse(src, h), nil
 		}
 
 		// Single range — check If-Range
@@ -195,9 +187,7 @@ func setContentDisposition(h web.Headers, opts ServeOptions) {
 		return
 	}
 	dt := opts.DispositionType
-	if dt == "" {
-		dt = "attachment"
-	}
+	dt = cmp.Or(dt, "attachment")
 	if opts.Filename == "" {
 		h.Set("Content-Disposition", dt)
 		return

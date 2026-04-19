@@ -199,14 +199,20 @@ func TestFile_Serve_Range_Multi(t *testing.T) {
 	src := testSource(data)
 
 	req := newTestRequest(http.MethodGet, "/test.bin")
-	req.Headers.Set("Range", "bytes=0-10,20-30")
+	req.Headers.Set("Range", "bytes=0-4,6-10")
 
 	resp, err := Serve(req, src, ServeOptions{})
 	if err != nil {
 		t.Fatalf("Serve: %v", err)
 	}
-	if resp.Status != http.StatusRequestedRangeNotSatisfiable {
-		t.Fatalf("status = %d, want %d", resp.Status, http.StatusRequestedRangeNotSatisfiable)
+	// RFC 7233 §3.1: server MAY decline multi-range by serving the full entity (200)
+	if resp.Status != http.StatusOK {
+		t.Fatalf("status = %d, want %d (full response)", resp.Status, http.StatusOK)
+	}
+	defer resp.Body.Close()
+	got, _ := io.ReadAll(resp.Body)
+	if string(got) != string(data) {
+		t.Errorf("body = %q, want %q", got, data)
 	}
 }
 

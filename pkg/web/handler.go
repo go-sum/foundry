@@ -87,6 +87,21 @@ func RequestID(c *Context) string {
 	return id
 }
 
+// CheckCancellation returns a Middleware that short-circuits the handler chain
+// when the request context has been cancelled or its deadline exceeded. Place it
+// at any position in the chain to guard the subsequent handlers against
+// continued work after a client disconnect.
+func CheckCancellation() Middleware {
+	return func(next Handler) Handler {
+		return func(c *Context) (Response, error) {
+			if err := c.Context().Err(); err != nil {
+				return Response{}, err
+			}
+			return next(c)
+		}
+	}
+}
+
 func generateRequestID() string {
 	var b [16]byte
 	_, _ = rand.Read(b[:])

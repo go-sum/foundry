@@ -76,6 +76,60 @@ func TestMethodNotAllowedHandler(t *testing.T) {
 	}
 }
 
+func TestCheckCancellation_ActiveContext_CallsNext(t *testing.T) {
+	called := false
+	inner := func(_ *Context) (Response, error) {
+		called = true
+		return Respond(http.StatusOK), nil
+	}
+	h := Chain(inner, CheckCancellation())
+	_, err := h(NewContext(context.Background(), Request{}))
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if !called {
+		t.Fatal("inner handler was not called")
+	}
+}
+
+func TestCheckCancellation_CancelledContext_ShortCircuits(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	called := false
+	inner := func(_ *Context) (Response, error) {
+		called = true
+		return Respond(http.StatusOK), nil
+	}
+	h := Chain(inner, CheckCancellation())
+	_, err := h(NewContext(ctx, Request{}))
+	if err != context.Canceled {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if called {
+		t.Fatal("inner handler should not have been called")
+	}
+}
+
+func TestCheckCancellation_DeadlineExceeded_ShortCircuits(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
+
+	called := false
+	inner := func(_ *Context) (Response, error) {
+		called = true
+		return Respond(http.StatusOK), nil
+	}
+	h := Chain(inner, CheckCancellation())
+	_, err := h(NewContext(ctx, Request{}))
+	if err != context.DeadlineExceeded {
+		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
+	}
+	if called {
+		t.Fatal("inner handler should not have been called")
+	}
+}
+
 func TestWithRequestID_SetsHeader(t *testing.T) {
 	inner := func(_ *Context) (Response, error) {
 		return Respond(http.StatusOK), nil
