@@ -3,6 +3,7 @@
 package serve
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"log/slog"
@@ -58,10 +59,7 @@ func ToHTTPHandlerWithConfig(h web.Handler, cfg Config) http.Handler {
 // pooled *web.Context. The caller must defer web.ReleaseContext on the result.
 func acquireContextWithConfig(w http.ResponseWriter, r *http.Request, cfg Config) *web.Context {
 	if r.Body != nil {
-		limit := cfg.MaxRequestBodyBytes
-		if limit == 0 {
-			limit = defaultMaxRequestBodyBytes
-		}
+		limit := cmp.Or(cfg.MaxRequestBodyBytes, defaultMaxRequestBodyBytes)
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
 	}
 	req := FromHTTPRequest(r)
@@ -96,9 +94,7 @@ func FromHTTPRequest(r *http.Request) web.Request {
 	}
 	if abs.Scheme == "" {
 		switch {
-		case r.TLS != nil:
-			abs.Scheme = "https"
-		case strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https"):
+		case r.TLS != nil, strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https"):
 			abs.Scheme = "https"
 		default:
 			abs.Scheme = "http"
@@ -121,10 +117,7 @@ func NewContext(r *http.Request) *web.Context {
 // NewContextWithConfig converts an *http.Request into a *web.Context, applying adapter config.
 func NewContextWithConfig(w http.ResponseWriter, r *http.Request, cfg Config) *web.Context {
 	if r.Body != nil {
-		limit := cfg.MaxRequestBodyBytes
-		if limit == 0 {
-			limit = defaultMaxRequestBodyBytes
-		}
+		limit := cmp.Or(cfg.MaxRequestBodyBytes, defaultMaxRequestBodyBytes)
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
 	}
 	return NewContext(r)

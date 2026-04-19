@@ -1,6 +1,7 @@
 package formdata
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"mime"
@@ -174,10 +175,7 @@ func parseMultipart(body io.Reader, boundary string, opts ParseOptions) (*FormDa
 				return nil, &MaxPartsExceededError{Limit: opts.MaxFiles}
 			}
 
-			ct := part.Header.Get("Content-Type")
-			if ct == "" {
-				ct = "application/octet-stream"
-			}
+			ct := cmp.Or(part.Header.Get("Content-Type"), "application/octet-stream")
 
 			// Wrap with file-size limit
 			limited := &limitedReader{R: io.LimitReader(part, opts.MaxFileSize+1), limit: opts.MaxFileSize}

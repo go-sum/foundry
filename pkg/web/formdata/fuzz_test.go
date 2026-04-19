@@ -2,6 +2,7 @@ package formdata
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"strings"
 	"testing"
@@ -45,9 +46,7 @@ func FuzzParseMultipart(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, boundary, rawBody string) {
-		if boundary == "" {
-			boundary = "fuzz"
-		}
+		boundary = cmp.Or(boundary, "fuzz")
 		ct := "multipart/form-data; boundary=" + boundary
 
 		opts := ParseOptions{

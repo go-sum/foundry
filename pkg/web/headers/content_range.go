@@ -1,6 +1,7 @@
 package headers
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 	"strings"
@@ -81,10 +82,7 @@ func ParseContentRange(v string) (ContentRange, error) {
 
 // String returns the canonical "bytes start-end/size" form.
 func (c ContentRange) String() string {
-	unit := c.Unit
-	if unit == "" {
-		unit = "bytes"
-	}
+	unit := cmp.Or(c.Unit, "bytes")
 
 	var rangeStr string
 	if c.Start < 0 || c.End < 0 {

@@ -1,6 +1,7 @@
 package headers
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 	"strings"
@@ -166,10 +167,7 @@ func (r Range) Normalize(size int64) (start, end int64, ok bool) {
 
 // String returns the canonical "bytes=..." form.
 func (r Range) String() string {
-	unit := r.Unit
-	if unit == "" {
-		unit = "bytes"
-	}
+	unit := cmp.Or(r.Unit, "bytes")
 
 	parts := make([]string, len(r.Ranges))
 	for i, br := range r.Ranges {

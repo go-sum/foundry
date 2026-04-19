@@ -1,6 +1,7 @@
 package headers
 
 import (
+	"cmp"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -153,10 +154,7 @@ func (s SetCookie) String() string {
 	}
 
 	// SameSite defaults to Lax.
-	sameSite := s.SameSite
-	if sameSite == "" {
-		sameSite = "Lax"
-	}
+	sameSite := cmp.Or(s.SameSite, "Lax")
 	b.WriteString("; SameSite=")
 	b.WriteString(sameSite)
 

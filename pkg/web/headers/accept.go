@@ -141,13 +141,14 @@ func (a Accept) Negotiate(offered ...string) string {
 
 		for _, mt := range a.MediaTypes {
 			var spec int
-			if mt.Type == otype && mt.Sub == osub {
+			switch {
+			case mt.Type == otype && mt.Sub == osub:
 				spec = 2
-			} else if mt.Type == otype && mt.Sub == "*" {
+			case mt.Type == otype && mt.Sub == "*":
 				spec = 1
-			} else if mt.Type == "*" && mt.Sub == "*" {
+			case mt.Type == "*" && mt.Sub == "*":
 				spec = 0
-			} else {
+			default:
 				continue
 			}
 			if !matched || spec > matchSpec {

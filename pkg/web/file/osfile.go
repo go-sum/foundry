@@ -1,6 +1,7 @@
 package file
 
 import (
+	"cmp"
 	"fmt"
 	"mime"
 	"os"
@@ -36,10 +37,7 @@ func OpenOSFile(root *os.Root, rel string) (*OSFile, error) {
 		return nil, fmt.Errorf("file: %q is a directory", rel)
 	}
 
-	ct := mime.TypeByExtension(filepath.Ext(rel))
-	if ct == "" {
-		ct = "application/octet-stream"
-	}
+	ct := cmp.Or(mime.TypeByExtension(filepath.Ext(rel)), "application/octet-stream")
 
 	return &OSFile{
 		root:    root,

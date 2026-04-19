@@ -1,6 +1,8 @@
 package session
 
 import (
+	"cmp"
+
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/htmx"
 )
@@ -35,10 +37,7 @@ func Guard(cfg GuardConfig) web.Middleware {
 		check = func(s *Session) bool { return s.Has("authed") }
 	}
 
-	redirectPath := cfg.RedirectPath
-	if redirectPath == "" {
-		redirectPath = "/signin"
-	}
+	redirectPath := cmp.Or(cfg.RedirectPath, "/signin")
 
 	onUnauthed := cfg.OnUnauthenticated
 	if onUnauthed == nil {

@@ -1,6 +1,7 @@
 package file
 
 import (
+	"cmp"
 	"mime"
 	"path/filepath"
 	"time"
@@ -20,9 +21,7 @@ func NewBytesSource(name string, data []byte, modTime time.Time, contentType str
 	if contentType == "" {
 		contentType = mime.TypeByExtension(filepath.Ext(name))
 	}
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
+	contentType = cmp.Or(contentType, "application/octet-stream")
 	return &BytesSource{data: data, name: name, modTime: modTime, ct: contentType}
 }
 

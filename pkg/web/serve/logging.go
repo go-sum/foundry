@@ -27,11 +27,14 @@ func AccessLogMiddleware() web.Middleware {
 
 			status := cmp.Or(resp.Status, http.StatusOK)
 
-			level := slog.LevelInfo
-			if status >= 500 {
+			var level slog.Level
+			switch {
+			case status >= 500:
 				level = slog.LevelError
-			} else if status >= 400 {
+			case status >= 400:
 				level = slog.LevelWarn
+			default:
+				level = slog.LevelInfo
 			}
 
 			slog.LogAttrs(c.Context(), level, "http.request",

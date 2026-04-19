@@ -1,6 +1,7 @@
 package otelweb
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/http"
@@ -32,10 +33,7 @@ func Middleware(tracer trace.Tracer) web.Middleware {
 
 			resp, err := next(c)
 
-			status := resp.Status
-			if status == 0 {
-				status = http.StatusOK
-			}
+			status := cmp.Or(resp.Status, http.StatusOK)
 			span.SetAttributes(
 				attribute.String("http.request.method", c.Method()),
 				attribute.Int("http.response.status_code", status),

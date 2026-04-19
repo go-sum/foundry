@@ -191,6 +191,39 @@ This is the preferred pattern for:
 Use adapters when an external-module interface must be satisfied by app-owned
 rendering, session, form, or redirect behavior.
 
+### Enum-to-value maps
+
+When a function maps a typed enum to a fixed value (commonly a CSS class string
+or a config constant), use a package-level map literal instead of a switch:
+
+```go
+// Prefer: declarative map with default lookup
+var variantClasses = map[Variant]string{
+    VariantDestructive: "bg-destructive text-white",
+    VariantOutline:     "border bg-background",
+    VariantSecondary:   "bg-secondary text-secondary-foreground",
+}
+
+func variantClass(v Variant) string {
+    if c, ok := variantClasses[v]; ok {
+        return c
+    }
+    return "bg-primary text-primary-foreground" // default
+}
+
+// Avoid: switch with one return per arm
+func variantClass(v Variant) string {
+    switch v {
+    case VariantDestructive: return "bg-destructive text-white"
+    case VariantOutline:     return "border bg-background"
+    default:                 return "bg-primary text-primary-foreground"
+    }
+}
+```
+
+This applies when every case returns a value and has no side effects. Do not
+apply when cases assign to different fields or depend on additional arguments.
+
 ### Resource-owner singleton
 
 Use a single shared instance when a resource should be created once and reused,
@@ -264,6 +297,10 @@ Do not refactor just to increase abstraction count.
 - business logic embedded in views
 - unbounded goroutines or background work with no lifecycle
 - hardcoded route paths where named routes already exist
+- redundant nil-and-length checks (`x != nil && len(x) > 0` — `len` of a nil slice is 0)
+- pointless error wrapping (`fmt.Errorf("%w", err)` with no added context — return the error directly)
+- string concatenation with `+=` in loops (use `strings.Builder` instead)
+- switch arms with identical bodies (merge with a comma-separated case list)
 
 If a simpler function, struct, or constructor solves the problem clearly, use
 that instead of reaching for a pattern.

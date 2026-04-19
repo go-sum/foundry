@@ -8,6 +8,15 @@ import (
 	"github.com/go-sum/web"
 )
 
+// DefaultCSPTemplate is the default Content-Security-Policy template. It includes
+// 'nonce-{nonce}' placeholders that CSPNonce replaces with a fresh per-request value.
+const DefaultCSPTemplate = "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+// DefaultCSPNonceConfig returns a CSPNonceConfig using DefaultCSPTemplate.
+func DefaultCSPNonceConfig() CSPNonceConfig {
+	return CSPNonceConfig{CSPTemplate: DefaultCSPTemplate}
+}
+
 // CSPNonceConfig configures per-request Content-Security-Policy nonce injection.
 type CSPNonceConfig struct {
 	// CSPTemplate is the Content-Security-Policy header value template.
