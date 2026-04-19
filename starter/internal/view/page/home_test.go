@@ -15,8 +15,8 @@ func TestHomePage(t *testing.T) {
 		`<meta name="viewport" content="width=device-width, initial-scale=1">` +
 		`<meta name="csrf-token" content="">` +
 		`<meta name="htmx-config" content="{&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;&#34;}}">` +
-		`<link rel="stylesheet" href="/static/css/app.css"></head>` +
-		`<body><script src="/static/js/htmx.min.js" defer nonce=""></script>` +
+		`<link rel="stylesheet" href="/css/app.css"></head>` +
+		`<body><script src="/js/htmx.min.js" defer nonce=""></script>` +
 		`<div id="flash" hx-swap-oob="true"></div>` +
 		`<div class="min-h-screen bg-gray-50">` +
 		`<div class="max-w-2xl mx-auto py-16 px-4">` +

@@ -22,8 +22,8 @@ func TestPage(t *testing.T) {
 		`<meta name="viewport" content="width=device-width, initial-scale=1">` +
 		`<meta name="csrf-token" content="tok-csrf">` +
 		`<meta name="htmx-config" content="{&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;tok-csrf&#34;}}">` +
-		`<link rel="stylesheet" href="/static/css/app.css"></head>` +
-		`<body><script src="/static/js/htmx.min.js" defer nonce="abc123"></script>` +
+		`<link rel="stylesheet" href="/css/app.css"></head>` +
+		`<body><script src="/js/htmx.min.js" defer nonce="abc123"></script>` +
 		`<div id="flash" hx-swap-oob="true"><div>saved</div></div>` +
 		`<div class="min-h-screen bg-gray-50">content</div></body></html>`
 

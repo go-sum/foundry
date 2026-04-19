@@ -2,6 +2,7 @@
 package layout
 
 import (
+	"github.com/go-sum/assets/publish"
 	"github.com/go-sum/web/render"
 	g "maragu.dev/gomponents"
 	c "maragu.dev/gomponents/components"
@@ -14,6 +15,7 @@ type Props struct {
 	Nonce     string
 	CSRFToken string
 	Flash     []string
+	Nav       g.Node   // optional navigation bar rendered above page content
 	Children  []g.Node
 }
 
@@ -26,11 +28,12 @@ func Page(p Props) g.Node {
 			h.Meta(h.Name("viewport"), h.Content("width=device-width, initial-scale=1")),
 			h.Meta(h.Name("csrf-token"), h.Content(p.CSRFToken)),
 			render.HXCSRFMeta(p.CSRFToken),
-			h.Link(h.Rel("stylesheet"), h.Href("/static/css/app.css")),
+			h.Link(h.Rel("stylesheet"), h.Href(publish.Path("css/app.css"))),
 		},
 		Body: []g.Node{
-			h.Script(h.Src("/static/js/htmx.min.js"), h.Defer(), g.Attr("nonce", p.Nonce)),
+			h.Script(h.Src(publish.Path("js/htmx.min.js")), h.Defer(), g.Attr("nonce", p.Nonce)),
 			flashRegion(p.Flash),
+			p.Nav,
 			h.Div(h.Class("min-h-screen bg-gray-50"),
 				g.Group(p.Children),
 			),

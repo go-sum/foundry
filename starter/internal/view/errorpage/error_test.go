@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/internal/view/errorpage"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/render"
@@ -108,5 +109,22 @@ func TestErrorContent_IsStable(t *testing.T) {
 	got2 := render.RenderNode(t, errorpage.ErrorContent(e))
 	if got1 != got2 {
 		t.Fatalf("ErrorContent is not stable across calls\nfirst:  %s\nsecond: %s", got1, got2)
+	}
+}
+
+func TestErrorPage_WrapsContentInLayout(t *testing.T) {
+	t.Parallel()
+
+	req := view.Request{
+		CSRFToken: "csrf-123",
+		Nonce:     "nonce-123",
+		Flash:     []string{"Saved"},
+	}
+	e := web.ErrNotFound("page not found")
+
+	got := render.RenderNode(t, errorpage.ErrorPage(req, e))
+	want := render.RenderNode(t, req.Page(e.Title, errorpage.ErrorContent(e)))
+	if got != want {
+		t.Fatalf("ErrorPage() = %q, want %q", got, want)
 	}
 }
