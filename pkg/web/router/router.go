@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/go-sum/web"
-	"github.com/go-sum/web/secure"
 )
 
 // Route describes a registered route.
@@ -143,17 +142,8 @@ type Router struct {
 	frozen     bool
 }
 
-// New creates a Router with secure.SecureDefaults() installed as the first middleware.
-// SecureDefaults provides: panic recovery, strict security headers (non-clobber),
-// and per-request CSP nonces. Use NewWithoutSecureDefaults for full manual control.
+// New creates a Router with no pre-installed middleware.
 func New() *Router {
-	r := &Router{names: make(map[string]*routeEntry)}
-	r.Use(secure.SecureDefaults())
-	return r
-}
-
-// NewWithoutSecureDefaults creates a Router with no pre-installed middleware.
-func NewWithoutSecureDefaults() *Router {
 	return &Router{names: make(map[string]*routeEntry)}
 }
 

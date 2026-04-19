@@ -153,38 +153,9 @@ func TestDuplicateRouteNamePanics(t *testing.T) {
 	Register(r, GET("/b", "dup", func(_ *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil }))
 }
 
-func TestP0_12_Router_SecureDefaultsInstalled(t *testing.T) {
-	r := New()
-	Register(r, GET("/", "home", func(c *web.Context) (web.Response, error) {
-		return web.Respond(http.StatusOK), nil
-	}))
-
-	resp, _ := r.Serve(testContext(http.MethodGet, "/"))
-
-	// SecureDefaults installs X-Content-Type-Options via Headers middleware.
-	if got := resp.Headers.Get("X-Content-Type-Options"); got != "nosniff" {
-		t.Fatalf("X-Content-Type-Options = %q, want 'nosniff' (SecureDefaults not installed)", got)
-	}
-	// HSTS should be present.
-	if hsts := resp.Headers.Get("Strict-Transport-Security"); hsts == "" {
-		t.Fatal("Strict-Transport-Security absent — SecureDefaults not installed")
-	}
-}
-
-func TestNewWithoutSecureDefaults_NoSecurityHeaders(t *testing.T) {
-	r := NewWithoutSecureDefaults()
-	Register(r, GET("/", "home", func(c *web.Context) (web.Response, error) {
-		return web.Respond(http.StatusOK), nil
-	}))
-
-	resp, _ := r.Serve(testContext(http.MethodGet, "/"))
-	if got := resp.Headers.Get("X-Content-Type-Options"); got != "" {
-		t.Fatalf("X-Content-Type-Options = %q, want empty (no SecureDefaults)", got)
-	}
-}
 
 func TestIsFrozen(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r, GET("/", "home", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	}))
@@ -201,7 +172,7 @@ func TestIsFrozen(t *testing.T) {
 }
 
 func TestIsFrozen_AfterExplicitFreeze(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r, GET("/", "home", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	}))
@@ -218,7 +189,7 @@ func TestIsFrozen_AfterExplicitFreeze(t *testing.T) {
 }
 
 func TestTrieWildcardCapturesRemainingSegments(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	var capturedPath string
 	Register(r, GET("/files/{path...}", "files.show", func(c *web.Context) (web.Response, error) {
 		capturedPath = c.Param("path")
@@ -235,7 +206,7 @@ func TestTrieWildcardCapturesRemainingSegments(t *testing.T) {
 }
 
 func TestTrieParamExtraction(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	var capturedID string
 	Register(r, GET("/users/{id}", "users.show", func(c *web.Context) (web.Response, error) {
 		capturedID = c.Param("id")
@@ -252,7 +223,7 @@ func TestTrieParamExtraction(t *testing.T) {
 }
 
 func TestTrieLiteralBeatsParam(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r,
 		GET("/users/{id}", "users.show", func(_ *web.Context) (web.Response, error) {
 			return web.Text(http.StatusOK, "param"), nil
@@ -275,7 +246,7 @@ func TestTrieLiteralBeatsParam(t *testing.T) {
 }
 
 func TestTrie405WithAllowHeader(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r, POST("/things", "things.create", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusCreated), nil
 	}))
@@ -293,7 +264,7 @@ func TestTrie405WithAllowHeader(t *testing.T) {
 }
 
 func TestTrie404UnregisteredPath(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r, GET("/exists", "exists", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	}))
@@ -304,7 +275,7 @@ func TestTrie404UnregisteredPath(t *testing.T) {
 }
 
 func TestTrieHEADFallbackToGET(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r, GET("/resource", "resource.show", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	}))
@@ -316,7 +287,7 @@ func TestTrieHEADFallbackToGET(t *testing.T) {
 }
 
 func TestTrieOPTIONSAutoResponse(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r,
 		GET("/resource", "resource.list", func(_ *web.Context) (web.Response, error) {
 			return web.Respond(http.StatusOK), nil
@@ -339,7 +310,7 @@ func TestTrieOPTIONSAutoResponse(t *testing.T) {
 // --- Phase 2 tests: RouteGroup, Any, Match ---
 
 func TestRouterGroup_PrefixApplied(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	g := r.Group("/api")
 	g.GET("/users", "api.users.list", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
@@ -355,7 +326,7 @@ func TestRouterGroup_PrefixApplied(t *testing.T) {
 }
 
 func TestRouterGroup_MiddlewareApplied(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	var mwCalled bool
 	mw := func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
@@ -376,7 +347,7 @@ func TestRouterGroup_MiddlewareApplied(t *testing.T) {
 }
 
 func TestRouterGroup_FrozenRouterPanics(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	r.GET("/seed", "seed", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	})
@@ -394,7 +365,7 @@ func TestRouterGroup_FrozenRouterPanics(t *testing.T) {
 }
 
 func TestRouteGroup_SubGroupAccumulatesPrefixAndMiddleware(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 
 	var order []string
 	mw1 := func(next web.Handler) web.Handler {
@@ -426,7 +397,7 @@ func TestRouteGroup_SubGroupAccumulatesPrefixAndMiddleware(t *testing.T) {
 }
 
 func TestRouterAny_AllMethodsDispatch(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	r.Any("/resource", "resource", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	})
@@ -439,7 +410,7 @@ func TestRouterAny_AllMethodsDispatch(t *testing.T) {
 }
 
 func TestRouterAny_NamesAreSuffixed(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	r.Any("/resource", "resource", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	})
@@ -453,7 +424,7 @@ func TestRouterAny_NamesAreSuffixed(t *testing.T) {
 }
 
 func TestRouterAny_EmptyNameRegistersNoNames(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	r.Any("/anon", "", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	})
@@ -472,7 +443,7 @@ func TestRouterAny_EmptyNameRegistersNoNames(t *testing.T) {
 }
 
 func TestRouterMatch_OnlySpecifiedMethodsDispatch(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	methods := []string{http.MethodGet, http.MethodPost}
 	r.Match(methods, "/thing", "thing", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
@@ -491,7 +462,7 @@ func TestRouterMatch_OnlySpecifiedMethodsDispatch(t *testing.T) {
 }
 
 func TestRouterMatch_NamesAreSuffixed(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	methods := []string{http.MethodGet, http.MethodDelete}
 	r.Match(methods, "/item", "item", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
@@ -506,7 +477,7 @@ func TestRouterMatch_NamesAreSuffixed(t *testing.T) {
 }
 
 func TestRouteGroupAny_PrefixAndMiddlewareApplied(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	var mwCalled bool
 	mw := func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
@@ -531,7 +502,7 @@ func TestRouteGroupAny_PrefixAndMiddlewareApplied(t *testing.T) {
 }
 
 func TestRouteGroupMatch_PrefixAndMiddlewareApplied(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	var mwCalled bool
 	mw := func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
@@ -560,7 +531,7 @@ func TestRouteGroupMatch_PrefixAndMiddlewareApplied(t *testing.T) {
 }
 
 func TestTreeAny_ConstructorProducesAllMethodNodes(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r, Any("/res", "res", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	})...)
@@ -573,7 +544,7 @@ func TestTreeAny_ConstructorProducesAllMethodNodes(t *testing.T) {
 }
 
 func TestTreeMatch_ConstructorProducesNamedNodes(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	methods := []string{http.MethodGet, http.MethodPatch}
 	Register(r, Match(methods, "/doc", "doc", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
@@ -591,7 +562,7 @@ func TestTreeMatch_ConstructorProducesNamedNodes(t *testing.T) {
 }
 
 func TestTreeAny_NamesAreSuffixed(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r, Any("/multi", "multi", func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	})...)
@@ -605,7 +576,7 @@ func TestTreeAny_NamesAreSuffixed(t *testing.T) {
 }
 
 func TestRouteGroupUse_AppendsMiddleware(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	var order []string
 	mw1 := func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
@@ -633,7 +604,7 @@ func TestRouteGroupUse_AppendsMiddleware(t *testing.T) {
 }
 
 func TestTrieLargeRouteSet(t *testing.T) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	handler := func(c *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil }
 	const n = 200
 	nodes := make([]Node, n)

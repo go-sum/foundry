@@ -9,7 +9,7 @@ import (
 )
 
 func benchRouter(n int) *Router {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	handler := func(c *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil }
 	nodes := make([]Node, n)
 	for i := range n {
@@ -67,7 +67,7 @@ func BenchmarkRouter_1000Routes(b *testing.B) {
 }
 
 func BenchmarkRouter_Reverse(b *testing.B) {
-	r := NewWithoutSecureDefaults()
+	r := New()
 	Register(r, GET("/users/{id}/posts/{postID}", "user.post.show", func(c *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	}))

@@ -12,9 +12,6 @@ type webContextKey struct{}
 // AsyncContext returns a Middleware that stores the current *Context inside the
 // underlying context.Context so deep-call code can retrieve it via FromContext
 // without explicit parameter plumbing.
-//
-// It is installed automatically by secure.SecureDefaults() as the first
-// middleware in the chain.
 func AsyncContext() Middleware {
 	return func(next Handler) Handler {
 		return func(c *Context) (Response, error) {
