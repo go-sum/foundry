@@ -2,6 +2,7 @@
 package page
 
 import (
+	"github.com/go-sum/componentry/ui/core"
 	"github.com/go-sum/foundry/internal/view"
 
 	g "maragu.dev/gomponents"
@@ -10,21 +11,24 @@ import (
 
 // HomePage renders the home page.
 func HomePage(req view.Request) g.Node {
-	content := HomeContent()
+	content := HomeContent(req)
 	return req.Page("Home", content)
 }
 
 // HomeContent renders the home page content (for HTMX partial).
-func HomeContent() g.Node {
+func HomeContent(req view.Request) g.Node {
+	helloURL := view.RouteURL(req.Routes, "hello.show", "name", "World")
 	return h.Div(h.Class("max-w-2xl mx-auto py-16 px-4"),
-		h.H1(h.Class("text-3xl font-bold text-gray-900 mb-4"),
+		h.H1(h.Class("text-2xl font-bold text-foreground mb-4"),
 			g.Text("Welcome to Foundry"),
 		),
-		h.P(h.Class("text-gray-600 mb-8"),
+		h.P(h.Class("text-muted-foreground mb-8"),
 			g.Text("A Go web application built on W3C Web API primitives."),
 		),
-		h.A(h.Href("/hello/World"), h.Class("text-blue-600 hover:underline"),
-			g.Text("Say hello to World"),
-		),
+		core.Button(core.ButtonProps{
+			Href:    helloURL,
+			Variant: core.VariantLink,
+			Label:   "Say hello to World",
+		}),
 	)
 }

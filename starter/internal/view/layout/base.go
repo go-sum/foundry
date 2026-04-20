@@ -34,7 +34,7 @@ func Page(p Props) g.Node {
 			h.Script(h.Src(publish.Path("js/htmx.min.js")), h.Defer(), g.Attr("nonce", p.Nonce)),
 			flashRegion(p.Flash),
 			p.Nav,
-			h.Div(h.Class("min-h-screen bg-gray-50"),
+			h.Div(h.Class("min-h-screen bg-background"),
 				g.Group(p.Children),
 			),
 		},
@@ -49,6 +49,7 @@ func flashRegion(messages []string) g.Node {
 	return h.Div(
 		h.ID("flash"),
 		g.Attr("hx-swap-oob", "true"),
+		g.Attr("aria-live", "polite"),
 		g.Group(nodes),
 	)
 }

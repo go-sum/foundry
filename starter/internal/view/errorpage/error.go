@@ -4,6 +4,8 @@ package errorpage
 import (
 	"fmt"
 
+	"github.com/go-sum/componentry/ui/core"
+	"github.com/go-sum/componentry/ui/data"
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/web"
 
@@ -21,22 +23,23 @@ func ErrorPage(req view.Request, e *web.Error) g.Node {
 // generic retry message and, when set, e.Instance for support correlation.
 func ErrorContent(e *web.Error) g.Node {
 	return h.Div(h.Class("max-w-lg mx-auto py-24 px-4"),
-		h.Div(h.Class("bg-white rounded-lg border border-gray-200 shadow-sm p-8"),
-			// Status badge
-			h.Div(h.Class("inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 mb-4"),
-				g.Text(fmt.Sprintf("%d", e.Status)),
-			),
-			// Title
-			h.H1(h.Class("text-2xl font-bold text-gray-900 mb-3"),
-				g.Text(e.Title),
-			),
-			// Public message or 5xx generic message
-			errorMessage(e),
-			// Back link
-			h.Div(h.Class("mt-8"),
-				h.A(h.Href("/"), h.Class("text-sm text-blue-600 hover:underline"),
-					g.Text("Back to home"),
+		data.Card.Root(
+			data.Card.Content(
+				core.Badge(core.BadgeProps{
+					Variant:  core.BadgeSecondary,
+					Children: []g.Node{g.Text(fmt.Sprintf("%d", e.Status))},
+				}),
+				h.H1(h.Class("text-2xl font-bold text-card-foreground mt-4 mb-3"),
+					g.Text(e.Title),
 				),
+				errorMessage(e),
+			),
+			data.Card.Footer(
+				core.Button(core.ButtonProps{
+					Href:    "/",
+					Variant: core.VariantLink,
+					Label:   "Back to home",
+				}),
 			),
 		),
 	)
@@ -48,7 +51,7 @@ func ErrorContent(e *web.Error) g.Node {
 func errorMessage(e *web.Error) g.Node {
 	if e.Status >= 500 {
 		return g.Group([]g.Node{
-			h.P(h.Class("text-sm text-gray-600 mb-2"),
+			h.P(h.Class("text-sm text-muted-foreground mb-2"),
 				g.Text("Something went wrong. Please try again or contact support."),
 			),
 			instanceNote(e),
@@ -58,7 +61,7 @@ func errorMessage(e *web.Error) g.Node {
 	if msg == "" || msg == e.Title {
 		return nil
 	}
-	return h.P(h.Class("text-sm text-gray-600"),
+	return h.P(h.Class("text-sm text-muted-foreground"),
 		g.Text(msg),
 	)
 }
@@ -69,7 +72,7 @@ func instanceNote(e *web.Error) g.Node {
 	if e.Instance == "" {
 		return nil
 	}
-	return h.P(h.Class("text-xs text-gray-400"),
+	return h.P(h.Class("text-xs text-muted-foreground"),
 		g.Textf("Reference: %s", e.Instance),
 	)
 }

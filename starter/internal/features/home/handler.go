@@ -22,5 +22,5 @@ func NewHandler(getRoutes func() []router.Route, opts ...view.RequestOption) *Ha
 // Show renders the home page with HTMX dual-mode support.
 func (h *Handler) Show(c *web.Context) (web.Response, error) {
 	vr := view.NewRequest(c, h.getRoutes(), h.reqOpts...)
-	return view.Render(vr, page.HomePage(vr), page.HomeContent())
+	return view.Render(vr, page.HomePage(vr), page.HomeContent(vr))
 }

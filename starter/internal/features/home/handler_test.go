@@ -39,7 +39,7 @@ func TestHandlerShow(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	body, _ = io.ReadAll(resp.Body)
-	want = render.RenderNode(t, page.HomeContent())
+	want = render.RenderNode(t, page.HomeContent(vr))
 	if string(body) != want {
 		t.Fatalf("partial body mismatch")
 	}

@@ -11,12 +11,28 @@ import (
 	"github.com/go-sum/web/render"
 )
 
+const (
+	_badgeClass = "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 transition-colors border-transparent bg-secondary text-secondary-foreground"
+	_btnClass   = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] cursor-pointer text-foreground underline-offset-4 hover:underline h-9 px-4 py-2"
+
+	_cardOpen    = `<div class="max-w-lg mx-auto py-24 px-4"><div class="w-full rounded-lg border bg-card text-card-foreground shadow-xs"><div class="p-6">`
+	_cardFooter  = `</div><div class="flex items-center p-6 pt-0"><a class="` + _btnClass + `" href="/">Back to home</a></div></div></div>`
+)
+
+func errorCard(status, title, body string) string {
+	return _cardOpen +
+		`<span class="` + _badgeClass + `">` + status + `</span>` +
+		`<h1 class="text-2xl font-bold text-card-foreground mt-4 mb-3">` + title + `</h1>` +
+		body +
+		_cardFooter
+}
+
 func TestErrorContent_NotFound(t *testing.T) {
 	t.Parallel()
 
 	e := web.ErrNotFound("page not found")
 	got := render.RenderNode(t, errorpage.ErrorContent(e))
-	want := `<div class="max-w-lg mx-auto py-24 px-4"><div class="bg-white rounded-lg border border-gray-200 shadow-sm p-8"><div class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 mb-4">404</div><h1 class="text-2xl font-bold text-gray-900 mb-3">Not Found</h1><p class="text-sm text-gray-600">page not found</p><div class="mt-8"><a href="/" class="text-sm text-blue-600 hover:underline">Back to home</a></div></div></div>`
+	want := errorCard("404", "Not Found", `<p class="text-sm text-muted-foreground">page not found</p>`)
 
 	if got != want {
 		t.Fatalf("ErrorContent(ErrNotFound) mismatch\ngot:  %s\nwant: %s", got, want)
@@ -28,7 +44,7 @@ func TestErrorContent_Forbidden(t *testing.T) {
 
 	e := web.ErrForbidden("access denied")
 	got := render.RenderNode(t, errorpage.ErrorContent(e))
-	want := `<div class="max-w-lg mx-auto py-24 px-4"><div class="bg-white rounded-lg border border-gray-200 shadow-sm p-8"><div class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 mb-4">403</div><h1 class="text-2xl font-bold text-gray-900 mb-3">Forbidden</h1><p class="text-sm text-gray-600">access denied</p><div class="mt-8"><a href="/" class="text-sm text-blue-600 hover:underline">Back to home</a></div></div></div>`
+	want := errorCard("403", "Forbidden", `<p class="text-sm text-muted-foreground">access denied</p>`)
 
 	if got != want {
 		t.Fatalf("ErrorContent(ErrForbidden) mismatch\ngot:  %s\nwant: %s", got, want)
@@ -51,8 +67,8 @@ func TestErrorContent_Internal_NoCauseLeak(t *testing.T) {
 		t.Fatalf("ErrorContent(ErrInternal) missing generic retry message; got: %q", got)
 	}
 
-	// Must contain the 500 badge number in the expected rendering context.
-	want := `<div class="max-w-lg mx-auto py-24 px-4"><div class="bg-white rounded-lg border border-gray-200 shadow-sm p-8"><div class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 mb-4">500</div><h1 class="text-2xl font-bold text-gray-900 mb-3">Internal Server Error</h1><p class="text-sm text-gray-600 mb-2">Something went wrong. Please try again or contact support.</p><div class="mt-8"><a href="/" class="text-sm text-blue-600 hover:underline">Back to home</a></div></div></div>`
+	want := errorCard("500", "Internal Server Error",
+		`<p class="text-sm text-muted-foreground mb-2">Something went wrong. Please try again or contact support.</p>`)
 	if got != want {
 		t.Fatalf("ErrorContent(ErrInternal) mismatch\ngot:  %s\nwant: %s", got, want)
 	}
@@ -74,7 +90,8 @@ func TestErrorContent_HTMLEntityEncoding(t *testing.T) {
 		t.Fatalf("raw '<special>' must not appear in rendered HTML; got: %q", got)
 	}
 
-	want := `<div class="max-w-lg mx-auto py-24 px-4"><div class="bg-white rounded-lg border border-gray-200 shadow-sm p-8"><div class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 mb-4">400</div><h1 class="text-2xl font-bold text-gray-900 mb-3">Bad Request</h1><p class="text-sm text-gray-600">input has &lt;special&gt; &amp; chars</p><div class="mt-8"><a href="/" class="text-sm text-blue-600 hover:underline">Back to home</a></div></div></div>`
+	want := errorCard("400", "Bad Request",
+		`<p class="text-sm text-muted-foreground">input has &lt;special&gt; &amp; chars</p>`)
 	if got != want {
 		t.Fatalf("ErrorContent(ErrBadRequest special chars) mismatch\ngot:  %s\nwant: %s", got, want)
 	}
@@ -87,7 +104,9 @@ func TestErrorContent_Internal_WithInstance(t *testing.T) {
 	e.Instance = "/api/users/42"
 	got := render.RenderNode(t, errorpage.ErrorContent(e))
 
-	want := `<div class="max-w-lg mx-auto py-24 px-4"><div class="bg-white rounded-lg border border-gray-200 shadow-sm p-8"><div class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 mb-4">500</div><h1 class="text-2xl font-bold text-gray-900 mb-3">Internal Server Error</h1><p class="text-sm text-gray-600 mb-2">Something went wrong. Please try again or contact support.</p><p class="text-xs text-gray-400">Reference: /api/users/42</p><div class="mt-8"><a href="/" class="text-sm text-blue-600 hover:underline">Back to home</a></div></div></div>`
+	want := errorCard("500", "Internal Server Error",
+		`<p class="text-sm text-muted-foreground mb-2">Something went wrong. Please try again or contact support.</p>`+
+			`<p class="text-xs text-muted-foreground">Reference: /api/users/42</p>`)
 	if got != want {
 		t.Fatalf("ErrorContent(ErrInternal with instance) mismatch\ngot:  %s\nwant: %s", got, want)
 	}
