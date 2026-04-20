@@ -292,6 +292,9 @@ Always use `%w` when wrapping a returned error that callers should be able to
 unwrap. Never use `%v` or `%s` on an `error` value in a wrapping
 `fmt.Errorf` — doing so severs the error chain and breaks `errors.Is`.
 
+Place `%w` at the end of the format string so the prefix reads as a natural
+operation trail: `fmt.Errorf("orders: create: %w", err)`.
+
 ### Constructor-time validation errors
 
 For invalid constructor arguments:
@@ -612,13 +615,16 @@ supply the `BoundaryConfig` extractors. `otelweb.MakeOnError()` provides the
 - validation failures
 - missing records
 - any runtime condition a caller can reasonably handle
+- crossing a package boundary — a panic must never propagate out of a package
+  to its caller; recover before returning if a package can panic internally
 
 ### Recovery rules
 
 - recover at top-level boundaries only
 - attach stack traces there
 - convert the failure into a safe 5xx response or runtime failure signal
-- do not continue from a panic in lower-level package code as if nothing happened
+- recovery exists to convert a crash into a logged, classified error at a
+  boundary — not to silently suppress failures and continue as if nothing happened
 
 ---
 

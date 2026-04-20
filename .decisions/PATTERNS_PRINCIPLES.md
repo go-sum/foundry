@@ -88,6 +88,26 @@ When creating a new function:
 - Pass typed values, not raw strings, once input crosses the boundary.
 - Return ordinary Go errors; do not use panics for expected failures.
 
+### Option structs vs functional options
+
+- Use an option struct when most callers need configuration or need multiple
+  options together.
+- Use functional options (variadic closures) when most callers need zero options
+  and extensibility across callers matters.
+- Never place `context.Context` in an option struct — it must remain a direct
+  function parameter.
+
+### Variable declarations
+
+- Use `var x T` when the zero value is meaningful and intentional.
+- Use `x := expr` for non-zero initialization.
+
+### Signal-boosting comments
+
+When an `err == nil` branch does significant work, add a comment to flag the
+inverted condition: `// if NO error`. The positive/negative inversion is easy
+to misread on a quick scan.
+
 ### Error handling
 
 - Wrap propagated errors with `%w` and enough context to identify the failing operation.
@@ -115,6 +135,12 @@ Do not let a lower layer depend on a higher one:
 - services should not render HTML
 - repositories should not decide redirects or HTTP status codes
 - views should not own business rules or persistence
+
+### Package naming
+
+Never name a package `util`, `helper`, or `common`. Name it for what it
+provides (e.g., `httputil` → `redirect`, `helper` → `token`, `common` → the
+specific domain it owns).
 
 ---
 
@@ -237,6 +263,24 @@ This is appropriate for:
 
 Avoid using the Singleton pattern as an excuse to hide dependencies.
 
+### Pattern selection by problem type
+
+Diagnose the problem category before reaching for a pattern.
+
+**Object creation problems** (complex construction, too many constructor args,
+need cloning): evaluate Builder, Prototype, or Factory. The Factory/registry
+pattern is the preferred entry point — see above.
+
+**Structural problems** (incompatible interfaces, adding behavior without
+subclassing, simplifying a complex subsystem): evaluate Decorator, Facade,
+Proxy, or Composite. The Adapter pattern is covered above.
+
+**Behavioral problems** (need to swap algorithms at runtime, notify observers,
+support undo/replay, or model state-dependent behavior): evaluate Strategy,
+Observer, Command, State, or Mediator.
+
+If no pattern simplifies the code that exists today, do not introduce one.
+
 ---
 
 ## 7. Concurrency And Lifecycle
@@ -256,6 +300,10 @@ when there is a clear correctness, latency, or throughput reason.
 - Do not create fire-and-forget goroutines from handlers or services.
 - If work must outlive the request, hand it to an owned background subsystem
   such as the queue.
+- Always specify channel direction (`chan<-`, `<-chan`) in function parameters
+  and return types when the function only sends or only receives.
+- Do not preallocate slice or map capacity without evidence the size is known at
+  the call site; guessed size hints add complexity without proven benefit.
 
 ---
 
@@ -272,6 +320,9 @@ Code should be easy to test at the boundary that owns behavior.
   entities.
 - When refactoring config structs or mappings, trace every caller and every
   mapping that depends on them.
+- Prefer real transports (`httptest.Server`) over hand-implemented HTTP client
+  mocks when testing outbound requests — mocked clients hide serialization and
+  real transport behavior.
 
 ### Refactor threshold
 
