@@ -1,29 +1,31 @@
-/* Zinc variant — identical structure to theme-slate.css with --color-zinc-*
-   substituted for --color-slate-* throughout. Zinc reads slightly warmer
-   and less blue than slate in mid-tones.
+/* Zinc- color scale using var(), making it easy to see which scale stop each
+   token maps to. Non-standard values (destructive dark, sidebar-primary dark)
+   keep raw oklch since they carry chroma.
 
-   To activate: change the import in tailwind.css from theme-slate.css to
-   theme-zinc.css. To create your own variant, copy this file and replace
-   zinc with any Tailwind color scale (stone, gray, neutral, etc.).
+   Light and dark tokens are defined here as plain CSS custom properties.
+   theme-base.css maps these onto Tailwind's --color-* namespace via
+   @theme inline {}, so every bg-*, text-*, border-* utility resolves at
+   runtime.  Toggling .dark on <html> switches the full palette instantly.
 
-   Primary stays blue — change --primary and --ring here to adopt a
-   different brand color without touching the neutral palette. */
+   Primary uses blue rather than the neutral slate scale — swap --primary and
+   --ring values here to adopt a different brand color, or replace this file
+   for a different neutral scale. */
 
-/* Light -------------------------------------------------------------------- */
+/* ──────────────────────────────────────────────────────────────── Light ─── */
 :root {
   --radius: 0.625rem;
 
-  --background:           var(--color-white);
+  --background:           var(--color-zinc-50);
   --foreground:           var(--color-zinc-950);
 
-  --card:                 var(--color-white);
+  --card:                 var(--color-zinc-50);
   --card-foreground:      var(--color-zinc-950);
 
-  --popover:              var(--color-white);
+  --popover:              var(--color-zinc-50);
   --popover-foreground:   var(--color-zinc-950);
 
   --primary:              var(--color-blue-600);
-  --primary-foreground:   var(--color-white);
+  --primary-foreground:   var(--color-zinc-50);
 
   --secondary:            var(--color-zinc-100);
   --secondary-foreground: var(--color-zinc-900);
@@ -34,12 +36,12 @@
   --accent:               var(--color-zinc-100);
   --accent-foreground:    var(--color-zinc-900);
 
-  --destructive:          oklch(0.577 0.245 27.325);
+  --destructive:          var(--color-red-500);
 
   --success:              var(--color-green-700);
-  --success-foreground:   var(--color-white);
+  --success-foreground:   var(--color-zinc-50);
   --warning:              var(--color-orange-700);
-  --warning-foreground:   var(--color-white);
+  --warning-foreground:   var(--color-zinc-50);
 
   --border:               var(--color-zinc-400);
   --input:                var(--color-zinc-400);
@@ -48,14 +50,14 @@
   --sidebar:                       var(--color-zinc-50);
   --sidebar-foreground:            var(--color-zinc-950);
   --sidebar-primary:               var(--color-blue-600);
-  --sidebar-primary-foreground:    var(--color-white);
+  --sidebar-primary-foreground:    var(--color-zinc-50);
   --sidebar-accent:                var(--color-zinc-200);
   --sidebar-accent-foreground:     var(--color-zinc-900);
   --sidebar-border:                var(--color-zinc-200);
   --sidebar-ring:                  var(--color-zinc-400);
 }
 
-/* Dark --------------------------------------------------------------------- */
+/* ───────────────────────────────────────────────────────────────── Dark ─── */
 .dark {
   --background:           var(--color-zinc-950);
   --foreground:           var(--color-zinc-50);
@@ -67,7 +69,7 @@
   --popover-foreground:   var(--color-zinc-50);
 
   --primary:              var(--color-blue-400);
-  --primary-foreground:   var(--color-white);
+  --primary-foreground:   var(--color-zinc-50);
 
   --secondary:            var(--color-zinc-800);
   --secondary-foreground: var(--color-zinc-50);
@@ -92,7 +94,7 @@
   --sidebar:                       var(--color-zinc-900);
   --sidebar-foreground:            var(--color-zinc-50);
   --sidebar-primary:               var(--color-blue-500);
-  --sidebar-primary-foreground:    var(--color-white);
+  --sidebar-primary-foreground:    var(--color-zinc-50);
   --sidebar-accent:                var(--color-zinc-800);
   --sidebar-accent-foreground:     var(--color-zinc-50);
   --sidebar-border:                var(--color-zinc-700);

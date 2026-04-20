@@ -1,16 +1,22 @@
-/* To use a web font, import the tailwindcss defaults: */
-/*@import "./theme-v4.css";*/
-
-/* Bridge semantic CSS custom properties to Tailwind color utilities.
+/* ─────────────────────────────────────────────────────────────────────────────
+Bridge semantic CSS custom properties to Tailwind color utilities.
    @theme inline defers resolution to runtime via CSS var(), so toggling .dark on <html> re-maps every bg-*, text-*, border-*
    utility instantly without recompiling the stylesheet.
+  ──────────────────────────────────────────────────────────────────────────────
+To use a web font, prepend it:
+  --font-sans: var(--theme-font-sans);
+  --font-mono: var(--theme-font-mono);
+Tailwind v4 default font stacks, probed at build time.
+  --font-family-sans: "Inter", var(--theme-font-sans);
+*/
+/* To use a web font, uncomment the tailwindcss v4 defaults:
+:root {
+  --theme-font-sans:  ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --theme-font-mono:  ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --theme-font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+*/
 
-   To use a web font, prepend it:
-*/
-/*
---font-sans: var(--theme-font-sans);
---font-mono: var(--theme-font-mono);
-*/
 @theme inline {
   --color-background:                  var(--background);
   --color-foreground:                  var(--foreground);
