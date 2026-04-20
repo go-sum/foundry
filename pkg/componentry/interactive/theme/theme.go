@@ -4,6 +4,7 @@ package theme
 
 import (
 	"crypto/sha256"
+	_ "embed"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -12,45 +13,43 @@ import (
 	h "maragu.dev/gomponents/html"
 )
 
-// themeScriptContent is the exact JavaScript emitted by ThemeScript().
-// Defined as a constant so its SHA-256 hash is computed once (ScriptCSPHash)
-// and the rendered <script> always matches what the CSP authorises.
-const themeScriptContent = `(function(){var p=localStorage.getItem('themePreference');if(p==='dark'||(p==='system'||!p)&&window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark')}})();`
+//go:embed init.min.js
+var initScriptContent string
 
-// selectorScriptContent is the exact JavaScript emitted by SelectorScript().
-const selectorScriptContent = `(function(){var btn=document.querySelector('[data-theme-selector]');if(!btn)return;btn.addEventListener('click',function(){var themes=['light','dark','system'];var cur=localStorage.getItem('themePreference')||'system';var next=themes[(themes.indexOf(cur)+1)%themes.length];localStorage.setItem('themePreference',next);document.documentElement.setAttribute('data-theme-preference',next);if(next==='dark'||(next==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}})})();`
+//go:embed theme.min.js
+var themeScriptContent string
 
-// ScriptCSPHash is the ready-to-embed CSP token for the ThemeScript inline
+// InitScriptCSPHash is the ready-to-embed CSP token for the InitScript inline
 // script. Add it to script-src in your Content-Security-Policy header:
 //
-//	script-src 'self' <ScriptCSPHash>
-var ScriptCSPHash string
+//	script-src 'self' <InitScriptCSPHash>
+var InitScriptCSPHash string
 
-// SelectorScriptCSPHash is the ready-to-embed CSP token for the SelectorScript
-// inline script.
-var SelectorScriptCSPHash string
+// ThemeScriptCSPHash is the ready-to-embed CSP token for the ThemeScript inline
+// script (the click handler).
+var ThemeScriptCSPHash string
 
 func init() {
-	// Hash the bytes the browser actually receives — the inner text of the
-	// rendered <script> element — so any future change to ThemeScript() or its
-	// gomponents wrapper automatically keeps the hash in sync.
+	initScriptContent = strings.TrimRight(initScriptContent, "\r\n")
+	themeScriptContent = strings.TrimRight(themeScriptContent, "\r\n")
+
 	var buf strings.Builder
-	if err := ThemeScript().Render(&buf); err != nil {
-		panic(fmt.Sprintf("theme.ThemeScript render: %v", err))
+	if err := InitScript().Render(&buf); err != nil {
+		panic(fmt.Sprintf("theme.InitScript render: %v", err))
 	}
 	rendered := buf.String()
 	inner := strings.TrimPrefix(rendered, "<script>")
 	inner = strings.TrimSuffix(inner, "</script>")
-	ScriptCSPHash = cspHash(inner)
+	InitScriptCSPHash = cspHash(inner)
 
 	buf.Reset()
-	if err := SelectorScript().Render(&buf); err != nil {
-		panic(fmt.Sprintf("theme.SelectorScript render: %v", err))
+	if err := ThemeScript().Render(&buf); err != nil {
+		panic(fmt.Sprintf("theme.ThemeScript render: %v", err))
 	}
 	rendered = buf.String()
 	inner = strings.TrimPrefix(rendered, "<script>")
 	inner = strings.TrimSuffix(inner, "</script>")
-	SelectorScriptCSPHash = cspHash(inner)
+	ThemeScriptCSPHash = cspHash(inner)
 }
 
 // cspHash returns the 'sha256-...' token for an inline script value.
@@ -59,7 +58,7 @@ func cspHash(s string) string {
 	return "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
 }
 
-// ThemeScript returns a synchronous inline <script> that must be placed
+// InitScript returns a synchronous inline <script> that must be placed
 // inside <head> before any body content renders. It reads the stored
 // 'themePreference' key from localStorage ('light', 'dark', or 'system')
 // and immediately adds the "dark" class to <html> when needed, preventing
@@ -67,8 +66,8 @@ func cspHash(s string) string {
 //
 // The script is intentionally minified — it must not be deferred, and
 // keeping it small reduces the blocking time to near zero.
-func ThemeScript() g.Node {
-	return h.Script(g.Raw(themeScriptContent))
+func InitScript() g.Node {
+	return h.Script(g.Raw(initScriptContent))
 }
 
 // ThemeSelectorProps configures the theme cycling button.
@@ -90,7 +89,7 @@ type ThemeSelectorProps struct {
 // reload.
 //
 // Icon visibility is controlled by CSS rules keyed on data-theme-preference on
-// <html>. The click handler is provided by SelectorScript().
+// <html>. The click handler is provided by ThemeScript().
 func ThemeSelector(p ThemeSelectorProps) g.Node {
 	lightIcon := p.LightIcon
 	if lightIcon == nil {
@@ -122,9 +121,9 @@ func ThemeSelector(p ThemeSelectorProps) g.Node {
 	return h.Button(nodes...)
 }
 
-// SelectorScript returns the inline <script> for the ThemeSelector click
-// handler. Place it after the ThemeSelector element (or at end of <body>).
-// Separate from ThemeScript so apps can choose how to load each.
-func SelectorScript() g.Node {
-	return h.Script(g.Raw(selectorScriptContent))
+// ThemeScript returns the inline <script> for the ThemeSelector click handler.
+// Place it after the ThemeSelector element (or at end of <body>).
+// Separate from InitScript so apps can choose how to load each.
+func ThemeScript() g.Node {
+	return h.Script(g.Raw(themeScriptContent))
 }

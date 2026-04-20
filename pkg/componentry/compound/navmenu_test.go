@@ -141,6 +141,22 @@ func TestNavMenu_RendersForm(t *testing.T) {
 	}
 }
 
+func TestNavMenu_ConfigEmbeddedSlots(t *testing.T) {
+	cfg := compound.NavConfig{
+		Brand: compound.NavBrand{Label: "Test", Href: "/"},
+		Sections: []compound.NavSection{
+			{Items: []compound.NavItem{{Slot: "theme"}}},
+		},
+		Slots: compound.NavSlots{
+			"theme": compound.ControlSlot("Theme", h.Button(g.Text("Toggle"))),
+		},
+	}
+	got := renderNode(t, compound.NavMenu(compound.NavMenuProps{Config: cfg}))
+	if !containsStr(got, "Toggle") {
+		t.Errorf("expected 'Toggle' from config-embedded slot, got:\n%s", got)
+	}
+}
+
 func TestNavMenu_SlotMissing(t *testing.T) {
 	cfg := baseConfig(
 		compound.NavItem{Slot: "nonexistent"},

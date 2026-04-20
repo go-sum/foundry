@@ -3,6 +3,7 @@ package layout
 
 import (
 	"github.com/go-sum/assets/publish"
+	"github.com/go-sum/componentry/interactive/theme"
 	"github.com/go-sum/web/render"
 	g "maragu.dev/gomponents"
 	c "maragu.dev/gomponents/components"
@@ -29,6 +30,7 @@ func Page(p Props) g.Node {
 			h.Meta(h.Name("csrf-token"), h.Content(p.CSRFToken)),
 			render.HXCSRFMeta(p.CSRFToken),
 			h.Link(h.Rel("stylesheet"), h.Href(publish.Path("css/app.css"))),
+			theme.InitScript(),
 		},
 		Body: []g.Node{
 			h.Script(h.Src(publish.Path("js/htmx.min.js")), h.Defer(), g.Attr("nonce", p.Nonce)),
@@ -37,6 +39,7 @@ func Page(p Props) g.Node {
 			h.Div(h.Class("min-h-screen bg-background"),
 				g.Group(p.Children),
 			),
+			theme.ThemeScript(),
 		},
 	})
 }

@@ -32,12 +32,12 @@ func TestThemeScript(t *testing.T) {
 		node g.Node
 	}{
 		{
-			name: "theme script",
-			node: theme.ThemeScript(),
+			name: "init script",
+			node: theme.InitScript(),
 		},
 		{
-			name: "selector script",
-			node: theme.SelectorScript(),
+			name: "theme script",
+			node: theme.ThemeScript(),
 		},
 		{
 			name: "theme selector default",
@@ -68,35 +68,32 @@ func TestThemeScript(t *testing.T) {
 	}
 }
 
-func TestScriptCSPHash(t *testing.T) {
-	if theme.ScriptCSPHash == "" {
-		t.Fatal("ScriptCSPHash: must not be empty")
+func TestInitScriptCSPHash(t *testing.T) {
+	if theme.InitScriptCSPHash == "" {
+		t.Fatal("InitScriptCSPHash: must not be empty")
 	}
-	if !strings.HasPrefix(theme.ScriptCSPHash, "'sha256-") {
-		t.Errorf("ScriptCSPHash: expected format 'sha256-...', got: %s", theme.ScriptCSPHash)
+	if !strings.HasPrefix(theme.InitScriptCSPHash, "'sha256-") {
+		t.Errorf("InitScriptCSPHash: expected format 'sha256-...', got: %s", theme.InitScriptCSPHash)
 	}
-	if !strings.HasSuffix(theme.ScriptCSPHash, "'") {
-		t.Errorf("ScriptCSPHash: expected trailing quote, got: %s", theme.ScriptCSPHash)
+	rendered := testutil.RenderNode(t, theme.InitScript())
+	inner := extractScriptContent(rendered)
+	want := cspHashOf(inner)
+	if theme.InitScriptCSPHash != want {
+		t.Errorf("InitScriptCSPHash mismatch:\n  got:  %s\n  want: %s", theme.InitScriptCSPHash, want)
+	}
+}
+
+func TestThemeScriptCSPHash(t *testing.T) {
+	if theme.ThemeScriptCSPHash == "" {
+		t.Fatal("ThemeScriptCSPHash: must not be empty")
+	}
+	if !strings.HasPrefix(theme.ThemeScriptCSPHash, "'sha256-") {
+		t.Errorf("ThemeScriptCSPHash: expected format 'sha256-...', got: %s", theme.ThemeScriptCSPHash)
 	}
 	rendered := testutil.RenderNode(t, theme.ThemeScript())
 	inner := extractScriptContent(rendered)
 	want := cspHashOf(inner)
-	if theme.ScriptCSPHash != want {
-		t.Errorf("ScriptCSPHash mismatch:\n  got:  %s\n  want: %s", theme.ScriptCSPHash, want)
-	}
-}
-
-func TestSelectorScriptCSPHash(t *testing.T) {
-	if !strings.HasPrefix(theme.SelectorScriptCSPHash, "'sha256-") {
-		t.Errorf("SelectorScriptCSPHash: expected format 'sha256-...', got: %s", theme.SelectorScriptCSPHash)
-	}
-	if !strings.HasSuffix(theme.SelectorScriptCSPHash, "'") {
-		t.Errorf("SelectorScriptCSPHash: expected trailing quote, got: %s", theme.SelectorScriptCSPHash)
-	}
-	rendered := testutil.RenderNode(t, theme.SelectorScript())
-	inner := extractScriptContent(rendered)
-	want := cspHashOf(inner)
-	if theme.SelectorScriptCSPHash != want {
-		t.Errorf("SelectorScriptCSPHash mismatch:\n  got:  %s\n  want: %s", theme.SelectorScriptCSPHash, want)
+	if theme.ThemeScriptCSPHash != want {
+		t.Errorf("ThemeScriptCSPHash mismatch:\n  got:  %s\n  want: %s", theme.ThemeScriptCSPHash, want)
 	}
 }

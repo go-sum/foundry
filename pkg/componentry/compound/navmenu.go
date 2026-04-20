@@ -26,6 +26,11 @@ const (
 	NavAlignEnd   NavAlign = "end"
 )
 
+// Well-known slot names for NavItem.Slot references.
+const (
+	SlotThemeToggle = "theme_toggle"
+)
+
 // NavBrand configures the logo/wordmark shown at the start of the nav bar.
 type NavBrand struct {
 	Label    string
@@ -37,6 +42,7 @@ type NavBrand struct {
 type NavConfig struct {
 	Brand    NavBrand
 	Sections []NavSection
+	Slots    NavSlots
 }
 
 // NavSection groups related nav items and can be aligned to the leading or trailing edge.
@@ -139,14 +145,42 @@ type NavMenuProps struct {
 }
 
 // NavMenu renders a full responsive navigation bar assembled from NavConfig and NavSlots.
+// Slots are resolved from NavMenuProps.Slots first; if nil, NavConfig.Slots is used.
 func NavMenu(p NavMenuProps) g.Node {
+	slots := p.Slots
+	if slots == nil {
+		slots = p.Config.Slots
+	}
 	return layout.Navbar(layout.NavbarProps{
 		ID:              p.ID,
 		Brand:           mapBrand(p.Config.Brand),
-		Sections:        buildSections(p.Config.Sections, p.Slots),
+		Sections:        buildSections(p.Config.Sections, slots),
 		CurrentPath:     p.CurrentPath,
 		IsAuthenticated: p.IsAuthenticated,
 	})
+}
+
+// ValidateSlots walks cfg and returns the names of any Slot references
+// that are not present in cfg.Slots. An empty return means all slots are wired.
+func ValidateSlots(cfg NavConfig) []string {
+	var missing []string
+	for _, section := range cfg.Sections {
+		collectMissingSlots(section.Items, cfg.Slots, &missing)
+	}
+	return missing
+}
+
+func collectMissingSlots(items []NavItem, slots NavSlots, missing *[]string) {
+	for _, item := range items {
+		if item.Slot != "" {
+			if _, ok := slots[item.Slot]; !ok {
+				*missing = append(*missing, item.Slot)
+			}
+		}
+		if len(item.Items) > 0 {
+			collectMissingSlots(item.Items, slots, missing)
+		}
+	}
 }
 
 func buildSections(sections []NavSection, slots NavSlots) []layout.NavbarSection {

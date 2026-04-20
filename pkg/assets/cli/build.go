@@ -86,7 +86,10 @@ func newBuildCmd() *cobra.Command {
 			if err := build.DownloadJS(cfg, build.DefaultClient, os.Stdout); err != nil {
 				return err
 			}
-			return build.BundleJS(cfg, minify, os.Stdout)
+			if err := build.BundleJS(cfg, minify, os.Stdout); err != nil {
+				return err
+			}
+			return build.MinifyJS(cfg, os.Stdout)
 		},
 	})
 

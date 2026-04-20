@@ -1,7 +1,7 @@
+-- init script --
+<script>(()=>{var e=localStorage.getItem("themePreference")||"system";document.documentElement.setAttribute("data-theme-preference",e),(e==="dark"||e==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)&&document.documentElement.classList.add("dark")})();</script>
 -- theme script --
-<script>(function(){var p=localStorage.getItem('themePreference');if(p==='dark'||(p==='system'||!p)&&window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark')}})();</script>
--- selector script --
-<script>(function(){var btn=document.querySelector('[data-theme-selector]');if(!btn)return;btn.addEventListener('click',function(){var themes=['light','dark','system'];var cur=localStorage.getItem('themePreference')||'system';var next=themes[(themes.indexOf(cur)+1)%themes.length];localStorage.setItem('themePreference',next);document.documentElement.setAttribute('data-theme-preference',next);if(next==='dark'||(next==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}})})();</script>
+<script>(()=>{var r=document.querySelector("[data-theme-selector]");r?.addEventListener("click",()=>{var t=["light","dark","system"],a=localStorage.getItem("themePreference")||"system",e=t[(t.indexOf(a)+1)%t.length];localStorage.setItem("themePreference",e),document.documentElement.setAttribute("data-theme-preference",e),e==="dark"||e==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches?document.documentElement.classList.add("dark"):document.documentElement.classList.remove("dark")})})();</script>
 -- theme selector default --
 <button data-theme-selector="" type="button" aria-label="Toggle theme"><span class="theme-light-icon">Light</span><span class="theme-dark-icon">Dark</span><span class="theme-system-icon">System</span></button>
 -- theme selector custom icons --

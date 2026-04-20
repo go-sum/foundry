@@ -34,6 +34,12 @@ type Paths struct {
 type JSConfig struct {
 	Downloads []JSDownload `yaml:"downloads"`
 	Bundles   []JSBundle   `yaml:"bundles"`
+	Minify    []JSMinify   `yaml:"minify"`
+}
+
+type JSMinify struct {
+	Source string `yaml:"source"`
+	Target string `yaml:"target"`
 }
 
 type JSDownload struct {
@@ -139,6 +145,10 @@ func (cfg *Config) normalize() {
 	for i, bundle := range cfg.JS.Bundles {
 		cfg.JS.Bundles[i].Entry = resolveSourcePath(cfg.Paths, bundle.Entry)
 		cfg.JS.Bundles[i].Target = resolvePublicPath(cfg.Paths, bundle.Target)
+	}
+	for i, m := range cfg.JS.Minify {
+		cfg.JS.Minify[i].Source = resolveSourcePath(cfg.Paths, m.Source)
+		cfg.JS.Minify[i].Target = resolveSourcePath(cfg.Paths, m.Target)
 	}
 	for i, entry := range cfg.CSS {
 		cfg.CSS[i].Input = resolveSourcePath(cfg.Paths, entry.Input)

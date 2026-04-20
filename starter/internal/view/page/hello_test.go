@@ -3,6 +3,7 @@ package page
 import (
 	"testing"
 
+	"github.com/go-sum/componentry/interactive/theme"
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/web/render"
 )
@@ -16,11 +17,15 @@ func TestHelloPage(t *testing.T) {
 	req := view.Request{}
 	got := render.RenderNode(t, HelloPage(req, "World", "/hello/greeting", "/"))
 
+	themeScript := render.RenderNode(t, theme.InitScript())
+	selectorScript := render.RenderNode(t, theme.ThemeScript())
+
 	want := `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hello World</title>` +
 		`<meta name="viewport" content="width=device-width, initial-scale=1">` +
 		`<meta name="csrf-token" content="">` +
-		`<meta name="htmx-config" content="{&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;&#34;}}">` +
-		`<link rel="stylesheet" href="/css/app.css"></head>` +
+		`<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false,&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;&#34;}}">` +
+		`<link rel="stylesheet" href="/css/app.css">` +
+		themeScript + `</head>` +
 		`<body><script src="/js/htmx.min.js" defer nonce=""></script>` +
 		`<div id="flash" hx-swap-oob="true" aria-live="polite"></div>` +
 		`<div class="min-h-screen bg-background">` +
@@ -34,7 +39,8 @@ func TestHelloPage(t *testing.T) {
 		`<input class="` + _inputClass + `" type="text" id="name" name="name" value="World" hx-get="/hello/greeting" hx-trigger="keyup changed delay:300ms" hx-target="#greeting" hx-swap="innerHTML" hx-include="this">` +
 		`</div></div>` +
 		`<div class="mt-4"><a class="` + _btnClass + `" href="/">Back to home</a></div>` +
-		`</div></div></body></html>`
+		`</div></div>` +
+		selectorScript + `</body></html>`
 
 	if got != want {
 		t.Errorf("HelloPage output mismatch\ngot:  %s\nwant: %s", got, want)

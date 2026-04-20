@@ -3,9 +3,10 @@ package config
 import (
 	"fmt"
 
+	"github.com/go-sum/componentry/interactive/theme"
 	cfgpkg "github.com/go-sum/config"
-	"github.com/go-sum/web/serve"
 	"github.com/go-sum/web/secure"
+	"github.com/go-sum/web/serve"
 	"github.com/go-sum/web/session"
 	"github.com/go-sum/web/site"
 	"github.com/go-sum/web/static"
@@ -46,13 +47,13 @@ func defaultProduction() (Config, error) {
 	assets.PublicDir = "public/static"
 
 	return Config{
-		Assets:    assets,
-		CSP:       secure.DefaultCSPNonceConfig(),
-		CSRF:      csrf,
-		Env:       Production,
-		Headers:   secure.DefaultHeadersConfig(),
-		RateLimit: secure.DefaultRateLimitProfile(),
-		Server:    serve.DefaultServerConfig(),
+		Assets:       assets,
+		CSP:          secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash, theme.ThemeScriptCSPHash),
+		CSRF:         csrf,
+		Env:          Production,
+		Headers:      secure.DefaultHeadersConfig(),
+		RateLimit:    secure.DefaultRateLimitProfile(),
+		Server:       serve.DefaultServerConfig(),
 		Session:      session.DefaultSettings(),
 		SessionStore: cfgpkg.ExpandEnv("SESSION_STORE", "memory"),
 		Site:         site.Config{BaseURL: cfgpkg.ExpandEnv("SITE_BASE_URL", "")},

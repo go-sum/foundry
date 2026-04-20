@@ -52,7 +52,7 @@ func DefaultHeadersConfig() HeadersConfig {
 		XFrameOptions:             "DENY",
 		XContentTypeOptions:       "nosniff",
 		ReferrerPolicy:            "strict-origin-when-cross-origin",
-		PermissionsPolicy:         "accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), execution-while-not-rendered=(), execution-while-out-of-viewport=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), navigation-override=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()",
+		PermissionsPolicy:         "accelerometer=(), autoplay=(), camera=(), cross-origin-isolated=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()",
 		CrossOriginOpenerPolicy:   "same-origin",
 		CrossOriginEmbedderPolicy: "require-corp",
 		CrossOriginResourcePolicy: "same-origin",

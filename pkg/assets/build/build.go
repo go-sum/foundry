@@ -33,6 +33,9 @@ func Build(cfg *config.Config, opts Options, client *http.Client, out io.Writer)
 		if err := BundleJS(cfg, opts.Minify, out); err != nil {
 			return err
 		}
+		if err := MinifyJS(cfg, out); err != nil {
+			return err
+		}
 	}
 	if opts.Fonts {
 		if err := DownloadFonts(cfg, client, out); err != nil {

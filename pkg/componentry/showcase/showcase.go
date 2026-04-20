@@ -599,10 +599,10 @@ func Showcase() g.Node {
 				example("Theme selector button", theme.ThemeSelector(theme.ThemeSelectorProps{})),
 				example("CSP hashes (for Content-Security-Policy)", h.Div(
 					h.Class("font-mono text-xs text-muted-foreground space-y-2"),
-					h.P(g.Text("ThemeScript hash:")),
-					h.Code(h.Class("block text-xs break-all"), g.Text(theme.ScriptCSPHash)),
-					h.P(h.Class("mt-2"), g.Text("SelectorScript hash:")),
-					h.Code(h.Class("block text-xs break-all"), g.Text(theme.SelectorScriptCSPHash)),
+					h.P(g.Text("InitScript hash:")),
+					h.Code(h.Class("block text-xs break-all"), g.Text(theme.InitScriptCSPHash)),
+					h.P(h.Class("mt-2"), g.Text("ThemeScript hash:")),
+					h.Code(h.Class("block text-xs break-all"), g.Text(theme.ThemeScriptCSPHash)),
 				)),
 				example("ThemeScript (place in <head>)", h.Div(
 					h.Class("font-mono text-xs text-muted-foreground"),

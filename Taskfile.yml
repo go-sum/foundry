@@ -37,3 +37,9 @@ tasks:
     desc: "Run golangci-lint across all workspace modules"
     cmds:
       - task: ws:lint
+
+  build:componentry:js:
+    desc: "Minify componentry JS source files into .min.js via esbuild"
+    vars:
+      GO: /usr/local/go/bin/go
+    cmd: '{{.GO}} run github.com/go-sum/assets/cli build js --config pkg/componentry/.assets.yaml'

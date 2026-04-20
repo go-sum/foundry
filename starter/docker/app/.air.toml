@@ -2,11 +2,12 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  pre_cmd = ["tailwindcss --input ./static/tailwind.css --output ./public/static/css/app.css"]
+  pre_cmd = ["go run ../pkg/assets/cli build css --incremental", "go run ../pkg/assets/cli sprites --incremental"]
   cmd = "go build -o ./tmp/server ./cmd/server"
   entrypoint = "./tmp/server"
   delay = 500
-  exclude_dir = ["tmp", "public", ".git", ".claude"]
+  exclude_dir = [".claude", ".git", ".secrets", "docker", "public", "tmp"]
+  exclude_file = ["docker*.yml"]
   include_ext = ["go", "html", "tmpl", "yaml", "toml", "css"]
   kill_delay = "1s"
   rerun = false

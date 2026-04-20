@@ -34,6 +34,19 @@ type CSPNonceConfig struct {
 	// (outermost middleware runs first, so list CSPNonce before Headers when
 	// calling router.Use or web.Chain).
 	CSPTemplate string
+
+	// ScriptSrcExtra holds additional script-src tokens (e.g. CSP hashes for
+	// inline scripts) that are appended to the script-src directive at
+	// middleware init time. Each entry should be a complete CSP source
+	// expression such as "'sha256-abc123...'" .
+	ScriptSrcExtra []string
+}
+
+// WithScriptHashes returns a copy of cfg with the given CSP hash tokens
+// appended to ScriptSrcExtra.
+func (cfg CSPNonceConfig) WithScriptHashes(hashes ...string) CSPNonceConfig {
+	cfg.ScriptSrcExtra = append(cfg.ScriptSrcExtra, hashes...)
+	return cfg
 }
 
 type nonceContextKey struct{}
@@ -53,6 +66,12 @@ func Nonce(c *web.Context) string {
 // a 22-character string. This satisfies the minimum entropy recommended by
 // the CSP3 spec (128 bits).
 func CSPNonce(cfg CSPNonceConfig) web.Middleware {
+	tmpl := cfg.CSPTemplate
+	if len(cfg.ScriptSrcExtra) > 0 && tmpl != "" {
+		extra := " " + strings.Join(cfg.ScriptSrcExtra, " ")
+		tmpl = strings.Replace(tmpl, "; style-src", extra+"; style-src", 1)
+	}
+
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
 			// Generate 16 random bytes → base64url, no padding.
@@ -65,8 +84,8 @@ func CSPNonce(cfg CSPNonceConfig) web.Middleware {
 			c.Set(nonceContextKey{}, nonce)
 			resp, err := next(c)
 
-			if cfg.CSPTemplate != "" {
-				policy := strings.ReplaceAll(cfg.CSPTemplate, "{nonce}", nonce)
+			if tmpl != "" {
+				policy := strings.ReplaceAll(tmpl, "{nonce}", nonce)
 				resp.Headers.Set("Content-Security-Policy", policy)
 			}
 

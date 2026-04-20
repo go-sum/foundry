@@ -2,7 +2,10 @@ package config
 
 import (
 	"github.com/go-sum/componentry/compound"
+	"github.com/go-sum/componentry/icons"
+	"github.com/go-sum/componentry/icons/render"
 	"github.com/go-sum/componentry/interactive/theme"
+	"github.com/go-sum/componentry/ui/core"
 )
 
 // DefaultNav returns the default navigation configuration for the Starter application.
@@ -44,7 +47,11 @@ func DefaultNav() compound.NavConfig {
 			},
 		},
 		Slots: compound.NavSlots{
-			compound.SlotThemeToggle: compound.ControlSlot("Theme", theme.ThemeSelector(theme.ThemeSelectorProps{})),
+			compound.SlotThemeToggle: compound.ControlSlot("Theme", theme.ThemeSelector(theme.ThemeSelectorProps{
+				LightIcon:  core.Icon(render.PropsFor(icons.ThemeLight, core.IconProps{})),
+				DarkIcon:   core.Icon(render.PropsFor(icons.ThemeDark, core.IconProps{})),
+				SystemIcon: core.Icon(render.PropsFor(icons.ThemeSystem, core.IconProps{})),
+			})),
 		},
 	}
 }

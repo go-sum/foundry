@@ -1,0 +1,9 @@
+paths:
+  source_dir: .
+
+js:
+  minify:
+    - source: interactive/theme/init.js
+      target: interactive/theme/init.min.js
+    - source: interactive/theme/theme.js
+      target: interactive/theme/theme.min.js

@@ -310,7 +310,7 @@ func Navbar(p NavbarProps) g.Node {
 	drawerID := navbarID(p.ID)
 
 	return h.Nav(
-		h.Class("w-full border-b bg-background"),
+		h.Class("w-full border-b bg-background text-foreground"),
 		h.Div(
 			h.Class("container mx-auto flex h-14 items-center px-4"),
 			h.Div(h.Class("mr-4 flex shrink-0"), brandNode(p.Brand)),
