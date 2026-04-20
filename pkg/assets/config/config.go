@@ -86,6 +86,17 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config %s: %w", path, err)
 	}
 	cfg.Paths = cfg.Paths.withDefaults()
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolving config path %s: %w", path, err)
+	}
+	baseDir := filepath.Dir(absPath)
+	if !filepath.IsAbs(cfg.Paths.SourceDir) {
+		cfg.Paths.SourceDir = filepath.Join(baseDir, cfg.Paths.SourceDir)
+	}
+	if !filepath.IsAbs(cfg.Paths.PublicDir) {
+		cfg.Paths.PublicDir = filepath.Join(baseDir, cfg.Paths.PublicDir)
+	}
 	cfg.normalize()
 	return &cfg, nil
 }

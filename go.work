@@ -7,4 +7,5 @@ use (
 	./pkg/web
 	./pkg/web/render
 	./starter
+	./tools
 )

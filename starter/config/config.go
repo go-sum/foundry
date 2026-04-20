@@ -43,7 +43,7 @@ func defaultProduction() (Config, error) {
 		return Config{}, fmt.Errorf("config: security: %w", err)
 	}
 	assets := static.DefaultAssetsConfig()
-	assets.PublicDir = "starter/public/static"
+	assets.PublicDir = "public/static"
 
 	return Config{
 		Assets:    assets,

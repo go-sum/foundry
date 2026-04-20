@@ -1,0 +1,184 @@
+version: '3'
+
+# dotenv is declared here for cloned apps where this is the root Taskfile.
+# dotenv:
+#   - '.versions'
+#   - '.env'
+
+vars:
+  GO: /usr/local/go/bin/go
+  PROJECT_NAME:
+    sh: basename "$(pwd)"
+  APP_NAME: "{{.PROJECT_NAME}}-dev"
+  DKR_ALL: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f
+    docker-compose.dev.yml -f docker-compose.caddy.yml --project-name
+    {{.PROJECT_NAME}}"
+  DKR_CADDY: "docker compose -f docker-compose.caddy.yml --project-name {{.PROJECT_NAME}}"
+  DKR_DATA: "docker compose -f docker-compose.data.yml --project-name {{.PROJECT_NAME}}"
+  DKR_DEV: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f
+    docker-compose.dev.yml --project-name {{.PROJECT_NAME}}"
+  DEV_DOMAIN: "{{.PROJECT_NAME}}.test"
+  RUN_TOOLS: "{{.DKR_DEV}} --profile tools run --rm"
+  TOOLS_DEV: "{{.TOOLS_IMAGE}}:dev"
+  TOOLS_IMAGE: "{{.PROJECT_NAME}}-tools"
+  TOOLS_PROD: "{{.TOOLS_IMAGE}}:prod"
+
+env:
+  APP_NAME: "{{.APP_NAME}}"
+  PROJECT_NAME: "{{.PROJECT_NAME}}"
+  TOOLS_DEV: "{{.TOOLS_DEV}}"
+  TOOLS_PROD: "{{.TOOLS_PROD}}"
+
+tasks:
+  # default, test, test:race are omitted here so they don't conflict when this
+  # file is included with flatten:true in the monorepo root Taskfile.
+  # The starter:clone command injects them into standalone cloned apps.
+
+  # ── Assets ────────────────────────────────────────────────────────────────────
+
+  build:assets:
+    desc: "Build static assets via assets CLI"
+    cmd: '{{.GO}} run github.com/go-sum/assets/cli build all --config .assets.yaml
+      --minify'
+
+  # ── Data containers (postgres + dragonfly) ────────────────────────────────────
+
+  data:up:
+    desc: "Start data containers (postgres, dragonfly) detached"
+    cmd: "{{.DKR_DATA}} up -d --build"
+
+  data:down:
+    desc: "Stop data containers"
+    cmd: "{{.DKR_DATA}} down"
+
+  data:reset:
+    desc: "Stop data containers and remove volumes"
+    cmd: "{{.DKR_DATA}} down -v"
+
+  # ── Dev stack (data + app + caddy) ────────────────────────────────────────────
+
+  dev:
+    desc: "Rebuild and attach to the full dev stack"
+    deps:
+      - _inspect:tools
+      - task: _caddy:config
+        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls internal"}
+    cmd: "{{.DKR_ALL}} up --build {{.CLI_ARGS}}"
+
+  dev:up:
+    desc: "Start full dev stack detached"
+    deps:
+      - _inspect:tools
+      - task: _caddy:config
+        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls internal"}
+    cmd: "{{.DKR_ALL}} up --build --detach {{.CLI_ARGS}}"
+
+  dev:down:
+    desc: "Stop app and caddy (data containers keep running)"
+    cmd: "{{.DKR_ALL}} down {{.CLI_ARGS}}"
+
+  dev:logs:
+    desc: "Follow dev stack logs"
+    cmd: "{{.DKR_ALL}} logs -f {{.CLI_ARGS}}"
+
+  dev:prune:
+    desc: "Remove all project containers, images, networks, and volumes"
+    cmds:
+      - "{{.DKR_ALL}} --profile tools down -v --rmi all --remove-orphans"
+
+  dev:tools:
+    desc: "Rebuild dev toolchain image"
+    cmd: "{{.DKR_DEV}} --profile tools build tools"
+
+  # ── Test ──────────────────────────────────────────────────────────────────────
+
+  app:test:
+    desc: "Run tests"
+    env:
+      GONOSUMDB: '*'
+    cmd: '{{.GO}} test -count=1 ./...'
+
+  app:test:race:
+    desc: "Run tests with race detector"
+    env:
+      GONOSUMDB: '*'
+    cmd: '{{.GO}} test -race -count=1 ./...'
+
+  # ── Secrets & Certs ───────────────────────────────────────────────────────────
+
+  secrets:init:
+    desc: "Write secret files from .env into .secrets/ (required before first docker
+      compose up)"
+    cmds:
+      - mkdir -p .secrets
+      - |
+        for var in $(awk '/^secrets:/{f=1; next} f && /^  [A-Z]/{print $1} f && /^[^ ]/{f=0}' docker-compose.data.yml docker-compose.yml | tr -d ':' | sort -u); do
+          val=$(grep "^${var}=" .env | cut -d= -f2-)
+          printf '%s' "$val" > ".secrets/$var"
+          chmod 600 ".secrets/$var"
+        done
+
+  certs:init:
+    desc: "Generate local TLS certificates with mkcert (run once per machine)"
+    cmds:
+      - mkdir -p docker/caddy/certs
+      - >
+        {{.RUN_TOOLS}} tools sh -c 'mkcert -install && mkcert -cert-file
+        /app/docker/caddy/certs/local.pem -key-file
+        /app/docker/caddy/certs/local-key.pem {{.DEV_DOMAIN}}
+        "*.{{.DEV_DOMAIN}}" localhost 127.0.0.1'
+
+  # ── Production ────────────────────────────────────────────────────────────────
+
+  prod:build:
+    desc: "Build production Docker image"
+    preconditions:
+      - sh: test -f go.prod.mod
+        msg: "go.prod.mod not found — run 'task ws:sync' first to generate it"
+    cmd: |
+      GITHUB_ACCESS_TOKEN="${GITHUB_ACCESS_TOKEN:-$(grep '^GITHUB_ACCESS_TOKEN=' .env 2>/dev/null | cut -d= -f2-)}"
+      export GITHUB_ACCESS_TOKEN
+      docker build --target production_target \
+        --file docker/app/Dockerfile \
+        --build-arg GO_VERSION={{.GO_VERSION}} \
+        --build-arg HTMX_VERSION={{.HTMX_VERSION}} \
+        --build-arg TAILWIND_VERSION={{.TAILWIND_VERSION}} \
+        --build-arg APP_VERSION={{.APP_VERSION}} \
+        --build-arg TOOLS_PROD_IMAGE={{.TOOLS_PROD}} \
+        --secret id=github_token,env=GITHUB_ACCESS_TOKEN \
+        -t {{.PROJECT_NAME}}:latest .
+
+  prod:
+    desc: "Build production image and start the production stack"
+    deps:
+      - prod:build
+      - task: _caddy:config
+        vars: {DOMAIN: "{{.PROD_DOMAIN}}", TLS_CONFIG: "tls"}
+    cmd: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f
+      docker-compose.caddy.yml up -d"
+
+  # ── Helpers ───────────────────────────────────────────────────────────────────
+
+  _caddy:config:
+    internal: true
+    requires:
+      vars: [DOMAIN, TLS_CONFIG]
+    cmd: |
+      cat > docker/caddy/Caddyfile <<'CADDY'
+      {
+      	admin off
+      }
+
+      {{.DOMAIN}} {
+      	{{.TLS_CONFIG}}
+
+      	reverse_proxy app:8080
+      }
+      CADDY
+
+  _inspect:tools:
+    status:
+      - docker image inspect {{.TOOLS_DEV}} >/dev/null 2>&1
+    cmd: "{{.DKR_DEV}} --profile tools build tools"
+    internal: true
+    silent: true

@@ -1,0 +1,111 @@
+x-pg-healthcheck: &pg-healthcheck
+  interval: 5s
+  timeout: 5s
+  retries: 5
+
+x-kv-healthcheck: &kv-healthcheck
+  interval: 5s
+  timeout: 5s
+  retries: 5
+  start_period: 20s
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    build:
+      context: ./docker/postgres
+      args:
+        PG_VERSION: ${PG_VERSION}
+    image: foundry-db:latest
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+      - /run/postgresql:size=8m
+    security_opt:
+      - no-new-privileges:false
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 256
+    shm_size: 128m
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/PGUSER
+      POSTGRES_PASSWORD_FILE: /run/secrets/PGPASSWORD
+      POSTGRES_DB: ${PGDATABASE:-foundry}
+    secrets:
+      - PGUSER
+      - PGPASSWORD
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $(cat /run/secrets/PGUSER)"]
+      <<: *pg-healthcheck
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - app_net
+
+  kv:
+    build:
+      context: ./docker/dragonfly
+      args:
+        DRAGONFLY_VERSION: ${DRAGONFLY_VERSION}
+        GO_VERSION: ${GO_VERSION}
+    image: foundry-kv:latest
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 128
+    environment:
+      - DFLY_proactor_threads=2
+    secrets:
+      - KV_PASSWORD
+    volumes:
+      - kv_data:/data
+    # Dragonfly warns "SWAP is enabled" on startup — this is a false positive.
+    # mem_swappiness: 0 prevents the kernel from swapping this container's pages.
+    mem_swappiness: 0
+    ulimits:
+      memlock: -1
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck"]
+      <<: *kv-healthcheck
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - app_net
+
+volumes:
+  postgres_data:
+  kv_data:
+
+secrets:
+  PGUSER:
+    file: .secrets/PGUSER
+  PGPASSWORD:
+    file: .secrets/PGPASSWORD
+  KV_PASSWORD:
+    file: .secrets/KV_PASSWORD
+
+networks:
+  app_net:
+    driver: bridge
+    internal: true

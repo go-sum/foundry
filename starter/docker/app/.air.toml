@@ -1,0 +1,22 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  pre_cmd = ["tailwindcss --input ./static/tailwind.css --output ./public/static/css/app.css"]
+  cmd = "go build -o ./tmp/server ./cmd/server"
+  entrypoint = "./tmp/server"
+  delay = 500
+  exclude_dir = ["tmp", "public", ".git", ".claude"]
+  include_ext = ["go", "html", "tmpl", "yaml", "toml", "css"]
+  kill_delay = "1s"
+  rerun = false
+  send_interrupt = true
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true
+
+[proxy]
+  enabled = false

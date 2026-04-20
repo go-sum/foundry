@@ -1,16 +1,20 @@
 version: '3'
 
 dotenv:
-  - '.versions'
   - 'starter/.env'
+  - 'starter/.versions'
 
-vars:
-  GO: /usr/local/go/bin/go
-  GOROOT:
-    sh: '{{.GO}} env GOROOT'
-  BUILD_DIR: ./starter/build
-  TAILWIND: /usr/local/bin/tailwindcss
-  STATIC_DIR: ./starter/public/static
+includes:
+  app:
+    dir: ./starter
+    taskfile: ./starter/Taskfile.yml
+    flatten: true
+    optional: true
+  ws:
+    dir: '{{.USER_WORKING_DIR}}'
+    taskfile: ./tools/Taskfile.yml
+    flatten: false
+    optional: true
 
 tasks:
   default:
@@ -18,37 +22,18 @@ tasks:
     silent: true
     cmd: task --list
 
-  build:assets:
-    desc: "Build static assets (CSS via Tailwind, copy HTMX)"
-    cmds:
-      - mkdir -p {{.STATIC_DIR}}/css {{.STATIC_DIR}}/js
-      - cp /usr/local/lib/htmx.min.js {{.STATIC_DIR}}/js/htmx.min.js
-      - '{{.TAILWIND}} --input ./starter/tailwind.css --output {{.STATIC_DIR}}/css/app.css --minify'
-
-  dev:
-    desc: "Run the starter app in native Go mode"
-    deps: [build:assets]
-    cmd: '{{.GO}} run ./starter/cmd/server'
-
-  build:
-    desc: "Build the starter app (native)"
-    cmd: '{{.GO}} build -o {{.BUILD_DIR}}/server ./starter/cmd/server'
-
+  # Override flattened app:test — run across all workspace modules, not just starter.
   test:
-    desc: "Run all tests"
-    env:
-      GONOSUMDB: '*'
+    desc: "Run tests across all workspace modules"
     cmds:
-      - '{{.GO}} test ./pkg/web/...'
-      - '{{.GO}} test ./pkg/web/render/...'
-      - '{{.GO}} test ./starter/...'
+      - task: ws:test
 
   test:race:
-    desc: "Run all tests with race detector"
-    env:
-      GONOSUMDB: '*'
+    desc: "Run tests with race detector across all workspace modules"
     cmds:
-      - '{{.GO}} test -race ./pkg/web/...'
-      - '{{.GO}} test -race ./pkg/web/render/...'
-      - '{{.GO}} test -race ./starter/...'
+      - task: ws:test-race
 
+  lint:
+    desc: "Run golangci-lint across all workspace modules"
+    cmds:
+      - task: ws:lint

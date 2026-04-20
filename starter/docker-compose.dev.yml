@@ -1,0 +1,83 @@
+# docker-compose.dev.yml — Dev overlay
+#
+# Merged via: docker compose -f docker-compose.data.yml -f docker-compose.yml -f docker-compose.dev.yml
+# Never present on production servers.
+
+services:
+  db:
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+      target: dev_target
+      args:
+        PG_VERSION: ${PG_VERSION}
+    image: foundry-db:dev
+
+  # Dev toolchain — build, lint, test, assets.
+  # profiles: [tools] keeps it out of `docker compose up`.
+  # `docker compose run --rm tools <cmd>` auto-builds if needed.
+  tools:
+    build:
+      context: ./docker/tools
+      dockerfile: Dockerfile
+      target: dev_toolchain
+      args:
+        GO_VERSION: ${GO_VERSION}
+        AIR_VERSION: ${AIR_VERSION}
+        GOLANGCI_LINT_VERSION: ${GOLANGCI_LINT_VERSION}
+        MKCERT_VERSION: ${MKCERT_VERSION}
+        TAILWIND_VERSION: ${TAILWIND_VERSION}
+    image: ${TOOLS_DEV:-foundry-tools:dev}
+    volumes:
+      - .:/app
+    working_dir: /app
+    env_file: .env
+    networks:
+      - app_net
+    profiles: [tools]
+
+  # Production toolchain — Tailwind only.
+  prod-tools:
+    build:
+      context: ./docker/tools
+      dockerfile: Dockerfile
+      target: production_toolchain
+      args:
+        GO_VERSION: ${GO_VERSION}
+        TAILWIND_VERSION: ${TAILWIND_VERSION}
+    image: ${TOOLS_PROD:-foundry-tools:prod}
+    volumes:
+      - .:/app
+    working_dir: /app
+    env_file: .env
+    profiles: [tools]
+
+  app:
+    build:
+      context: .
+      target: dev_target
+      dockerfile: docker/app/Dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        TOOLS_DEV_IMAGE: ${TOOLS_DEV:-foundry-tools:dev}
+    image: foundry-dev
+    pids_limit: 512
+    read_only: false
+    mem_limit: 2g
+    memswap_limit: 2g
+    tmpfs: !reset []
+    security_opt: !reset []
+    cap_drop: !reset []
+    healthcheck:
+      disable: true
+    volumes:
+      - ../:/app
+    working_dir: /app/${PROJECT_NAME}
+    restart: "no"
+    networks:
+      - app_net
+      - proxy_net
+
+networks:
+  app_net:
+  proxy_net:

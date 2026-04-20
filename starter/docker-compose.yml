@@ -1,0 +1,51 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    image: foundry:latest
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 128
+    env_file:
+      - .env
+    secrets:
+      - DATABASE_URL
+      - SECURITY_CSRF_KEY
+      - SECURITY_CSRF_KEY_PREVIOUS
+      - KV_PASSWORD
+    healthcheck:
+      test: ["CMD", "/opt/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - app_net
+      - proxy_net
+
+secrets:
+  DATABASE_URL:
+    file: .secrets/DATABASE_URL
+  SECURITY_CSRF_KEY:
+    file: .secrets/SECURITY_CSRF_KEY
+  SECURITY_CSRF_KEY_PREVIOUS:
+    file: .secrets/SECURITY_CSRF_KEY_PREVIOUS
+
+networks:
+  app_net:
+  proxy_net:
+    external: true
+    name: ${PROXY_NETWORK:-caddy_net}

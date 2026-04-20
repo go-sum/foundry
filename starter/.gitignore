@@ -5,3 +5,8 @@ public/static/
 tmp/
 
 .env
+
+.secrets/
+docker/caddy/Caddyfile
+docker/caddy/certs/*.pem
+docker/caddy/certs/*.key

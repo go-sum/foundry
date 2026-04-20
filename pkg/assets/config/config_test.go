@@ -28,11 +28,11 @@ js:
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Paths.SourceDir != "src" {
-		t.Errorf("SourceDir = %q, want %q", cfg.Paths.SourceDir, "src")
+	if cfg.Paths.SourceDir != filepath.Join(dir, "src") {
+		t.Errorf("SourceDir = %q, want %q", cfg.Paths.SourceDir, filepath.Join(dir, "src"))
 	}
-	if cfg.Paths.PublicDir != "dist" {
-		t.Errorf("PublicDir = %q, want %q", cfg.Paths.PublicDir, "dist")
+	if cfg.Paths.PublicDir != filepath.Join(dir, "dist") {
+		t.Errorf("PublicDir = %q, want %q", cfg.Paths.PublicDir, filepath.Join(dir, "dist"))
 	}
 	if cfg.Paths.PublicPrefix != "/assets" {
 		t.Errorf("PublicPrefix = %q, want %q", cfg.Paths.PublicPrefix, "/assets")
@@ -63,14 +63,65 @@ func TestLoad_defaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Paths.SourceRoot() != defaultSourceDir {
-		t.Errorf("SourceRoot = %q, want %q", cfg.Paths.SourceRoot(), defaultSourceDir)
+	if cfg.Paths.SourceRoot() != filepath.Join(dir, defaultSourceDir) {
+		t.Errorf("SourceRoot = %q, want %q", cfg.Paths.SourceRoot(), filepath.Join(dir, defaultSourceDir))
 	}
-	if cfg.Paths.PublicRoot() != defaultPublicDir {
-		t.Errorf("PublicRoot = %q, want %q", cfg.Paths.PublicRoot(), defaultPublicDir)
+	if cfg.Paths.PublicRoot() != filepath.Join(dir, defaultPublicDir) {
+		t.Errorf("PublicRoot = %q, want %q", cfg.Paths.PublicRoot(), filepath.Join(dir, defaultPublicDir))
 	}
 	if cfg.Paths.URLPrefix() != defaultPublicPrefix {
 		t.Errorf("URLPrefix = %q, want %q", cfg.Paths.URLPrefix(), defaultPublicPrefix)
+	}
+}
+
+func TestLoad_resolves_relative_to_yaml_dir(t *testing.T) {
+	parent := t.TempDir()
+	sub := filepath.Join(parent, "subdir")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := `
+paths:
+  source_dir: assets
+  public_dir: out
+`
+	yamlPath := filepath.Join(sub, ".assets.yaml")
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(parent); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(yamlPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Paths.SourceDir != filepath.Join(sub, "assets") {
+		t.Errorf("SourceDir = %q, want %q", cfg.Paths.SourceDir, filepath.Join(sub, "assets"))
+	}
+	if cfg.Paths.PublicDir != filepath.Join(sub, "out") {
+		t.Errorf("PublicDir = %q, want %q", cfg.Paths.PublicDir, filepath.Join(sub, "out"))
+	}
+}
+
+func TestLoad_absolute_paths_unchanged(t *testing.T) {
+	dir := t.TempDir()
+	absSource := filepath.Join(dir, "abs-source")
+	absPublic := filepath.Join(dir, "abs-public")
+	content := "paths:\n  source_dir: " + absSource + "\n  public_dir: " + absPublic + "\n"
+	yamlPath := filepath.Join(dir, ".assets.yaml")
+	if err := os.WriteFile(yamlPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(yamlPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Paths.SourceDir != absSource {
+		t.Errorf("SourceDir = %q, want %q", cfg.Paths.SourceDir, absSource)
+	}
+	if cfg.Paths.PublicDir != absPublic {
+		t.Errorf("PublicDir = %q, want %q", cfg.Paths.PublicDir, absPublic)
 	}
 }
 

@@ -1,12 +1,13 @@
 paths:
   source_dir: static
-  public_dir: starter/public/static
+  public_dir: public/static
   public_prefix: /static
 
 js:
   downloads:
     - name: htmx
-      version: "2.0.4"
+      # version resolved from HTMX_VERSION env var (set in .versions)
+      version: ""
       url: "https://unpkg.com/htmx.org@{version}/dist/htmx.min.js"
       target: js/htmx.min.js
   bundles: []
@@ -35,7 +36,7 @@ sprites:
     enabled: true
     target: img/svg/theme-icons.svg
     sources:
-      - path: "static/img/svg/"
+      - path: "img/svg/"
         files:
           - "sun.svg"
           - "moon.svg"

@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Scan Go source files for Tailwind class names */
+@source "../**/*.go";
+@source "../vendor/github.com/go-sum/componentry/**/*.go";
+/* scans for componentry in monorepo */
+@source "../../pkg/componentry/**/*.go";
