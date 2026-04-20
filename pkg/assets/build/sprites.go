@@ -172,6 +172,70 @@ func processSVG(data []byte, id string) (string, error) {
 	return fmt.Sprintf("    <symbol id=%q viewBox=%q%s>\n%s\n    </symbol>", id, viewBox, presAttrs, strings.Join(lines, "\n")), nil
 }
 
+// BuildSpritesIfChanged builds each enabled sprite only when its local source
+// files have changed since the last successful build. Sprites whose sources are
+// all remote are always rebuilt (delegated to BuildSprite which already skips
+// when the target exists).
+func BuildSpritesIfChanged(cfg *config.Config, opts SpriteOptions, client *http.Client, state *StateFile, out io.Writer) error {
+	built, totalIcons := 0, 0
+	for name, sprite := range cfg.Sprites {
+		if !sprite.Enabled {
+			continue
+		}
+		if opts.Name != "" && name != opts.Name {
+			continue
+		}
+
+		localFiles := collectLocalFiles(sprite.Sources)
+		if len(localFiles) == 0 {
+			// No local files — delegate to BuildSprite (handles remote skip).
+			if err := BuildSprite(name, sprite, client, opts.DryRun, out); err != nil {
+				return err
+			}
+		} else {
+			key := "sprite:" + name
+			changed, err := state.HasChanged(key, localFiles)
+			if err != nil {
+				// Fail open: rebuild when change detection errors.
+				changed = true
+			}
+			if !changed {
+				fmt.Fprintf(out, "  ↷ sprite %s: no changes, skipping\n", name)
+			} else {
+				if err := BuildSprite(name, sprite, client, opts.DryRun, out); err != nil {
+					return err
+				}
+				_ = state.MarkBuilt(key, localFiles)
+			}
+		}
+
+		built++
+		for _, src := range sprite.Sources {
+			totalIcons += len(src.Files)
+		}
+	}
+	fmt.Fprintf(out, "Built %d sprite(s), %d total icons\n", built, totalIcons)
+	return nil
+}
+
+// collectLocalFiles returns the resolved file paths for all local (non-remote,
+// non-file://) sources in the sprite configuration.
+func collectLocalFiles(sources []config.SourcesConfig) []string {
+	var files []string
+	for _, src := range sources {
+		if strings.HasPrefix(src.Path, "http://") || strings.HasPrefix(src.Path, "https://") {
+			continue
+		}
+		if strings.HasPrefix(src.Path, "file://") {
+			continue
+		}
+		for _, file := range src.Files {
+			files = append(files, filepath.Join(src.Path, file))
+		}
+	}
+	return files
+}
+
 func allRemoteSources(sources []config.SourcesConfig) bool {
 	for _, src := range sources {
 		if !strings.HasPrefix(src.Path, "http://") && !strings.HasPrefix(src.Path, "https://") {

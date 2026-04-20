@@ -3,6 +3,7 @@ module github.com/go-sum/assets
 go 1.26.0
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/evanw/esbuild v0.25.3
 	github.com/spf13/cobra v1.9.1
 	go.yaml.in/yaml/v3 v3.0.4
