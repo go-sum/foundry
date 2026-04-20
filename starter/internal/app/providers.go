@@ -108,7 +108,7 @@ func provideServices(_ context.Context, _ Runtime, _ Security) (Services, error)
 
 func provideErrorBoundary(runtime Runtime, routing *router.Router) web.Middleware {
 	return web.ErrorBoundary(web.BoundaryConfig{
-		Renderer:     &appErrorRenderer{getRoutes: routing.Routes},
+		Renderer:     &appErrorRenderer{rt: routing},
 		Logger:       runtime.Logger,
 		CaptureStack: runtime.Config.Env == config.Production,
 		OnError:      otelweb.MakeOnError(),
@@ -130,13 +130,13 @@ func provideErrorBoundary(runtime Runtime, routing *router.Router) web.Middlewar
 
 // appErrorRenderer implements web.ErrorRenderer for the starter application.
 type appErrorRenderer struct {
-	getRoutes func() []router.Route
+	rt *router.Router
 }
 
 // RenderError renders the error as an HTML response, choosing full-page or
 // HTMX fragment mode based on the request.
 func (r *appErrorRenderer) RenderError(c *web.Context, e *web.Error) web.Response {
-	vr := view.NewRequest(c, r.getRoutes())
+	vr := view.NewRequest(c)
 	full := errorpage.ErrorPage(vr, e)
 	partial := errorpage.ErrorContent(e)
 	return view.RenderWithStatus(vr, e.Status, full, partial)

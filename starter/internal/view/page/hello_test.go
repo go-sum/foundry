@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/router"
 )
 
 const (
@@ -14,13 +13,8 @@ const (
 )
 
 func TestHelloPage(t *testing.T) {
-	req := view.Request{
-		Routes: []router.Route{
-			{Method: "GET", Pattern: "/hello/greeting", Name: "hello.greeting"},
-			{Method: "GET", Pattern: "/", Name: "home.show"},
-		},
-	}
-	got := render.RenderNode(t, HelloPage(req, "World"))
+	req := view.Request{}
+	got := render.RenderNode(t, HelloPage(req, "World", "/hello/greeting", "/"))
 
 	want := `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hello World</title>` +
 		`<meta name="viewport" content="width=device-width, initial-scale=1">` +

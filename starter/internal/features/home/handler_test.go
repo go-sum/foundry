@@ -14,8 +14,17 @@ import (
 	"github.com/go-sum/web/router"
 )
 
+func testRouter(t *testing.T) *router.Router {
+	t.Helper()
+	rt := router.New()
+	router.Register(rt,
+		router.GET("/hello/{name}", "hello.show", nil),
+	)
+	return rt
+}
+
 func TestHandlerShow(t *testing.T) {
-	h := NewHandler(func() []router.Route { return nil })
+	h := NewHandler(testRouter(t))
 
 	u, _ := url.Parse("/")
 	req := web.NewRequest(http.MethodGet, u)
@@ -26,8 +35,8 @@ func TestHandlerShow(t *testing.T) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	vr := view.NewRequest(c, nil)
-	want := render.RenderNode(t, page.HomePage(vr))
+	vr := view.NewRequest(c)
+	want := render.RenderNode(t, page.HomePage(vr, "/hello/World"))
 	if string(body) != want {
 		t.Fatalf("body mismatch")
 	}
@@ -39,7 +48,7 @@ func TestHandlerShow(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	body, _ = io.ReadAll(resp.Body)
-	want = render.RenderNode(t, page.HomeContent(vr))
+	want = render.RenderNode(t, page.HomeContent(vr, "/hello/World"))
 	if string(body) != want {
 		t.Fatalf("partial body mismatch")
 	}

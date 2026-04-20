@@ -10,14 +10,13 @@ import (
 )
 
 // HomePage renders the home page.
-func HomePage(req view.Request) g.Node {
-	content := HomeContent(req)
+func HomePage(req view.Request, helloURL string) g.Node {
+	content := HomeContent(req, helloURL)
 	return req.Page("Home", content)
 }
 
 // HomeContent renders the home page content (for HTMX partial).
-func HomeContent(req view.Request) g.Node {
-	helloURL := view.RouteURL(req.Routes, "hello.show", "name", "World")
+func HomeContent(req view.Request, helloURL string) g.Node {
 	return h.Div(h.Class("max-w-2xl mx-auto py-16 px-4"),
 		h.H1(h.Class("text-2xl font-bold text-foreground mb-4"),
 			g.Text("Welcome to Foundry"),

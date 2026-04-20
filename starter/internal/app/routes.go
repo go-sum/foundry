@@ -56,9 +56,9 @@ func registerStaticRoutes(rt *router.Router, assets static.AssetsConfig) error {
 
 func registerPublicRoutes(rt *router.Router, sec Security, s *site.Site) {
 	navOpt := view.WithNavConfig(starterconfig.DefaultNav())
-	homeH := home.NewHandler(rt.Routes, navOpt)
-	helloH := hello.NewHandler(rt.Routes, navOpt)
-	demosH := demos.NewHandler(rt.Routes, navOpt)
+	homeH := home.NewHandler(rt, navOpt)
+	helloH := hello.NewHandler(rt, navOpt)
+	demosH := demos.NewHandler(rt, navOpt)
 	metaH := site.NewHandlers(s, rt,
 		site.RobotsConfig{DefaultAllow: true},
 		site.SitemapConfig{

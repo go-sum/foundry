@@ -5,16 +5,11 @@ import (
 
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/router"
 )
 
 func TestHomePage(t *testing.T) {
-	req := view.Request{
-		Routes: []router.Route{
-			{Method: "GET", Pattern: "/hello/{name}", Name: "hello.show"},
-		},
-	}
-	got := render.RenderNode(t, HomePage(req))
+	req := view.Request{}
+	got := render.RenderNode(t, HomePage(req, "/hello/World"))
 
 	const btnClass = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] cursor-pointer text-foreground underline-offset-4 hover:underline h-9 px-4 py-2"
 
@@ -38,12 +33,8 @@ func TestHomePage(t *testing.T) {
 }
 
 func TestHomeContent(t *testing.T) {
-	req := view.Request{
-		Routes: []router.Route{
-			{Method: "GET", Pattern: "/hello/{name}", Name: "hello.show"},
-		},
-	}
-	got := render.RenderNode(t, HomeContent(req))
+	req := view.Request{}
+	got := render.RenderNode(t, HomeContent(req, "/hello/World"))
 
 	const btnClass = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] cursor-pointer text-foreground underline-offset-4 hover:underline h-9 px-4 py-2"
 

@@ -16,8 +16,18 @@ import (
 	"github.com/go-sum/web/router"
 )
 
+func testRouter(t *testing.T) *router.Router {
+	t.Helper()
+	rt := router.New()
+	router.Register(rt,
+		router.GET("/hello/greeting", "hello.greeting", nil),
+		router.GET("/", "home.show", nil),
+	)
+	return rt
+}
+
 func TestHandlerGreeting(t *testing.T) {
-	h := NewHandler(func() []router.Route { return nil })
+	h := NewHandler(nil)
 
 	u, _ := url.Parse("/hello/greeting?name=Alice")
 	req := web.NewRequest(http.MethodGet, u)
@@ -34,7 +44,7 @@ func TestHandlerGreeting(t *testing.T) {
 }
 
 func TestHandlerGreeting_EmptyName_DefaultsToWorld(t *testing.T) {
-	h := NewHandler(func() []router.Route { return nil })
+	h := NewHandler(nil)
 
 	u, _ := url.Parse("/hello/greeting")
 	req := web.NewRequest(http.MethodGet, u)
@@ -51,7 +61,7 @@ func TestHandlerGreeting_EmptyName_DefaultsToWorld(t *testing.T) {
 }
 
 func TestHandlerShow(t *testing.T) {
-	h := NewHandler(func() []router.Route { return nil })
+	h := NewHandler(testRouter(t))
 
 	u, _ := url.Parse("/hello/Alice")
 	req := web.NewRequest(http.MethodGet, u)
@@ -63,8 +73,8 @@ func TestHandlerShow(t *testing.T) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	vr := view.NewRequest(c, nil)
-	want := render.RenderNode(t, page.HelloPage(vr, "Alice"))
+	vr := view.NewRequest(c)
+	want := render.RenderNode(t, page.HelloPage(vr, "Alice", "/hello/greeting", "/"))
 	if string(body) != want {
 		t.Fatalf("body mismatch")
 	}
@@ -84,7 +94,7 @@ func TestHandlerShow(t *testing.T) {
 }
 
 func TestHandlerShow_InvalidName_ReturnsBadRequest(t *testing.T) {
-	h := NewHandler(func() []router.Route { return nil })
+	h := NewHandler(nil)
 
 	u, _ := url.Parse("/hello/bad!!!")
 	req := web.NewRequest(http.MethodGet, u)
@@ -112,7 +122,7 @@ func TestHandlerShow_InvalidName_ReturnsBadRequest(t *testing.T) {
 }
 
 func TestHandlerShow_LongName_ReturnsBadRequest(t *testing.T) {
-	h := NewHandler(func() []router.Route { return nil })
+	h := NewHandler(nil)
 
 	longName := strings.Repeat("a", 65) // 65 chars — exceeds 64-char limit
 	u, _ := url.Parse("/hello/" + longName)

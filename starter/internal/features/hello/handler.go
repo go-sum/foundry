@@ -14,13 +14,13 @@ import (
 
 // Handler serves the hello greeting page.
 type Handler struct {
-	getRoutes func() []router.Route
-	reqOpts   []view.RequestOption
+	rt      *router.Router
+	reqOpts []view.RequestOption
 }
 
 // NewHandler creates a new hello Handler.
-func NewHandler(getRoutes func() []router.Route, opts ...view.RequestOption) *Handler {
-	return &Handler{getRoutes: getRoutes, reqOpts: opts}
+func NewHandler(rt *router.Router, opts ...view.RequestOption) *Handler {
+	return &Handler{rt: rt, reqOpts: opts}
 }
 
 // Greeting renders just the greeting fragment for HTMX partial swaps.
@@ -36,8 +36,10 @@ func (h *Handler) Show(c *web.Context) (web.Response, error) {
 	if !isValidName(name) {
 		return web.Response{}, web.ErrBadRequest("name must be 1–64 letters only")
 	}
-	vr := view.NewRequest(c, h.getRoutes(), h.reqOpts...)
-	return view.Render(vr, page.HelloPage(vr, name), page.HelloPartial(name))
+	greetingURL := h.rt.MustReverse("hello.greeting", nil)
+	homeURL := h.rt.MustReverse("home.show", nil)
+	vr := view.NewRequest(c, h.reqOpts...)
+	return view.Render(vr, page.HelloPage(vr, name, greetingURL, homeURL), page.HelloPartial(name))
 }
 
 func isValidName(name string) bool {

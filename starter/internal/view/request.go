@@ -6,7 +6,6 @@ import (
 	"github.com/go-sum/foundry/internal/view/layout"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/router"
 	"github.com/go-sum/web/secure"
 	"github.com/go-sum/web/session"
 
@@ -17,14 +16,13 @@ import (
 type Request struct {
 	CurrentPath     string
 	HTMX            HTMXRequest
-	Routes          []router.Route
-	CSRFToken       string              // CSRF token for form rendering; set via WithCSRFToken.
-	RequestID       string              // Correlation ID; set via WithRequestID.
-	Nonce           string              // CSP nonce; set via WithNonce.
-	Flash           []string            // Flash messages; set via WithFlash.
-	IsAuthenticated bool                // Auth state; set via WithIsAuthenticated.
-	NavConfig       compound.NavConfig  // Declarative nav config; set via WithNavConfig.
-	NavSlots        compound.NavSlots   // Dynamic nav slot content; set via WithNavSlots.
+	CSRFToken       string             // CSRF token for form rendering; set via WithCSRFToken.
+	RequestID       string             // Correlation ID; set via WithRequestID.
+	Nonce           string             // CSP nonce; set via WithNonce.
+	Flash           []string           // Flash messages; set via WithFlash.
+	IsAuthenticated bool               // Auth state; set via WithIsAuthenticated.
+	NavConfig       compound.NavConfig // Declarative nav config; set via WithNavConfig.
+	NavSlots        compound.NavSlots  // Dynamic nav slot content; set via WithNavSlots.
 }
 
 // HTMXRequest holds HTMX-specific request state parsed from headers.
@@ -78,7 +76,7 @@ func WithNavSlots(slots compound.NavSlots) RequestOption {
 // NewRequest builds request-scoped presentation state from a web.Context.
 // Fields are auto-populated from context values (RequestID, CSRFToken, Nonce,
 // Flash); explicit WithX options run after and override auto-populated values.
-func NewRequest(c *web.Context, routes []router.Route, opts ...RequestOption) Request {
+func NewRequest(c *web.Context, opts ...RequestOption) Request {
 	currentPath := ""
 	headers := web.NewHeaders()
 	if c != nil {
@@ -91,7 +89,6 @@ func NewRequest(c *web.Context, routes []router.Route, opts ...RequestOption) Re
 	r := Request{
 		CurrentPath: currentPath,
 		HTMX:        NewHTMXRequest(headers),
-		Routes:      routes,
 	}
 
 	if c != nil {

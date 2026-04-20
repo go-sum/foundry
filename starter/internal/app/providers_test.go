@@ -115,7 +115,7 @@ func TestProvideErrorBoundary_RendersFullAndPartialResponses(t *testing.T) {
 	if err := fullResp.Body.Close(); err != nil {
 		t.Fatalf("full body Close() error = %v", err)
 	}
-	fullWant := render.RenderNode(t, errorpage.ErrorPage(view.NewRequest(fullCtx, routing.Routes()), web.ErrNotFound("missing page")))
+	fullWant := render.RenderNode(t, errorpage.ErrorPage(view.NewRequest(fullCtx), web.ErrNotFound("missing page")))
 	if got := string(fullBody); got != fullWant {
 		t.Fatalf("full body = %q, want %q", got, fullWant)
 	}

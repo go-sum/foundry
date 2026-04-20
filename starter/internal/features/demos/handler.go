@@ -9,17 +9,17 @@ import (
 
 // Handler serves the component showcase page.
 type Handler struct {
-	getRoutes func() []router.Route
-	reqOpts   []view.RequestOption
+	rt      *router.Router
+	reqOpts []view.RequestOption
 }
 
 // NewHandler creates a new demos Handler.
-func NewHandler(getRoutes func() []router.Route, opts ...view.RequestOption) *Handler {
-	return &Handler{getRoutes: getRoutes, reqOpts: opts}
+func NewHandler(rt *router.Router, opts ...view.RequestOption) *Handler {
+	return &Handler{rt: rt, reqOpts: opts}
 }
 
 // Show renders the component showcase page.
 func (h *Handler) Show(c *web.Context) (web.Response, error) {
-	vr := view.NewRequest(c, h.getRoutes(), h.reqOpts...)
+	vr := view.NewRequest(c, h.reqOpts...)
 	return view.Render(vr, vr.Page("Component Showcase", showcase.Showcase()), nil)
 }

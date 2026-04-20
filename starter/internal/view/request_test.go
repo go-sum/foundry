@@ -12,7 +12,6 @@ import (
 	"github.com/go-sum/foundry/internal/view/layout"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/router"
 	"github.com/go-sum/web/session"
 
 	g "maragu.dev/gomponents"
@@ -86,10 +85,8 @@ func TestNewRequest(t *testing.T) {
 	c := web.NewContext(context.Background(), req)
 	c.Set(web.RequestIDKey{}, "req-123")
 
-	routes := []router.Route{{Method: "GET", Pattern: "/", Name: "home.show"}}
 	vr := NewRequest(
 		c,
-		routes,
 		WithRequestID("override-req"),
 		WithCSRFToken("csrf-123"),
 		WithNonce("nonce-123"),
@@ -104,9 +101,6 @@ func TestNewRequest(t *testing.T) {
 	}
 	if vr.HTMX.Trigger != "load" {
 		t.Fatalf("HTMX.Trigger = %q, want %q", vr.HTMX.Trigger, "load")
-	}
-	if len(vr.Routes) != 1 {
-		t.Fatalf("Routes len = %d, want 1", len(vr.Routes))
 	}
 	if vr.RequestID != "override-req" {
 		t.Fatalf("RequestID = %q, want %q", vr.RequestID, "override-req")
@@ -161,7 +155,7 @@ func TestNewRequest_PopsFlashFromSession(t *testing.T) {
 
 	var captured Request
 	readFlash := session.Middleware(cfg)(func(c *web.Context) (web.Response, error) {
-		captured = NewRequest(c, nil)
+		captured = NewRequest(c)
 		return web.Text(http.StatusOK, "ok"), nil
 	})
 

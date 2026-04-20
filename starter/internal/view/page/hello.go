@@ -10,9 +10,7 @@ import (
 )
 
 // HelloPage renders the hello page with a greeting for the given name.
-func HelloPage(req view.Request, name string) g.Node {
-	greetingURL := view.RouteURL(req.Routes, "hello.greeting")
-	homeURL := view.RouteURL(req.Routes, "home.show")
+func HelloPage(req view.Request, name, greetingURL, homeURL string) g.Node {
 	partial := HelloPartial(name)
 	return req.Page("Hello "+name,
 		h.Div(h.Class("max-w-2xl mx-auto py-16 px-4"),

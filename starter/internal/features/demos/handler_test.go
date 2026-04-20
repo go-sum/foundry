@@ -11,13 +11,12 @@ import (
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/router"
 )
 
 func TestHandlerShow(t *testing.T) {
 	t.Parallel()
 
-	h := NewHandler(func() []router.Route { return nil })
+	h := NewHandler(nil)
 
 	u, _ := url.Parse("/demos/")
 	req := web.NewRequest(http.MethodGet, u)
@@ -28,7 +27,7 @@ func TestHandlerShow(t *testing.T) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	vr := view.NewRequest(c, nil)
+	vr := view.NewRequest(c)
 	want := render.RenderNode(t, vr.Page("Component Showcase", showcase.Showcase()))
 	if string(body) != want {
 		t.Fatalf("full page body mismatch\ngot:  %s\nwant: %s", string(body), want)
@@ -39,7 +38,7 @@ func TestHandlerShow_HTMXReturnsFullPage(t *testing.T) {
 	// nil partial means HTMX requests receive the full page instead of a fragment.
 	t.Parallel()
 
-	h := NewHandler(func() []router.Route { return nil })
+	h := NewHandler(nil)
 
 	u, _ := url.Parse("/demos/")
 	req := web.NewRequest(http.MethodGet, u)
@@ -51,7 +50,7 @@ func TestHandlerShow_HTMXReturnsFullPage(t *testing.T) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	vr := view.NewRequest(c, nil)
+	vr := view.NewRequest(c)
 	want := render.RenderNode(t, vr.Page("Component Showcase", showcase.Showcase()))
 	if string(body) != want {
 		t.Fatalf("HTMX body mismatch\ngot:  %s\nwant: %s", string(body), want)

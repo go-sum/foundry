@@ -10,17 +10,18 @@ import (
 
 // Handler serves the home page.
 type Handler struct {
-	getRoutes func() []router.Route
-	reqOpts   []view.RequestOption
+	rt      *router.Router
+	reqOpts []view.RequestOption
 }
 
 // NewHandler creates a new home Handler.
-func NewHandler(getRoutes func() []router.Route, opts ...view.RequestOption) *Handler {
-	return &Handler{getRoutes: getRoutes, reqOpts: opts}
+func NewHandler(rt *router.Router, opts ...view.RequestOption) *Handler {
+	return &Handler{rt: rt, reqOpts: opts}
 }
 
 // Show renders the home page with HTMX dual-mode support.
 func (h *Handler) Show(c *web.Context) (web.Response, error) {
-	vr := view.NewRequest(c, h.getRoutes(), h.reqOpts...)
-	return view.Render(vr, page.HomePage(vr), page.HomeContent(vr))
+	helloURL := h.rt.MustReverse("hello.show", map[string]string{"name": "World"})
+	vr := view.NewRequest(c, h.reqOpts...)
+	return view.Render(vr, page.HomePage(vr, helloURL), page.HomeContent(vr, helloURL))
 }
