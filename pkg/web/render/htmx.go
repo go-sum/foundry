@@ -68,11 +68,14 @@ func HXCSRFHeaders(token string) g.Node {
 // This is an alternative to HXCSRFHeaders for apps that cannot easily add
 // attributes to the HTMX root element.
 //
+// includeIndicatorStyles is disabled to prevent HTMX from injecting a runtime <style> element,
+// which would violate Content-Security-Policy. Indicator styles are provided by the static CSS bundle.
+//
 // Produces:
 //
-//	<meta name="htmx-config" content='{"antiForgery":{"headerName":"X-CSRF-Token","parameterName":"_csrf","token":"<token>"}}'>
+//	<meta name="htmx-config" content='{"includeIndicatorStyles":false,"antiForgery":{"headerName":"X-CSRF-Token","parameterName":"_csrf","token":"<token>"}}'>
 func HXCSRFMeta(token string) g.Node {
-	content := `{"antiForgery":{"headerName":"X-CSRF-Token","parameterName":"_csrf","token":"` + jsonEscapeToken(token) + `"}}`
+	content := `{"includeIndicatorStyles":false,"antiForgery":{"headerName":"X-CSRF-Token","parameterName":"_csrf","token":"` + jsonEscapeToken(token) + `"}}`
 	return g.El("meta",
 		g.Attr("name", "htmx-config"),
 		g.Attr("content", content),

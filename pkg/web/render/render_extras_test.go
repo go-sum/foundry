@@ -170,7 +170,7 @@ func TestHXCSRFHeaders_TokenWithQuote(t *testing.T) {
 func TestHXCSRFMeta_BasicToken(t *testing.T) {
 	node := HXCSRFMeta("tok")
 	got := RenderNode(t, node)
-	want := `<meta name="htmx-config" content="{&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;tok&#34;}}">`
+	want := `<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false,&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;tok&#34;}}">`
 	if got != want {
 		t.Errorf("HXCSRFMeta = %q, want %q", got, want)
 	}
@@ -179,7 +179,7 @@ func TestHXCSRFMeta_BasicToken(t *testing.T) {
 func TestHXCSRFMeta_TokenAppearsInContent(t *testing.T) {
 	node := HXCSRFMeta("mytoken42")
 	got := RenderNode(t, node)
-	want := `<meta name="htmx-config" content="{&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;mytoken42&#34;}}">`
+	want := `<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false,&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;mytoken42&#34;}}">`
 	if got != want {
 		t.Errorf("HXCSRFMeta = %q, want %q", got, want)
 	}

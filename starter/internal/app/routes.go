@@ -89,8 +89,8 @@ func registerPublicRoutes(rt *router.Router, sec Security, s *site.Site) {
 			router.GET("/hello/greeting", "hello.greeting", helloH.Greeting),
 			router.GET("/hello/{name}", "hello.show", helloH.Show),
 
-			router.GroupNode("/demos",
-				router.GET("/", "demos.showcase", demosH.Show),
+			router.GroupNode("/componentry",
+				router.GET("/_components", "demos.showcase", demosH.Show),
 			),
 
 			router.GroupNode("/account",

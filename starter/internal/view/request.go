@@ -22,7 +22,6 @@ type Request struct {
 	Flash           []string           // Flash messages; set via WithFlash.
 	IsAuthenticated bool               // Auth state; set via WithIsAuthenticated.
 	NavConfig       compound.NavConfig // Declarative nav config; set via WithNavConfig.
-	NavSlots        compound.NavSlots  // Dynamic nav slot content; set via WithNavSlots.
 }
 
 // HTMXRequest holds HTMX-specific request state parsed from headers.
@@ -66,11 +65,6 @@ func WithIsAuthenticated(authenticated bool) RequestOption {
 // WithNavConfig sets the declarative nav configuration rendered in the page shell.
 func WithNavConfig(cfg compound.NavConfig) RequestOption {
 	return func(r *Request) { r.NavConfig = cfg }
-}
-
-// WithNavSlots injects dynamic slot content (theme toggles, auth controls, etc.) into the nav.
-func WithNavSlots(slots compound.NavSlots) RequestOption {
-	return func(r *Request) { r.NavSlots = slots }
 }
 
 // NewRequest builds request-scoped presentation state from a web.Context.
@@ -133,7 +127,6 @@ func (r Request) Page(title string, children ...g.Node) g.Node {
 	if len(r.NavConfig.Sections) > 0 || r.NavConfig.Brand.Label != "" {
 		nav = compound.NavMenu(compound.NavMenuProps{
 			Config:          r.NavConfig,
-			Slots:           r.NavSlots,
 			CurrentPath:     r.CurrentPath,
 			IsAuthenticated: r.IsAuthenticated,
 		})
