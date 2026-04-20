@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "./css/theme-base.css";
+@import "./css/theme-slate.css";
+@import "./css/componentry.css";
 
 /* Scan Go source files for Tailwind class names */
 @source "../**/*.go";
@@ -6,22 +9,8 @@
 /* scans for componentry in monorepo */
 @source "../../pkg/componentry/**/*.go";
 
-@theme {
-  /* Semantic tokens — neutral light theme matching componentry defaults */
-  --color-background:         var(--color-gray-50);
-  --color-foreground:         var(--color-gray-900);
-  --color-card:               white;
-  --color-card-foreground:    var(--color-gray-900);
-  --color-muted:              var(--color-gray-100);
-  --color-muted-foreground:   var(--color-gray-600);
-  --color-primary:            var(--color-blue-600);
-  --color-primary-foreground: white;
-  --color-secondary:          var(--color-gray-100);
-  --color-secondary-foreground: var(--color-gray-800);
-  --color-accent:             var(--color-gray-100);
-  --color-accent-foreground:  var(--color-gray-900);
-  --color-destructive:        var(--color-red-600);
-  --color-border:             var(--color-gray-200);
-  --color-input:              var(--color-gray-300);
-  --color-ring:               var(--color-blue-500);
-}
+/* Class-based dark mode: utilities prefixed with dark: activate when .dark
+   is present on <html> or any ancestor.  The ThemeScript in <head> sets
+   this class before the first paint; ThemeSelector in the navbar maintains
+   it at runtime via localStorage. */
+@custom-variant dark (&:where(.dark, .dark *));

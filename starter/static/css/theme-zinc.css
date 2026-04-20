@@ -1,0 +1,100 @@
+/* Zinc variant — identical structure to theme-slate.css with --color-zinc-*
+   substituted for --color-slate-* throughout. Zinc reads slightly warmer
+   and less blue than slate in mid-tones.
+
+   To activate: change the import in tailwind.css from theme-slate.css to
+   theme-zinc.css. To create your own variant, copy this file and replace
+   zinc with any Tailwind color scale (stone, gray, neutral, etc.).
+
+   Primary stays blue — change --primary and --ring here to adopt a
+   different brand color without touching the neutral palette. */
+
+/* Light -------------------------------------------------------------------- */
+:root {
+  --radius: 0.625rem;
+
+  --background:           var(--color-white);
+  --foreground:           var(--color-zinc-950);
+
+  --card:                 var(--color-white);
+  --card-foreground:      var(--color-zinc-950);
+
+  --popover:              var(--color-white);
+  --popover-foreground:   var(--color-zinc-950);
+
+  --primary:              var(--color-blue-600);
+  --primary-foreground:   var(--color-white);
+
+  --secondary:            var(--color-zinc-100);
+  --secondary-foreground: var(--color-zinc-900);
+
+  --muted:                var(--color-zinc-100);
+  --muted-foreground:     var(--color-zinc-500);
+
+  --accent:               var(--color-zinc-100);
+  --accent-foreground:    var(--color-zinc-900);
+
+  --destructive:          oklch(0.577 0.245 27.325);
+
+  --success:              var(--color-green-700);
+  --success-foreground:   var(--color-white);
+  --warning:              var(--color-orange-700);
+  --warning-foreground:   var(--color-white);
+
+  --border:               var(--color-zinc-400);
+  --input:                var(--color-zinc-400);
+  --ring:                 color-mix(in oklch, var(--color-blue-500) 50%, transparent);
+
+  --sidebar:                       var(--color-zinc-50);
+  --sidebar-foreground:            var(--color-zinc-950);
+  --sidebar-primary:               var(--color-blue-600);
+  --sidebar-primary-foreground:    var(--color-white);
+  --sidebar-accent:                var(--color-zinc-200);
+  --sidebar-accent-foreground:     var(--color-zinc-900);
+  --sidebar-border:                var(--color-zinc-200);
+  --sidebar-ring:                  var(--color-zinc-400);
+}
+
+/* Dark --------------------------------------------------------------------- */
+.dark {
+  --background:           var(--color-zinc-950);
+  --foreground:           var(--color-zinc-50);
+
+  --card:                 var(--color-zinc-900);
+  --card-foreground:      var(--color-zinc-50);
+
+  --popover:              var(--color-zinc-900);
+  --popover-foreground:   var(--color-zinc-50);
+
+  --primary:              var(--color-blue-400);
+  --primary-foreground:   var(--color-white);
+
+  --secondary:            var(--color-zinc-800);
+  --secondary-foreground: var(--color-zinc-50);
+
+  --muted:                var(--color-zinc-800);
+  --muted-foreground:     var(--color-zinc-400);
+
+  --accent:               var(--color-zinc-800);
+  --accent-foreground:    var(--color-zinc-50);
+
+  --destructive:          oklch(0.704 0.191 22.216);
+
+  --success:              var(--color-green-500);
+  --success-foreground:   var(--color-zinc-950);
+  --warning:              var(--color-orange-500);
+  --warning-foreground:   var(--color-zinc-950);
+
+  --border:               var(--color-zinc-700);
+  --input:                var(--color-zinc-700);
+  --ring:                 var(--color-blue-500);
+
+  --sidebar:                       var(--color-zinc-900);
+  --sidebar-foreground:            var(--color-zinc-50);
+  --sidebar-primary:               var(--color-blue-500);
+  --sidebar-primary-foreground:    var(--color-white);
+  --sidebar-accent:                var(--color-zinc-800);
+  --sidebar-accent-foreground:     var(--color-zinc-50);
+  --sidebar-border:                var(--color-zinc-700);
+  --sidebar-ring:                  var(--color-zinc-500);
+}

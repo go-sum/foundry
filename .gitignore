@@ -8,6 +8,7 @@
 bin/
 public/static/
 tmp/
+.task/
 
 *.test
 *.out

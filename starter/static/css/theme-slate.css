@@ -1,0 +1,102 @@
+/* Reference color scale via var(), making it easy to see which scale stop each
+   token maps to. Non-standard values (destructive dark, sidebar-primary dark)
+   keep raw oklch since they carry chroma.
+
+   Light and dark tokens are defined here as plain CSS custom properties.
+   theme-base.css maps these onto Tailwind's --color-* namespace via
+   @theme inline {}, so every bg-*, text-*, border-* utility resolves at
+   runtime.  Toggling .dark on <html> switches the full palette instantly.
+
+   Primary uses blue rather than the neutral slate scale — swap --primary and
+   --ring values here to adopt a different brand color, or replace this file
+   with theme-zinc.css (or your own variant) for a different neutral scale. */
+
+/* Light -------------------------------------------------------------------- */
+:root {
+  --radius: 0.625rem;
+
+  --background:           var(--color-white);
+  --foreground:           var(--color-slate-950);
+
+  --card:                 var(--color-white);
+  --card-foreground:      var(--color-slate-950);
+
+  --popover:              var(--color-white);
+  --popover-foreground:   var(--color-slate-950);
+
+  --primary:              var(--color-blue-600);
+  --primary-foreground:   var(--color-white);
+
+  --secondary:            var(--color-slate-100);
+  --secondary-foreground: var(--color-slate-900);
+
+  --muted:                var(--color-slate-100);
+  --muted-foreground:     var(--color-slate-500);
+
+  --accent:               var(--color-slate-100);
+  --accent-foreground:    var(--color-slate-900);
+
+  --destructive:          var(--color-red-500);
+
+  --success:              var(--color-green-700);
+  --success-foreground:   var(--color-white);
+  --warning:              var(--color-orange-700);
+  --warning-foreground:   var(--color-white);
+
+  --border:               var(--color-slate-400);
+  --input:                var(--color-slate-400);
+  --ring:                 color-mix(in oklch, var(--color-blue-500) 50%, transparent);
+
+  --sidebar:                       var(--color-slate-50);
+  --sidebar-foreground:            var(--color-slate-950);
+  --sidebar-primary:               var(--color-blue-600);
+  --sidebar-primary-foreground:    var(--color-white);
+  --sidebar-accent:                var(--color-slate-200);
+  --sidebar-accent-foreground:     var(--color-slate-900);
+  --sidebar-border:                var(--color-slate-200);
+  --sidebar-ring:                  var(--color-slate-400);
+}
+
+/* Dark --------------------------------------------------------------------- */
+.dark {
+  --background:           var(--color-slate-950);
+  --foreground:           var(--color-slate-50);
+
+  --card:                 var(--color-slate-900);
+  --card-foreground:      var(--color-slate-50);
+
+  --popover:              var(--color-slate-900);
+  --popover-foreground:   var(--color-slate-50);
+
+  --primary:              var(--color-blue-400);
+  --primary-foreground:   var(--color-white);
+
+  --secondary:            var(--color-slate-800);
+  --secondary-foreground: var(--color-slate-50);
+
+  --muted:                var(--color-slate-800);
+  --muted-foreground:     var(--color-slate-400);
+
+  --accent:               var(--color-slate-800);
+  --accent-foreground:    var(--color-slate-50);
+
+  --destructive:          oklch(0.704 0.191 22.216);
+
+  --success:              var(--color-green-500);
+  --success-foreground:   var(--color-slate-950);
+  --warning:              var(--color-orange-500);
+  --warning-foreground:   var(--color-slate-950);
+
+  --border:               var(--color-slate-700);
+  --input:                var(--color-slate-700);
+  --ring:                 var(--color-blue-500);
+
+  --sidebar:                       var(--color-slate-900);
+  --sidebar-foreground:            var(--color-slate-50);
+  --sidebar-primary:               var(--color-blue-500);
+  --sidebar-primary-foreground:    var(--color-white);
+  --sidebar-accent:                var(--color-slate-800);
+  --sidebar-accent-foreground:     var(--color-slate-50);
+  --sidebar-border:                var(--color-slate-700);
+  --sidebar-ring:                  var(--color-slate-500);
+}
