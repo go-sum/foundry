@@ -39,4 +39,36 @@
   html[data-theme-preference="system"] .theme-system-icon { display: contents; }
   html:not([data-theme-preference])    .theme-system-icon { display: contents; }
 
+  /* pkg/componentry/ui/feedback/progress — native <progress> fill bar.
+     --pb-fill is set by modifier classes and cascades into pseudo-elements. */
+  progress.progress-bar {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    border-radius: 9999px;
+    background: var(--secondary);
+    overflow: hidden;
+  }
+  progress.progress-bar::-webkit-progress-bar {
+    background: var(--secondary);
+    border-radius: 9999px;
+  }
+  progress.progress-bar::-webkit-progress-value {
+    background: var(--pb-fill, var(--primary));
+    border-radius: 9999px;
+    transition: width 150ms ease;
+  }
+  progress.progress-bar::-moz-progress-bar {
+    background: var(--pb-fill, var(--primary));
+    border-radius: 9999px;
+    transition: width 150ms ease;
+  }
+
+  /* Variant fill colours */
+  .progress-default { --pb-fill: var(--primary); }
+  .progress-success { --pb-fill: var(--success); }
+  .progress-danger  { --pb-fill: var(--destructive); }
+  .progress-warning { --pb-fill: var(--warning); }
+
 }

@@ -4,6 +4,7 @@ package layout
 import (
 	"github.com/go-sum/assets/publish"
 	"github.com/go-sum/componentry/interactive/theme"
+	"github.com/go-sum/componentry/ui/feedback"
 	"github.com/go-sum/web/render"
 	g "maragu.dev/gomponents"
 	c "maragu.dev/gomponents/components"
@@ -33,10 +34,11 @@ func Page(p Props) g.Node {
 			theme.InitScript(),
 		},
 		Body: []g.Node{
+			h.Class("bg-background text-foreground min-h-screen flex flex-col"),
 			h.Script(h.Src(publish.Path("js/htmx.min.js")), h.Defer(), g.Attr("nonce", p.Nonce)),
 			flashRegion(p.Flash),
 			p.Nav,
-			h.Div(h.Class("min-h-screen bg-background"),
+			h.Main(h.Class("container mx-auto px-4 py-6 flex-1"),
 				g.Group(p.Children),
 			),
 			theme.ThemeScript(),
@@ -47,10 +49,14 @@ func Page(p Props) g.Node {
 func flashRegion(messages []string) g.Node {
 	nodes := make([]g.Node, len(messages))
 	for i, msg := range messages {
-		nodes[i] = h.Div(g.Text(msg))
+		nodes[i] = feedback.Alert.Root(
+			feedback.AlertProps{Variant: feedback.AlertDefault, Dismissible: true},
+			feedback.Alert.Description(g.Text(msg)),
+		)
 	}
 	return h.Div(
 		h.ID("flash"),
+		h.Class("container mx-auto px-4 pt-4 grid gap-2"),
 		g.Attr("hx-swap-oob", "true"),
 		g.Attr("aria-live", "polite"),
 		g.Group(nodes),

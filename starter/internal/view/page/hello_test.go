@@ -26,9 +26,9 @@ func TestHelloPage(t *testing.T) {
 		`<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false,&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;&#34;}}">` +
 		`<link rel="stylesheet" href="/css/app.css">` +
 		themeScript + `</head>` +
-		`<body><script src="/js/htmx.min.js" defer nonce=""></script>` +
-		`<div id="flash" hx-swap-oob="true" aria-live="polite"></div>` +
-		`<div class="min-h-screen bg-background">` +
+		`<body class="bg-background text-foreground min-h-screen flex flex-col"><script src="/js/htmx.min.js" defer nonce=""></script>` +
+		`<div id="flash" class="container mx-auto px-4 pt-4 grid gap-2" hx-swap-oob="true" aria-live="polite"></div>` +
+		`<main class="container mx-auto px-4 py-6 flex-1">` +
 		`<div class="max-w-2xl mx-auto py-16 px-4">` +
 		`<div id="greeting">` +
 		`<div><h1 class="text-2xl font-bold text-foreground mb-4">Hello, World!</h1>` +
@@ -39,7 +39,8 @@ func TestHelloPage(t *testing.T) {
 		`<input class="` + _inputClass + `" type="text" id="name" name="name" value="World" hx-get="/hello/greeting" hx-trigger="keyup changed delay:300ms" hx-target="#greeting" hx-swap="innerHTML" hx-include="this">` +
 		`</div></div>` +
 		`<div class="mt-4"><a class="` + _btnClass + `" href="/">Back to home</a></div>` +
-		`</div></div>` +
+		`</div>` +
+		`</main>` +
 		selectorScript + `</body></html>`
 
 	if got != want {

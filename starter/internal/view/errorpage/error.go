@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-sum/componentry/ui/core"
 	"github.com/go-sum/componentry/ui/data"
+	"github.com/go-sum/componentry/ui/feedback"
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/web"
 
@@ -22,48 +23,60 @@ func ErrorPage(req view.Request, e *web.Error) g.Node {
 // It never renders e.Cause or any internal detail. For 5xx errors it shows a
 // generic retry message and, when set, e.Instance for support correlation.
 func ErrorContent(e *web.Error) g.Node {
-	return h.Div(h.Class("max-w-lg mx-auto py-24 px-4"),
+	return h.Div(h.Class("mx-auto flex max-w-2xl flex-col gap-6 py-16"),
 		data.Card.Root(
-			data.Card.Content(
-				core.Badge(core.BadgeProps{
-					Variant:  core.BadgeSecondary,
-					Children: []g.Node{g.Text(fmt.Sprintf("%d", e.Status))},
-				}),
-				h.H1(h.Class("text-2xl font-bold text-card-foreground mt-4 mb-3"),
-					g.Text(e.Title),
+			data.Card.Header(
+				h.Div(
+					h.Class("flex items-start justify-between gap-4"),
+					h.Div(
+						h.Class("space-y-1"),
+						data.Card.Title(g.Text(e.Title)),
+						data.Card.Description(g.Textf("%d %s", e.Status, e.Title)),
+					),
+					core.Badge(core.BadgeProps{
+						Variant:  core.BadgeSecondary,
+						Children: []g.Node{g.Text(fmt.Sprintf("HTTP %d", e.Status))},
+					}),
 				),
-				errorMessage(e),
 			),
-			data.Card.Footer(
-				core.Button(core.ButtonProps{
-					Href:    "/",
-					Variant: core.VariantLink,
-					Label:   "Back to home",
-				}),
+			data.Card.Content(
+				h.Div(
+					h.Class("space-y-4"),
+					feedback.Alert.Root(
+						feedback.AlertProps{Variant: alertVariant(e.Status)},
+						feedback.Alert.Description(g.Text(messageText(e))),
+					),
+					h.Div(
+						h.Class("flex flex-wrap gap-3"),
+						core.Button(core.ButtonProps{
+							Label:   "Return Home",
+							Href:    "/",
+							Variant: core.VariantDefault,
+						}),
+					),
+					instanceNote(e),
+				),
 			),
 		),
 	)
 }
 
-// errorMessage renders the user-visible message section.
-// For 5xx errors it always shows a generic retry message and never leaks cause.
-// For 4xx errors it shows the public message when non-empty.
-func errorMessage(e *web.Error) g.Node {
+func alertVariant(status int) feedback.AlertVariant {
+	if status >= 500 {
+		return feedback.AlertDestructive
+	}
+	return feedback.AlertDefault
+}
+
+func messageText(e *web.Error) string {
 	if e.Status >= 500 {
-		return g.Group([]g.Node{
-			h.P(h.Class("text-sm text-muted-foreground mb-2"),
-				g.Text("Something went wrong. Please try again or contact support."),
-			),
-			instanceNote(e),
-		})
+		return "Something went wrong. Please try again or contact support."
 	}
 	msg := e.PublicMessage()
 	if msg == "" || msg == e.Title {
-		return nil
+		return e.Title
 	}
-	return h.P(h.Class("text-sm text-muted-foreground"),
-		g.Text(msg),
-	)
+	return msg
 }
 
 // instanceNote renders e.Instance in muted text when set. This aids support

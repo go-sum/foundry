@@ -17,17 +17,27 @@ func HomePage(req view.Request, helloURL string) g.Node {
 
 // HomeContent renders the home page content (for HTMX partial).
 func HomeContent(req view.Request, helloURL string) g.Node {
-	return h.Div(h.Class("max-w-2xl mx-auto py-16 px-4"),
-		h.H1(h.Class("text-2xl font-bold text-foreground mb-4"),
-			g.Text("Welcome to Foundry"),
+	return h.Div(h.Class("mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 py-24 text-center"),
+		h.Div(
+			h.Class("space-y-4"),
+			h.P(
+				h.Class("text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground"),
+				g.Text("Go Web Starter"),
+			),
+			h.H1(h.Class("text-2xl font-bold"),
+				g.Text("Welcome to Foundry"),
+			),
+			h.P(h.Class("mx-auto max-w-2xl text-sm text-muted-foreground"),
+				g.Text("A Go web application built on W3C Web API primitives."),
+			),
 		),
-		h.P(h.Class("text-muted-foreground mb-8"),
-			g.Text("A Go web application built on W3C Web API primitives."),
+		h.Div(
+			h.Class("flex flex-col gap-3 sm:flex-row"),
+			core.Button(core.ButtonProps{
+				Href:    helloURL,
+				Variant: core.VariantDefault,
+				Label:   "Get Started",
+			}),
 		),
-		core.Button(core.ButtonProps{
-			Href:    helloURL,
-			Variant: core.VariantLink,
-			Label:   "Say hello to World",
-		}),
 	)
 }

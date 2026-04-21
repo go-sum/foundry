@@ -28,9 +28,9 @@ func TestPage(t *testing.T) {
 		`<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false,&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;tok-csrf&#34;}}">` +
 		`<link rel="stylesheet" href="/css/app.css">` +
 		themeScript + `</head>` +
-		`<body><script src="/js/htmx.min.js" defer nonce="abc123"></script>` +
-		`<div id="flash" hx-swap-oob="true" aria-live="polite"><div>saved</div></div>` +
-		`<div class="min-h-screen bg-background">content</div>` +
+		`<body class="bg-background text-foreground min-h-screen flex flex-col"><script src="/js/htmx.min.js" defer nonce="abc123"></script>` +
+		`<div id="flash" class="container mx-auto px-4 pt-4 grid gap-2" hx-swap-oob="true" aria-live="polite"><div class="relative w-full rounded-lg border px-4 py-3 text-sm grid gap-1.5 items-start backdrop-blur-sm border-primary/30 bg-primary/20 text-primary [&amp;_[data-alert-description]]:text-muted-foreground" role="alert" aria-live="polite" data-dismissible=""><div class="grid justify-items-start gap-1 text-sm" data-alert-description="">saved</div><button data-dismiss="alert" class="absolute top-3 right-3 opacity-70 hover:opacity-100 transition-opacity outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" type="button" aria-label="Dismiss">×</button></div></div>` +
+		`<main class="container mx-auto px-4 py-6 flex-1">content</main>` +
 		selectorScript + `</body></html>`
 
 	if got != want {
