@@ -3,7 +3,7 @@
 -- content with children --
 <dialog id="dlg" aria-labelledby="dlg-title" aria-describedby="dlg-description" class="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg backdrop:bg-black/50">dialog content</dialog>
 -- trigger --
-<div data-dialog-open="confirm-dialog" aria-haspopup="dialog" aria-controls="confirm-dialog" class="contents cursor-pointer">Open</div>
+<div data-controller="dialog" data-dialog-open="confirm-dialog" aria-haspopup="dialog" aria-controls="confirm-dialog" class="contents cursor-pointer">Open</div>
 -- close --
 <div data-dialog-close="" class="contents cursor-pointer">Cancel</div>
 -- title --

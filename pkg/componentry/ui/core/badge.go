@@ -16,9 +16,11 @@ const (
 )
 
 // BadgeProps configures a Badge.
+// Set Class instead of Variant to apply arbitrary Tailwind color utilities.
 type BadgeProps struct {
 	ID       string
 	Variant  BadgeVariant
+	Class    string
 	Children []g.Node
 	Extra    []g.Node
 }
@@ -38,7 +40,11 @@ func badgeVariantClasses(v BadgeVariant) string {
 
 // Badge renders a small status indicator <span>.
 func Badge(p BadgeProps) g.Node {
-	cls := "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 transition-colors " + badgeVariantClasses(p.Variant)
+	variantCls := p.Class
+	if variantCls == "" {
+		variantCls = badgeVariantClasses(p.Variant)
+	}
+	cls := "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 transition-colors " + variantCls
 	nodes := []g.Node{h.Class(cls)}
 	if p.ID != "" {
 		nodes = append(nodes, h.ID(p.ID))

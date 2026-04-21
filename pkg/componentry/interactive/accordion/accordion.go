@@ -11,12 +11,24 @@ import (
 	core "github.com/go-sum/componentry/ui/core"
 )
 
+// RootProps configures the accordion root element.
+type RootProps struct {
+	// Exclusive enables exclusive mode: only one item can be open at a time.
+	// Requires the runtime theme controller to be active on the page.
+	Exclusive bool
+}
+
 // Root renders the accordion container.
-func Root(children ...g.Node) g.Node {
-	return h.Div(
+func Root(p RootProps, children ...g.Node) g.Node {
+	nodes := []g.Node{
+		g.Attr("data-controller", "accordion"),
 		h.Class("w-full divide-y divide-border rounded-lg border"),
-		g.Group(children),
-	)
+	}
+	if p.Exclusive {
+		nodes = append(nodes, g.Attr("data-accordion-exclusive", ""))
+	}
+	nodes = append(nodes, g.Group(children))
+	return h.Div(nodes...)
 }
 
 // Item renders a single collapsible item as a native <details> element.

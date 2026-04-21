@@ -10,7 +10,9 @@ js:
       version: ""
       url: "https://unpkg.com/htmx.org@{version}/dist/htmx.min.js"
       target: js/htmx.min.js
-  bundles: []
+  bundles:
+    - entry: ../../pkg/componentry/interactive/runtime/controllers/index.js
+      target: js/componentry.min.js
 
 css:
   - tool: tailwindcss

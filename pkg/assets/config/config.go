@@ -32,9 +32,9 @@ type Paths struct {
 }
 
 type JSConfig struct {
-	Downloads []JSDownload `yaml:"downloads"`
-	Bundles   []JSBundle   `yaml:"bundles"`
-	Minify    []JSMinify   `yaml:"minify"`
+	Downloads    []JSDownload `yaml:"downloads"`
+	Bundles      []JSBundle   `yaml:"bundles"`
+	Minify       []JSMinify   `yaml:"minify"`
 }
 
 type JSMinify struct {

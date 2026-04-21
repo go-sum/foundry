@@ -1,7 +1,7 @@
 -- root empty props --
-<details data-popover="" class="relative inline-block"></details>
+<details data-popover="" class="relative inline-block" data-controller="dropdown"></details>
 -- root with id --
-<details data-popover="" class="relative inline-block" id="user-menu"></details>
+<details data-popover="" class="relative inline-block" id="user-menu" data-controller="dropdown"></details>
 -- trigger with children --
 <summary class="list-none cursor-pointer outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground">Options<svg class="size-4 shrink-0 text-muted-foreground" aria-hidden="true"><use href="#"></use></svg></summary>
 -- trigger no children --

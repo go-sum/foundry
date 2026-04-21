@@ -16,11 +16,15 @@ func TestAccordion(t *testing.T) {
 	}{
 		{
 			name: "root empty",
-			node: accordion.Root(),
+			node: accordion.Root(accordion.RootProps{}),
 		},
 		{
 			name: "root with children",
-			node: accordion.Root(g.Text("items")),
+			node: accordion.Root(accordion.RootProps{}, g.Text("items")),
+		},
+		{
+			name: "root exclusive",
+			node: accordion.Root(accordion.RootProps{Exclusive: true}, g.Text("items")),
 		},
 		{
 			name: "item empty",

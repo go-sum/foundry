@@ -24,7 +24,7 @@ func main() {
 		},
 	}
 
-	resp, err := client.Get("http://localhost:" + port + "/health")
+	resp, err := client.Get("http://localhost:" + port + "/healthz")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "health: %v\n", err)
 		os.Exit(1)

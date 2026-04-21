@@ -18,7 +18,7 @@ func TestHelloPage(t *testing.T) {
 	got := render.RenderNode(t, HelloPage(req, "World", "/hello/greeting", "/"))
 
 	themeScript := render.RenderNode(t, theme.InitScript())
-	selectorScript := render.RenderNode(t, theme.ThemeScript())
+	const selectorScript = `<script src="/js/componentry.min.js" defer></script>`
 
 	want := `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hello World</title>` +
 		`<meta name="viewport" content="width=device-width, initial-scale=1">` +

@@ -90,6 +90,28 @@ tasks:
     desc: "Rebuild dev toolchain image"
     cmd: "{{.DKR_DEV}} --profile tools build tools"
 
+  # ── Database ──────────────────────────────────────────────────────────────────
+
+  db:migrate:
+    desc: "Run pending database migrations"
+    cmd: {task: _db:run, vars: {DB_CMD: migrate}}
+
+  db:rollback:
+    desc: "Roll back the last database migration"
+    cmd: {task: _db:run, vars: {DB_CMD: rollback}}
+
+  db:status:
+    desc: "Show database migration status"
+    cmd: {task: _db:run, vars: {DB_CMD: status}}
+
+  db:seed:
+    desc: "Seed development data"
+    cmd: {task: _db:run, vars: {DB_CMD: seed}}
+
+  db:health:
+    desc: "Check database schema health"
+    cmd: {task: _db:run, vars: {DB_CMD: health}}
+
   # ── Test ──────────────────────────────────────────────────────────────────────
 
   app:test:
@@ -175,6 +197,13 @@ tasks:
       	reverse_proxy app:8080
       }
       CADDY
+
+  _db:run:
+    internal: true
+    requires:
+      vars: [DB_CMD]
+    cmd: "{{.DKR_DEV}} run --rm --entrypoint '' app sh -c '{{.GO}} build -o ./tmp/db
+      ./cmd/db && ./tmp/db {{.DB_CMD}}'"
 
   _inspect:tools:
     status:

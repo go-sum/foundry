@@ -36,10 +36,6 @@ func TestThemeScript(t *testing.T) {
 			node: theme.InitScript(),
 		},
 		{
-			name: "theme script",
-			node: theme.ThemeScript(),
-		},
-		{
 			name: "theme selector default",
 			node: theme.ThemeSelector(theme.ThemeSelectorProps{}),
 		},
@@ -83,17 +79,3 @@ func TestInitScriptCSPHash(t *testing.T) {
 	}
 }
 
-func TestThemeScriptCSPHash(t *testing.T) {
-	if theme.ThemeScriptCSPHash == "" {
-		t.Fatal("ThemeScriptCSPHash: must not be empty")
-	}
-	if !strings.HasPrefix(theme.ThemeScriptCSPHash, "'sha256-") {
-		t.Errorf("ThemeScriptCSPHash: expected format 'sha256-...', got: %s", theme.ThemeScriptCSPHash)
-	}
-	rendered := testutil.RenderNode(t, theme.ThemeScript())
-	inner := extractScriptContent(rendered)
-	want := cspHashOf(inner)
-	if theme.ThemeScriptCSPHash != want {
-		t.Errorf("ThemeScriptCSPHash mismatch:\n  got:  %s\n  want: %s", theme.ThemeScriptCSPHash, want)
-	}
-}

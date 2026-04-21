@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,19 +11,16 @@ import (
 )
 
 func main() {
-	if err := run(context.Background()); err != nil {
-		slog.Error("fatal", "err", err)
-		os.Exit(1)
-	}
-}
-
-func run(ctx context.Context) error {
-	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	a, err := app.New(ctx)
 	if err != nil {
-		return fmt.Errorf("startup: %w", err)
+		fmt.Fprintf(os.Stderr, "startup: %v\n", err)
+		os.Exit(1)
 	}
-	return a.Run(ctx)
+	if err := a.Run(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "server: %v\n", err)
+		os.Exit(1)
+	}
 }

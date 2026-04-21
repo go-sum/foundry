@@ -19,6 +19,7 @@ func panelID(rootID, value string) string {
 func Root(id, defaultTab string, children ...g.Node) g.Node {
 	return h.Div(
 		h.ID(id),
+		g.Attr("data-controller", "tabs"),
 		g.Attr("data-tabs", defaultTab),
 		h.Class("w-full"),
 		g.Group(children),

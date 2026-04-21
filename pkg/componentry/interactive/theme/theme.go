@@ -16,22 +16,14 @@ import (
 //go:embed init.min.js
 var initScriptContent string
 
-//go:embed theme.min.js
-var themeScriptContent string
-
 // InitScriptCSPHash is the ready-to-embed CSP token for the InitScript inline
 // script. Add it to script-src in your Content-Security-Policy header:
 //
 //	script-src 'self' <InitScriptCSPHash>
 var InitScriptCSPHash string
 
-// ThemeScriptCSPHash is the ready-to-embed CSP token for the ThemeScript inline
-// script (the click handler).
-var ThemeScriptCSPHash string
-
 func init() {
 	initScriptContent = strings.TrimRight(initScriptContent, "\r\n")
-	themeScriptContent = strings.TrimRight(themeScriptContent, "\r\n")
 
 	var buf strings.Builder
 	if err := InitScript().Render(&buf); err != nil {
@@ -41,15 +33,6 @@ func init() {
 	inner := strings.TrimPrefix(rendered, "<script>")
 	inner = strings.TrimSuffix(inner, "</script>")
 	InitScriptCSPHash = cspHash(inner)
-
-	buf.Reset()
-	if err := ThemeScript().Render(&buf); err != nil {
-		panic(fmt.Sprintf("theme.ThemeScript render: %v", err))
-	}
-	rendered = buf.String()
-	inner = strings.TrimPrefix(rendered, "<script>")
-	inner = strings.TrimSuffix(inner, "</script>")
-	ThemeScriptCSPHash = cspHash(inner)
 }
 
 // cspHash returns the 'sha256-...' token for an inline script value.
@@ -89,7 +72,8 @@ type ThemeSelectorProps struct {
 // reload.
 //
 // Icon visibility is controlled by CSS rules keyed on data-theme-preference on
-// <html>. The click handler is provided by ThemeScript().
+// <html>. The click handler is provided by the runtime theme controller when
+// runtime.Script() is included in the page layout.
 func ThemeSelector(p ThemeSelectorProps) g.Node {
 	lightIcon := p.LightIcon
 	if lightIcon == nil {
@@ -105,25 +89,17 @@ func ThemeSelector(p ThemeSelectorProps) g.Node {
 	}
 
 	nodes := []g.Node{
+		g.Attr("data-controller", "theme"),
+		g.Attr("data-action", "click->theme#cycle"),
 		g.Attr("data-theme-selector", ""),
 		h.Type("button"),
 		g.Attr("aria-label", "Toggle theme"),
-		// Light icon — visible when data-theme-preference="light" on <html>.
 		h.Span(h.Class("theme-light-icon"), lightIcon),
-		// Dark icon — visible when data-theme-preference="dark" on <html>.
 		h.Span(h.Class("theme-dark-icon"), darkIcon),
-		// System icon — visible when data-theme-preference="system" on <html>.
 		h.Span(h.Class("theme-system-icon"), systemIcon),
 	}
 	for _, extra := range p.Extra {
 		nodes = append(nodes, extra)
 	}
 	return h.Button(nodes...)
-}
-
-// ThemeScript returns the inline <script> for the ThemeSelector click handler.
-// Place it after the ThemeSelector element (or at end of <body>).
-// Separate from InitScript so apps can choose how to load each.
-func ThemeScript() g.Node {
-	return h.Script(g.Raw(themeScriptContent))
 }

@@ -24,6 +24,7 @@ func Root(children ...g.Node) g.Node {
 // Trigger renders a wrapper that opens the <dialog> with the given ID when clicked.
 func Trigger(dialogID string, children ...g.Node) g.Node {
 	return h.Div(
+		g.Attr("data-controller", "dialog"),
 		g.Attr("data-dialog-open", dialogID),
 		g.Attr("aria-haspopup", "dialog"),
 		g.Attr("aria-controls", dialogID),
@@ -82,6 +83,16 @@ func Close(children ...g.Node) g.Node {
 	return h.Div(
 		g.Attr("data-dialog-close", ""),
 		h.Class("contents cursor-pointer"),
+		g.Group(children),
+	)
+}
+
+// CloseButton renders a button that closes the nearest parent <dialog> on click.
+// Use this when you need a semantic <button> rather than a <div> wrapper.
+func CloseButton(children ...g.Node) g.Node {
+	return h.Button(
+		g.Attr("data-dialog-close", ""),
+		h.Type("button"),
 		g.Group(children),
 	)
 }

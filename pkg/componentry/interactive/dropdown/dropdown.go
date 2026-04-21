@@ -32,9 +32,10 @@ type ItemProps struct {
 
 // Root renders a dropdown root using core.Popover.Root.
 func Root(p Props, children ...g.Node) g.Node {
+	extra := append([]g.Node{g.Attr("data-controller", "dropdown")}, p.Extra...)
 	return core.Popover.Root(core.PopoverRootProps{
 		ID:    p.ID,
-		Extra: p.Extra,
+		Extra: extra,
 	}, children...)
 }
 

@@ -3,6 +3,7 @@ package layout
 
 import (
 	"github.com/go-sum/assets/publish"
+	"github.com/go-sum/componentry/interactive/runtime"
 	"github.com/go-sum/componentry/interactive/theme"
 	"github.com/go-sum/componentry/ui/feedback"
 	"github.com/go-sum/web/render"
@@ -41,7 +42,7 @@ func Page(p Props) g.Node {
 			h.Main(h.Class("container mx-auto px-4 py-6 flex-1"),
 				g.Group(p.Children),
 			),
-			theme.ThemeScript(),
+			runtime.ScriptSrc(publish.Path("js/componentry.min.js")),
 		},
 	})
 }

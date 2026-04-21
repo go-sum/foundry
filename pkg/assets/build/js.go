@@ -13,6 +13,69 @@ import (
 	"github.com/go-sum/assets/config"
 )
 
+// BuildJSIfChanged builds JS bundles, embed bundles, and minify entries only
+// when their tracked input files have changed since the last successful build.
+// Downloads are always skipped in incremental mode (no network I/O).
+// Unchanged entries are skipped with a log message.
+func BuildJSIfChanged(cfg *config.Config, minify bool, state *StateFile, out io.Writer) error {
+	if err := RemoveStaleJS(cfg, out); err != nil {
+		return err
+	}
+
+	for _, bundle := range cfg.JS.Bundles {
+		files, err := ExpandGlobs(filepath.Dir(bundle.Entry), []string{"**/*.js", "**/*.ts", "**/*.jsx", "**/*.tsx"})
+		key := "jsbundle:" + bundle.Target
+		if err != nil {
+			// Fail open: rebuild when glob errors.
+			if buildErr := bundleOne(bundle, minify, out); buildErr != nil {
+				return buildErr
+			}
+			continue
+		}
+		changed, err := state.HasChanged(key, files)
+		if err != nil {
+			// Fail open: rebuild when change detection errors.
+			if buildErr := bundleOne(bundle, minify, out); buildErr != nil {
+				return buildErr
+			}
+			_ = state.MarkBuilt(key, files)
+			continue
+		}
+		if !changed {
+			fmt.Fprintf(out, "  ↷ js bundle %s: no changes, skipping\n", bundle.Target)
+			continue
+		}
+		if err := bundleOne(bundle, minify, out); err != nil {
+			return err
+		}
+		_ = state.MarkBuilt(key, files)
+	}
+
+	for _, entry := range cfg.JS.Minify {
+		files := []string{entry.Source}
+		key := "jsminify:" + entry.Target
+		changed, err := state.HasChanged(key, files)
+		if err != nil {
+			// Fail open: rebuild when change detection errors.
+			if buildErr := minifyJSOne(entry, out); buildErr != nil {
+				return buildErr
+			}
+			_ = state.MarkBuilt(key, files)
+			continue
+		}
+		if !changed {
+			fmt.Fprintf(out, "  ↷ js minify %s: no changes, skipping\n", entry.Target)
+			continue
+		}
+		if err := minifyJSOne(entry, out); err != nil {
+			return err
+		}
+		_ = state.MarkBuilt(key, files)
+	}
+
+	return nil
+}
+
 func DownloadJS(cfg *config.Config, client *http.Client, out io.Writer) error {
 	for _, dl := range cfg.JS.Downloads {
 		version := ResolveVersion(dl.Name, dl.Version)

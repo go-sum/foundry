@@ -125,6 +125,7 @@ func TestLoad_absolute_paths_unchanged(t *testing.T) {
 	}
 }
 
+
 func TestPaths_URLPrefix(t *testing.T) {
 	tests := []struct {
 		prefix string

@@ -1,7 +1,7 @@
 -- root empty --
-<div class="w-full divide-y divide-border rounded-lg border"></div>
+<div data-controller="accordion" class="w-full divide-y divide-border rounded-lg border"></div>
 -- root with children --
-<div class="w-full divide-y divide-border rounded-lg border">items</div>
+<div data-controller="accordion" class="w-full divide-y divide-border rounded-lg border">items</div>
 -- item empty --
 <details class="px-4"></details>
 -- item with children --
@@ -12,3 +12,5 @@
 <summary class="flex w-full items-center justify-between py-4 text-sm font-medium transition-all hover:underline text-left cursor-pointer"><span class="transition-transform duration-200 details-chevron"><svg class="size-4 shrink-0" aria-hidden="true"><use href="#"></use></svg></span></summary>
 -- content with children --
 <div class="pb-4 text-sm text-muted-foreground">Details here</div>
+-- root exclusive --
+<div data-controller="accordion" class="w-full divide-y divide-border rounded-lg border" data-accordion-exclusive="">items</div>

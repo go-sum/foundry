@@ -1,7 +1,7 @@
 -- root --
-<div id="my-tabs" data-tabs="tab1" class="w-full"></div>
+<div id="my-tabs" data-controller="tabs" data-tabs="tab1" class="w-full"></div>
 -- root with children --
-<div id="tabs" data-tabs="t1" class="w-full">content</div>
+<div id="tabs" data-controller="tabs" data-tabs="t1" class="w-full">content</div>
 -- list empty --
 <div role="tablist" aria-orientation="horizontal" class="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground"></div>
 -- trigger active --

@@ -40,14 +40,7 @@ func newBuildCmd() *cobra.Command {
 				if err := build.BuildCSSIfChanged(cfg, minify, state, os.Stdout); err != nil {
 					return err
 				}
-				// JS and fonts do not participate in change detection.
-				if err := build.RemoveStaleJS(cfg, os.Stdout); err != nil {
-					return err
-				}
-				if err := build.DownloadJS(cfg, build.DefaultClient, os.Stdout); err != nil {
-					return err
-				}
-				if err := build.BundleJS(cfg, minify, os.Stdout); err != nil {
+				if err := build.BuildJSIfChanged(cfg, minify, state, os.Stdout); err != nil {
 					return err
 				}
 				return build.DownloadFonts(cfg, build.DefaultClient, os.Stdout)
@@ -79,6 +72,10 @@ func newBuildCmd() *cobra.Command {
 			cfg, err := loadCfg()
 			if err != nil {
 				return err
+			}
+			if incremental {
+				state := build.LoadState(stateFilePath)
+				return build.BuildJSIfChanged(cfg, minify, state, os.Stdout)
 			}
 			if err := build.RemoveStaleJS(cfg, os.Stdout); err != nil {
 				return err
