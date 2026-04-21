@@ -14,7 +14,6 @@ require (
 	github.com/go-sum/web v0.0.0
 	github.com/go-sum/web/render v0.0.0
 	github.com/jackc/pgx/v5 v5.9.1
-	github.com/spf13/cobra v1.10.2
 	go.opentelemetry.io/otel/trace v1.43.0
 	maragu.dev/gomponents v1.3.0
 )
@@ -38,6 +37,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.0 // indirect
 	github.com/redis/go-redis/v9 v9.7.3 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
+	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
