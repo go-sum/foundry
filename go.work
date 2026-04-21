@@ -4,6 +4,11 @@ use (
 	./pkg/assets
 	./pkg/componentry
 	./pkg/config
+	./pkg/db
+	./pkg/kv
+	./pkg/notification
+	./pkg/queue
+	./pkg/queue/pgstore
 	./pkg/web
 	./pkg/web/render
 	./starter
