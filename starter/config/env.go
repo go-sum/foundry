@@ -34,11 +34,18 @@ func LoadEnv() (Config, error) {
 	return cfg, nil
 }
 
+// airProxyCSPHash is the SHA-256 hash of Air's injected live-reload script
+// (github.com/air-verse/air v1.65.0 runner/proxy.js). Update this constant
+// when the Air version in .versions changes.
+const airProxyCSPHash = "'sha256-y933zYNvpVe5f9j5A+OKECUXiWo8bKB5Yp5sLDD3d0I='"
+
 func overlayDevelopment(cfg *Config) {
 	cfg.Site.BaseURL = "http://forge.test"
 	cfg.CSRF.CookieSecure = false
 	cfg.Session.CookieSecure = false
 	cfg.Headers.StrictTransportSecurity = ""
+	cfg.Server.Addr = ":3000"
+	cfg.CSP = cfg.CSP.WithScriptHashes(airProxyCSPHash)
 }
 
 func overlayTesting(cfg *Config) {
