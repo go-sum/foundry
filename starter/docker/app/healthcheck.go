@@ -29,7 +29,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "health: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusBadRequest {
 		os.Exit(0)

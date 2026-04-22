@@ -117,7 +117,7 @@ func TestSSEEvent_Encode_PropagatesWriterError(t *testing.T) {
 
 func TestNewSSEResponse_Headers(t *testing.T) {
 	resp, sse := NewSSEResponse()
-	defer sse.Close()
+	defer sse.Close() //nolint:errcheck
 
 	if ct := resp.Headers.Get("Content-Type"); ct != "text/event-stream" {
 		t.Errorf("Content-Type = %q, want text/event-stream", ct)
@@ -135,7 +135,7 @@ func TestNewSSEResponse_RoundTrip(t *testing.T) {
 
 	go func() {
 		_ = sse.Send(SSEEvent{Event: "hello", Data: "world"})
-		sse.Close()
+		sse.Close() //nolint:errcheck
 	}()
 
 	data, err := io.ReadAll(resp.Body)

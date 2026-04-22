@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/go-sum/web"
-	"github.com/go-sum/web/serve"
 	"github.com/go-sum/web/router"
+	"github.com/go-sum/web/serve"
 )
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ func doGet(t *testing.T, client *http.Client, url string, headers map[string]str
 
 func readAllBody(t *testing.T, resp *http.Response) string {
 	t.Helper()
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("io.ReadAll: %v", err)
@@ -144,7 +144,7 @@ func TestBoundary_PanicUsesProblemJSON(t *testing.T) {
 	t.Parallel()
 
 	panicInvoked := false
-	var onPanic func(any, []byte) = func(val any, stack []byte) {
+	onPanic := func(val any, stack []byte) {
 		panicInvoked = true
 	}
 
@@ -341,7 +341,7 @@ func TestBoundary_HEADBodyEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HEAD /test: %v", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusNotFound {

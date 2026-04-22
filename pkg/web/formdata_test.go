@@ -53,7 +53,7 @@ func TestRequest_FormData_Multipart(t *testing.T) {
 		if err := writer.WriteField("username", "alice"); err != nil {
 			t.Fatalf("writing field: %v", err)
 		}
-		writer.Close()
+		_ = writer.Close()
 
 		req := NewRequest("POST", &url.URL{Path: "/upload"})
 		req.Headers.Set("Content-Type", writer.FormDataContentType())
@@ -76,8 +76,8 @@ func TestRequest_FormData_Multipart(t *testing.T) {
 		if err != nil {
 			t.Fatalf("creating form file: %v", err)
 		}
-		fmt.Fprint(part, fileContent)
-		writer.Close()
+		_, _ = fmt.Fprint(part, fileContent)
+		_ = writer.Close()
 
 		req := NewRequest("POST", &url.URL{Path: "/upload"})
 		req.Headers.Set("Content-Type", writer.FormDataContentType())
@@ -108,7 +108,7 @@ func TestRequest_FormData_Multipart(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Open() error: %v", err)
 		}
-		defer rc.Close()
+		defer func() { _ = rc.Close() }()
 		data, err := io.ReadAll(rc)
 		if err != nil {
 			t.Fatalf("reading file: %v", err)
@@ -226,7 +226,7 @@ func TestRequest_FormData_Errors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CreateFormFile() error = %v", err)
 		}
-		fmt.Fprint(part, "hello")
+		_, _ = fmt.Fprint(part, "hello")
 		if err := writer.Close(); err != nil {
 			t.Fatalf("writer.Close() error = %v", err)
 		}
@@ -248,7 +248,7 @@ func TestRequest_FormData_Errors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CreateFormFile() error = %v", err)
 		}
-		fmt.Fprint(part, "hello stream")
+		_, _ = fmt.Fprint(part, "hello stream")
 		if err := writer.Close(); err != nil {
 			t.Fatalf("writer.Close() error = %v", err)
 		}
@@ -263,7 +263,7 @@ func TestRequest_FormData_Errors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FormDataWithOptions() error = %v", err)
 		}
-		defer fd.Close()
+		defer fd.Close() //nolint:errcheck
 
 		files := fd.Files["document"]
 		if len(files) != 1 {
@@ -273,7 +273,7 @@ func TestRequest_FormData_Errors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Open() error = %v", err)
 		}
-		defer rc.Close()
+		defer func() { _ = rc.Close() }()
 		data, err := io.ReadAll(rc)
 		if err != nil {
 			t.Fatalf("io.ReadAll() error = %v", err)
@@ -318,7 +318,7 @@ func TestFormDataOptions_InMemorySpill(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		defer fd.Close()
+		defer fd.Close() //nolint:errcheck
 
 		files := fd.Files["f"]
 		if len(files) != 1 {
@@ -338,7 +338,7 @@ func TestFormDataOptions_InMemorySpill(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Open() error: %v", err)
 		}
-		defer rc.Close()
+		defer func() { _ = rc.Close() }()
 		got, _ := io.ReadAll(rc)
 		if string(got) != string(content) {
 			t.Errorf("content = %q, want %q", got, content)
@@ -355,7 +355,7 @@ func TestFormDataOptions_InMemorySpill(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		defer fd.Close()
+		defer fd.Close() //nolint:errcheck
 
 		files := fd.Files["f"]
 		if len(files) != 1 {
@@ -403,7 +403,7 @@ func TestFormDataOptions_InMemorySpill(t *testing.T) {
 			t.Fatalf("Open() error: %v", err)
 		}
 		got, _ := io.ReadAll(rc)
-		rc.Close()
+		_ = rc.Close()
 		if string(got) != string(content) {
 			t.Errorf("content = %q, want %q", got, content)
 		}
@@ -415,7 +415,7 @@ func TestFormDataOptions_InMemorySpill(t *testing.T) {
 		// After Close, Open() should fail (file removed).
 		rc2, err := f.Open()
 		if err == nil {
-			rc2.Close()
+			_ = rc2.Close()
 			t.Error("expected error opening removed temp file, got nil")
 		}
 	})
@@ -445,7 +445,7 @@ func TestFormDataOptions_InMemorySpill(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		defer fd.Close()
+		defer fd.Close() //nolint:errcheck
 
 		files := fd.Files["f"]
 		if len(files) != 1 {
@@ -483,7 +483,7 @@ func TestFormDataOptions_InMemorySpill(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		defer fd.Close()
+		defer fd.Close() //nolint:errcheck
 
 		if !handlerCalled {
 			t.Error("expected UploadHandler to be called")

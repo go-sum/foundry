@@ -209,7 +209,7 @@ func TestFile_Serve_Range_Multi(t *testing.T) {
 	if resp.Status != http.StatusOK {
 		t.Fatalf("status = %d, want %d (full response)", resp.Status, http.StatusOK)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	got, _ := io.ReadAll(resp.Body)
 	if string(got) != string(data) {
 		t.Errorf("body = %q, want %q", got, data)
@@ -620,7 +620,7 @@ func TestP0_10_File_OSRootTraversalBlocked(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenRoot: %v", err)
 	}
-	defer root.Close()
+	defer root.Close() //nolint:errcheck
 
 	// Attempt to open a traversal path — os.Root should block this structurally
 	_, err = OpenOSFile(root, "../../../etc/passwd")

@@ -56,7 +56,7 @@ func Generate(ctx context.Context, cfg Config, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer os.Remove(desiredFile)
+	defer os.Remove(desiredFile) //nolint:errcheck
 
 	upSQL, err := runPGSchemaDiff(ctx, cfg.PlanDB, desiredFile)
 	if err != nil {
@@ -94,12 +94,12 @@ func Generate(ctx context.Context, cfg Config, name string) (string, error) {
 	return filePath, nil
 }
 
-func writeTempSQL(sql string) (string, error) {
+func writeTempSQL(sql string) (_ string, err error) {
 	f, err := os.CreateTemp("", "foundry-schema-*.sql")
 	if err != nil {
 		return "", fmt.Errorf("compose: create temp file: %w", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	if _, err := f.WriteString(sql); err != nil {
 		return "", fmt.Errorf("compose: write temp file: %w", err)

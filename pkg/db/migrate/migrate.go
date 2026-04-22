@@ -22,12 +22,12 @@ type MigrationStatus struct {
 }
 
 // Up applies all pending migrations from dir to the database at dsn.
-func Up(ctx context.Context, dsn, dir string) error {
+func Up(ctx context.Context, dsn, dir string) (err error) {
 	db, err := openDB(dsn)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("migrate up: set dialect: %w", err)
@@ -41,12 +41,12 @@ func Up(ctx context.Context, dsn, dir string) error {
 }
 
 // UpTo applies migrations up to and including the given version.
-func UpTo(ctx context.Context, dsn, dir string, version int64) error {
+func UpTo(ctx context.Context, dsn, dir string, version int64) (err error) {
 	db, err := openDB(dsn)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("migrate up-to: set dialect: %w", err)
@@ -60,12 +60,12 @@ func UpTo(ctx context.Context, dsn, dir string, version int64) error {
 }
 
 // Down rolls back the most recently applied migration.
-func Down(ctx context.Context, dsn, dir string) error {
+func Down(ctx context.Context, dsn, dir string) (err error) {
 	db, err := openDB(dsn)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("migrate down: set dialect: %w", err)
@@ -79,12 +79,12 @@ func Down(ctx context.Context, dsn, dir string) error {
 }
 
 // DownTo rolls back migrations to and including the given version.
-func DownTo(ctx context.Context, dsn, dir string, version int64) error {
+func DownTo(ctx context.Context, dsn, dir string, version int64) (err error) {
 	db, err := openDB(dsn)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("migrate down-to: set dialect: %w", err)
@@ -98,12 +98,12 @@ func DownTo(ctx context.Context, dsn, dir string, version int64) error {
 }
 
 // Status returns the state of each known migration.
-func Status(ctx context.Context, dsn, dir string) ([]MigrationStatus, error) {
+func Status(ctx context.Context, dsn, dir string) (_ []MigrationStatus, err error) {
 	db, err := openDB(dsn)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return nil, fmt.Errorf("migrate status: set dialect: %w", err)
@@ -133,12 +133,12 @@ func Status(ctx context.Context, dsn, dir string) ([]MigrationStatus, error) {
 }
 
 // Version returns the current applied migration version (0 if none applied).
-func Version(ctx context.Context, dsn string) (int64, error) {
+func Version(ctx context.Context, dsn string) (_ int64, err error) {
 	db, err := openDB(dsn)
 	if err != nil {
 		return 0, err
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return 0, fmt.Errorf("migrate version: set dialect: %w", err)

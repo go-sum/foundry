@@ -121,7 +121,7 @@ func TestReverse_ForwardsResponseBody(t *testing.T) {
 	if resp.Body == nil {
 		t.Fatal("response body is nil")
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	got, err := io.ReadAll(resp.Body)
 	if err != nil {

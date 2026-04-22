@@ -78,7 +78,6 @@ func TestBufferedDispatcher_Send_QueueFull_ReturnsErrQueueFull(t *testing.T) {
 type blockingDispatcher struct {
 	block chan struct{}
 	ready chan struct{}
-	once  sync.Once
 }
 
 func (b *blockingDispatcher) asDispatcher() *notification.Dispatcher {

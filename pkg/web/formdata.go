@@ -312,7 +312,7 @@ func (r Request) parseMultipartForm(boundary string, opts FormDataOptions) (Form
 
 		name := part.FormName()
 		if name == "" {
-			part.Close()
+			_ = part.Close()
 			continue
 		}
 
@@ -321,11 +321,11 @@ func (r Request) parseMultipartForm(boundary string, opts FormDataOptions) (Form
 		if filename == "" {
 			fieldCount++
 			if fieldCount > opts.MaxFields {
-				part.Close()
+				_ = part.Close()
 				return FormData{}, ErrFormFieldsExceeded
 			}
 			data, err := readAllWithLimit(part, opts.MaxValueBytes, ErrFormValueTooLarge)
-			part.Close()
+			_ = part.Close()
 			if err != nil {
 				return FormData{}, wrapMultipartReadError(name, err)
 			}
@@ -335,12 +335,12 @@ func (r Request) parseMultipartForm(boundary string, opts FormDataOptions) (Form
 
 		fileCount++
 		if fileCount > opts.MaxFiles {
-			part.Close()
+			part.Close() //nolint:errcheck
 			return FormData{}, ErrFormFilesExceeded
 		}
 
 		file, err := parseMultipartFilePart(part, name, filename, partHeaders, opts)
-		part.Close()
+		part.Close() //nolint:errcheck
 		if err != nil {
 			return FormData{}, wrapMultipartReadError(name, err)
 		}

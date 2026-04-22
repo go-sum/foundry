@@ -17,7 +17,7 @@ func BenchmarkParse_URLEncoded(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		fd.Close()
+		fd.Close() //nolint:errcheck
 	}
 }
 
@@ -37,7 +37,7 @@ func BenchmarkParse_Multipart_SmallFields(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		fd.Close()
+		fd.Close() //nolint:errcheck
 	}
 }
 
@@ -70,11 +70,11 @@ func BenchmarkParse_Multipart_1MBFile(b *testing.B) {
 					rc, _ := f.Open()
 					if rc != nil {
 						_, _ = io.Copy(io.Discard, rc)
-						rc.Close()
+						rc.Close() //nolint:errcheck
 					}
 				}
 			}
 		}
-		fd.Close()
+		fd.Close() //nolint:errcheck
 	}
 }

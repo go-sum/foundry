@@ -33,14 +33,16 @@ func sessionFromMiddleware(t *testing.T) *websession.Session {
 
 	var captured *websession.Session
 	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/"})
-	mw(func(c *web.Context) (web.Response, error) {
+	if _, err := mw(func(c *web.Context) (web.Response, error) {
 		sess, ok := websession.FromContext(c)
 		if !ok {
 			t.Fatal("session not found in context")
 		}
 		captured = sess
 		return web.Respond(http.StatusOK), nil
-	})(web.NewContext(context.Background(), req))
+	})(web.NewContext(context.Background(), req)); err != nil {
+		t.Fatalf("middleware error: %v", err)
+	}
 
 	return captured
 }

@@ -21,7 +21,7 @@ func (m MediaType) String() string {
 	var b strings.Builder
 	b.WriteString(mt)
 	if m.Q != 1.0 {
-		b.WriteString(fmt.Sprintf(";q=%g", m.Q))
+		fmt.Fprintf(&b, ";q=%g", m.Q)
 	}
 	for k, v := range m.Params {
 		b.WriteString(";" + k + "=" + Quote(v))

@@ -113,7 +113,7 @@ func TestListenAndServeGracefully_ServeAndShutdown(t *testing.T) {
 		t.Fatalf("Listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	ln.Close() //nolint:errcheck
 
 	handler := func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "hello"), nil
@@ -143,7 +143,7 @@ func TestListenAndServeGracefully_ServeAndShutdown(t *testing.T) {
 		cancel()
 		t.Fatalf("server did not start in time: %v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		cancel()
@@ -170,7 +170,7 @@ func TestListenAndServeGracefully_DefaultShutdownTimeout(t *testing.T) {
 		t.Fatalf("Listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	ln.Close() //nolint:errcheck
 
 	handler := func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "ok"), nil
@@ -190,7 +190,7 @@ func TestListenAndServeGracefully_DefaultShutdownTimeout(t *testing.T) {
 	for time.Now().Before(deadline) {
 		resp, httpErr := http.Get(fmt.Sprintf("http://%s/", addr))
 		if httpErr == nil {
-			resp.Body.Close()
+			resp.Body.Close() //nolint:errcheck
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -240,7 +240,7 @@ func TestListenAndServeGracefully_TLS_ServeAndShutdown(t *testing.T) {
 		t.Fatalf("Listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	ln.Close() //nolint:errcheck
 
 	handler := func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "tls-ok"), nil
@@ -276,7 +276,7 @@ func TestListenAndServeGracefully_TLS_ServeAndShutdown(t *testing.T) {
 		cancel()
 		t.Fatalf("server did not start in time: %v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		cancel()
@@ -301,7 +301,7 @@ func TestListenAndServeGracefully_TLS_HTTP2Negotiated(t *testing.T) {
 		t.Fatalf("Listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	ln.Close() //nolint:errcheck
 
 	handler := func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "h2-ok"), nil
@@ -336,7 +336,7 @@ func TestListenAndServeGracefully_TLS_HTTP2Negotiated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("server did not start in time: %v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	if resp.Proto != "HTTP/2.0" {
 		t.Errorf("Proto = %q, want HTTP/2.0", resp.Proto)
@@ -369,7 +369,7 @@ func TestListenAndServeGracefully_H2C_Cleartext(t *testing.T) {
 		t.Fatalf("Listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	ln.Close() //nolint:errcheck
 
 	handler := func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "h2c-ok"), nil
@@ -407,7 +407,7 @@ func TestListenAndServeGracefully_H2C_Cleartext(t *testing.T) {
 		cancel()
 		t.Fatalf("server did not start in time: %v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		cancel()

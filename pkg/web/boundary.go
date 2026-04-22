@@ -187,8 +187,5 @@ func preferHTML(c *Context) bool {
 		return true
 	}
 	accept := c.Headers().Get("Accept")
-	if strings.Contains(accept, "text/html") {
-		return true
-	}
-	return false
+	return strings.Contains(accept, "text/html")
 }

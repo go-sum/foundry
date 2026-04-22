@@ -98,12 +98,12 @@ func Path(name string) string {
 	return Default.Path(name)
 }
 
-func hashFile(path string) (string, error) {
+func hashFile(path string) (_ string, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err

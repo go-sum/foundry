@@ -98,8 +98,6 @@ func ThemeSelector(p ThemeSelectorProps) g.Node {
 		h.Span(h.Class("theme-dark-icon"), darkIcon),
 		h.Span(h.Class("theme-system-icon"), systemIcon),
 	}
-	for _, extra := range p.Extra {
-		nodes = append(nodes, extra)
-	}
+	nodes = append(nodes, p.Extra...)
 	return h.Button(nodes...)
 }

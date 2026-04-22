@@ -23,9 +23,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "connect: %v\n", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
-	conn.SetDeadline(time.Now().Add(2 * time.Second))
+	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		fmt.Fprintf(os.Stderr, "set deadline: %v\n", err)
+		os.Exit(1)
+	}
 
 	if pw, err := os.ReadFile("/run/secrets/KV_PASSWORD"); err == nil {
 		password := strings.TrimSpace(string(pw))

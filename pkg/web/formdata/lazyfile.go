@@ -51,7 +51,7 @@ func (lf *LazyFile) Open() (io.ReadCloser, error) {
 func (lf *LazyFile) Close() error {
 	if lf.tmpf != nil {
 		name := lf.tmpf.Name()
-		lf.tmpf.Close()
+		lf.tmpf.Close() //nolint:errcheck
 		return os.Remove(name)
 	}
 	return nil

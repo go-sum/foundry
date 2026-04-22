@@ -17,10 +17,7 @@ func FuzzParseSigned(f *testing.F) {
 	f.Add("AgAAAAA=") // too short
 	f.Fuzz(func(t *testing.T, input string) {
 		c2, _ := cookiecodec.New(cookiecodec.Config{Name: "sess", Secrets: [][]byte{[]byte("secret1")}, Mode: cookiecodec.Signed})
-		v, err := c2.Parse(input)
-		if err == nil && v == "" {
-			// empty value is technically valid
-		}
+		_, _ = c2.Parse(input)
 		// Must not panic
 	})
 }

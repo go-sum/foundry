@@ -20,7 +20,7 @@ func TestRun_ShutsDownCleanlyOnContextCancel(t *testing.T) {
 		t.Fatalf("net.Listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	ln.Close() //nolint:errcheck
 
 	rt := router.New()
 	rt.GET("/health", "health", func(_ *web.Context) (web.Response, error) {
@@ -60,7 +60,7 @@ func TestRun_ShutsDownCleanlyOnContextCancel(t *testing.T) {
 		cancel()
 		t.Fatalf("server did not start in time: %v", err)
 	}
-	httpResp.Body.Close()
+	httpResp.Body.Close() //nolint:errcheck
 
 	if httpResp.StatusCode != http.StatusOK {
 		cancel()
@@ -85,7 +85,7 @@ func TestRun_ContextCanceledImmediately(t *testing.T) {
 		t.Fatalf("net.Listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	ln.Close() //nolint:errcheck
 
 	rt := router.New()
 	rt.GET("/health", "health", func(_ *web.Context) (web.Response, error) {

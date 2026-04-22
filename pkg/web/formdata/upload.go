@@ -36,23 +36,23 @@ func DefaultUploadHandler(memThreshold int64) UploadHandler {
 		written := int64(n)
 
 		if _, err := tmp.Write(buf); err != nil {
-			tmp.Close()
-			os.Remove(tmp.Name())
+			tmp.Close()           //nolint:errcheck
+			os.Remove(tmp.Name()) //nolint:errcheck
 			return nil, err
 		}
 
 		// Drain the rest of the body to disk
 		rest, err := io.Copy(tmp, body)
 		if err != nil {
-			tmp.Close()
-			os.Remove(tmp.Name())
+			tmp.Close()           //nolint:errcheck
+			os.Remove(tmp.Name()) //nolint:errcheck
 			return nil, err
 		}
 		written += rest
 
 		if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-			tmp.Close()
-			os.Remove(tmp.Name())
+			tmp.Close()           //nolint:errcheck
+			os.Remove(tmp.Name()) //nolint:errcheck
 			return nil, err
 		}
 

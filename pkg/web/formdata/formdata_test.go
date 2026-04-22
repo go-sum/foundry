@@ -70,7 +70,7 @@ func TestFormData_Multipart_FileField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	defer fd.Close()
+	defer fd.Close() //nolint:errcheck
 
 	files, ok := fd.Files["document"]
 	if !ok || len(files) != 1 {
@@ -89,7 +89,7 @@ func TestFormData_Multipart_FileField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer rc.Close()
+	defer rc.Close() //nolint:errcheck
 	data, err := io.ReadAll(rc)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
@@ -118,7 +118,7 @@ func TestP0_07_Multipart_StreamingDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	defer fd.Close()
+	defer fd.Close() //nolint:errcheck
 
 	files, ok := fd.Files["bigfile"]
 	if !ok || len(files) != 1 {
@@ -202,7 +202,7 @@ func TestFormData_Multipart_MaxTotalSize(t *testing.T) {
 			if err != nil {
 				t.Fatalf("CreateFormFile: %v", err)
 			}
-			part.Write(bytes.Repeat([]byte("x"), 100))
+			part.Write(bytes.Repeat([]byte("x"), 100)) //nolint:errcheck
 		}
 	})
 
@@ -230,7 +230,7 @@ func TestFormData_Multipart_Close_CleansTempFiles(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CreateFormFile: %v", err)
 		}
-		part.Write(fileData)
+		part.Write(fileData) //nolint:errcheck
 	})
 
 	opts := DefaultOptions

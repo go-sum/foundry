@@ -52,8 +52,12 @@ func TestCSPNonce_UniquePerRequest(t *testing.T) {
 	})
 
 	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/"})
-	capture1(web.NewContext(context.Background(), req))
-	capture2(web.NewContext(context.Background(), req))
+	if _, err := capture1(web.NewContext(context.Background(), req)); err != nil {
+		t.Fatalf("capture1: %v", err)
+	}
+	if _, err := capture2(web.NewContext(context.Background(), req)); err != nil {
+		t.Fatalf("capture2: %v", err)
+	}
 
 	if nonce1 == nonce2 {
 		t.Errorf("expected unique nonces per request, got identical: %q", nonce1)

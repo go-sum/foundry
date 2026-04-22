@@ -76,7 +76,7 @@ func (s *Sender) Send(ctx context.Context, n notification.Notification) error {
 	if err != nil {
 		return errors.Join(notification.ErrTransient, fmt.Errorf("notification: webhook: %w", err))
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil

@@ -362,7 +362,9 @@ func TestProcessor_ProcessesJob(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	proc.Stop()
+	if err := proc.Stop(); err != nil {
+		t.Fatalf("proc.Stop: %v", err)
+	}
 
 	if store.completedCount() < 1 {
 		t.Error("expected Complete to be called at least once")
@@ -396,7 +398,9 @@ func TestProcessor_HandlerError(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	proc.Stop()
+	if err := proc.Stop(); err != nil {
+		t.Fatalf("proc.Stop: %v", err)
+	}
 
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -437,7 +441,9 @@ func TestProcessor_HandlerPanic(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	proc.Stop()
+	if err := proc.Stop(); err != nil {
+		t.Fatalf("proc.Stop: %v", err)
+	}
 
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -480,7 +486,9 @@ func TestProcessor_Ready(t *testing.T) {
 		t.Fatal("Ready() channel did not close within timeout")
 	}
 
-	proc.Stop()
+	if err := proc.Stop(); err != nil {
+		t.Fatalf("proc.Stop: %v", err)
+	}
 }
 
 // -- computeBackoff tests --

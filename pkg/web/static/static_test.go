@@ -48,7 +48,7 @@ func setupRoot(t *testing.T) *os.Root {
 	if err != nil {
 		t.Fatalf("OpenRoot: %v", err)
 	}
-	t.Cleanup(func() { root.Close() })
+	t.Cleanup(func() { root.Close() }) //nolint:errcheck
 	return root
 }
 
@@ -251,7 +251,7 @@ func setupRootWithSidecars(t *testing.T) *os.Root {
 	if err != nil {
 		t.Fatalf("OpenRoot: %v", err)
 	}
-	t.Cleanup(func() { root.Close() })
+	t.Cleanup(func() { root.Close() }) //nolint:errcheck
 	return root
 }
 

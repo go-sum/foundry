@@ -28,7 +28,7 @@ func TestComponent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading body: %v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	want := "<div>hello</div>"
 	if string(body) != want {
@@ -50,7 +50,7 @@ func TestComponentWithStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading body: %v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	want := "<p>error</p>"
 	if string(body) != want {
@@ -72,7 +72,7 @@ func TestFragment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading body: %v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	want := "<span>frag</span>"
 	if string(body) != want {
@@ -94,7 +94,7 @@ func TestFragmentWithStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading body: %v", err)
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	want := "<span>frag</span>"
 	if string(body) != want {

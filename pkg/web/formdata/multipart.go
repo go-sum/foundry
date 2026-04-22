@@ -131,14 +131,14 @@ func parseMultipart(body io.Reader, boundary string, opts ParseOptions) (*FormDa
 		}
 		if err != nil {
 			// Clean up on error
-			result.Close()
+			result.Close() //nolint:errcheck
 			return nil, &MalformedMultipartError{Reason: err.Error()}
 		}
 
 		partCount++
 		if partCount > opts.MaxParts {
-			part.Close()
-			result.Close()
+			part.Close()   //nolint:errcheck
+			result.Close() //nolint:errcheck
 			return nil, &MaxPartsExceededError{Limit: opts.MaxParts}
 		}
 
@@ -150,19 +150,19 @@ func parseMultipart(body io.Reader, boundary string, opts ParseOptions) (*FormDa
 			limited := io.LimitReader(part, opts.MaxFileSize+1)
 			data, err := io.ReadAll(limited)
 			if err != nil {
-				part.Close()
-				result.Close()
+				part.Close()   //nolint:errcheck
+				result.Close() //nolint:errcheck
 				return nil, err
 			}
 			if int64(len(data)) > opts.MaxFileSize {
-				part.Close()
-				result.Close()
+				part.Close()   //nolint:errcheck
+				result.Close() //nolint:errcheck
 				return nil, &MaxFileSizeExceededError{Field: fieldName, Limit: opts.MaxFileSize}
 			}
 			totalBytes += int64(len(data))
 			if totalBytes > opts.MaxTotalSize {
-				part.Close()
-				result.Close()
+				part.Close()   //nolint:errcheck
+				result.Close() //nolint:errcheck
 				return nil, &MaxTotalSizeExceededError{Limit: opts.MaxTotalSize}
 			}
 			result.Values[fieldName] = append(result.Values[fieldName], string(data))
@@ -170,8 +170,8 @@ func parseMultipart(body io.Reader, boundary string, opts ParseOptions) (*FormDa
 			// File field
 			fileCount++
 			if fileCount > opts.MaxFiles {
-				part.Close()
-				result.Close()
+				part.Close()   //nolint:errcheck
+				result.Close() //nolint:errcheck
 				return nil, &MaxPartsExceededError{Limit: opts.MaxFiles}
 			}
 
@@ -181,30 +181,30 @@ func parseMultipart(body io.Reader, boundary string, opts ParseOptions) (*FormDa
 			limited := &limitedReader{R: io.LimitReader(part, opts.MaxFileSize+1), limit: opts.MaxFileSize}
 			lf, err := opts.Upload(fieldName, filename, ct, limited)
 			if limited.exceeded {
-				part.Close()
+				part.Close() //nolint:errcheck
 				if lf != nil {
-					lf.Close()
+					lf.Close() //nolint:errcheck
 				}
-				result.Close()
+				result.Close() //nolint:errcheck
 				return nil, &MaxFileSizeExceededError{Field: fieldName, Limit: opts.MaxFileSize}
 			}
 			if err != nil {
-				part.Close()
-				result.Close()
+				part.Close()   //nolint:errcheck
+				result.Close() //nolint:errcheck
 				return nil, err
 			}
 			if lf != nil {
 				totalBytes += lf.Size
 				if totalBytes > opts.MaxTotalSize {
-					lf.Close()
-					part.Close()
-					result.Close()
+					lf.Close()     //nolint:errcheck
+					part.Close()   //nolint:errcheck
+					result.Close() //nolint:errcheck
 					return nil, &MaxTotalSizeExceededError{Limit: opts.MaxTotalSize}
 				}
 				result.Files[fieldName] = append(result.Files[fieldName], lf)
 			}
 		}
-		part.Close()
+		part.Close() //nolint:errcheck
 	}
 	return result, nil
 }

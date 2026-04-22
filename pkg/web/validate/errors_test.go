@@ -38,7 +38,7 @@ func TestErrors_Error_FormatsCorrectly(t *testing.T) {
 }
 
 func TestErrors_ImplementsErrorInterface(t *testing.T) {
-	var e Errors = Errors{{Field: "x", Tag: "required", Message: "is required"}}
+	e := Errors{{Field: "x", Tag: "required", Message: "is required"}}
 	var _ error = e // compile-time
 	if e.Error() == "" {
 		t.Error("Error() returned empty string")

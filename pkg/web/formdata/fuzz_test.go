@@ -69,7 +69,7 @@ func FuzzParseMultipart(f *testing.F) {
 			t.Error("expected non-nil FormData on success")
 			return
 		}
-		fd.Close()
+		fd.Close() //nolint:errcheck
 	})
 }
 
@@ -97,6 +97,6 @@ func FuzzParseURLEncoded(f *testing.F) {
 			t.Error("expected non-nil FormData on success")
 			return
 		}
-		fd.Close()
+		fd.Close() //nolint:errcheck
 	})
 }

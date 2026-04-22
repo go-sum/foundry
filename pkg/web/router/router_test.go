@@ -164,7 +164,7 @@ func TestIsFrozen(t *testing.T) {
 		t.Fatal("IsFrozen() = true before first Serve, want false")
 	}
 
-	r.Serve(testContext(http.MethodGet, "/"))
+	r.Serve(testContext(http.MethodGet, "/")) //nolint:errcheck
 
 	if !r.IsFrozen() {
 		t.Fatal("IsFrozen() = false after Serve, want true")

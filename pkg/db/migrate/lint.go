@@ -56,12 +56,12 @@ func Lint(dir string) ([]LintResult, error) {
 	return results, nil
 }
 
-func lintFile(path string) ([]LintResult, error) {
+func lintFile(path string) (_ []LintResult, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("lint: open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	var results []LintResult
 	inUp := false

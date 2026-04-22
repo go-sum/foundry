@@ -78,7 +78,7 @@ func FSHandler(fsys fs.FS, opts Options) web.Handler {
 
 // openFSFile opens a file from fsys and returns it as a file.Source.
 // Returns an error if the file does not exist, is a directory, or rel is empty.
-func openFSFile(fsys fs.FS, rel string) (file.Source, error) {
+func openFSFile(fsys fs.FS, rel string) (_ file.Source, err error) {
 	if rel == "" {
 		return nil, fs.ErrNotExist
 	}
@@ -87,7 +87,7 @@ func openFSFile(fsys fs.FS, rel string) (file.Source, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	fi, err := f.Stat()
 	if err != nil {
@@ -106,4 +106,3 @@ func openFSFile(fsys fs.FS, rel string) (file.Source, error) {
 
 	return file.NewBytesSource(filepath.Base(rel), data, fi.ModTime(), ct), nil
 }
-

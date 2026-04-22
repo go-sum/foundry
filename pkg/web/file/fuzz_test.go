@@ -80,7 +80,7 @@ func FuzzServeHeaders(f *testing.F) {
 		// Body must be fully readable without panic
 		if resp.Body != nil {
 			_, _ = io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
+			resp.Body.Close() //nolint:errcheck
 		}
 	})
 }
@@ -118,7 +118,7 @@ func FuzzOSFilePath(f *testing.F) {
 	if err != nil {
 		f.Fatal(err)
 	}
-	f.Cleanup(func() { root.Close() })
+	f.Cleanup(func() { root.Close() }) //nolint:errcheck
 
 	f.Fuzz(func(t *testing.T, rel string) {
 		// Must not panic; error is expected for traversal / missing paths.
@@ -142,6 +142,6 @@ func t_tempDir(f *testing.F) string {
 	if err != nil {
 		f.Fatal(err)
 	}
-	f.Cleanup(func() { os.RemoveAll(dir) })
+	f.Cleanup(func() { os.RemoveAll(dir) }) //nolint:errcheck
 	return dir
 }

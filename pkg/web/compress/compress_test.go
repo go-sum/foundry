@@ -35,7 +35,7 @@ func bodyString(t *testing.T, resp web.Response) string {
 	if resp.Body == nil {
 		return ""
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("reading body: %v", err)
@@ -50,7 +50,7 @@ func decompressGzip(t *testing.T, r io.Reader) string {
 	if err != nil {
 		t.Fatalf("gzip.NewReader: %v", err)
 	}
-	defer gr.Close()
+	defer gr.Close() //nolint:errcheck
 	data, err := io.ReadAll(gr)
 	if err != nil {
 		t.Fatalf("reading gzip: %v", err)
@@ -62,7 +62,7 @@ func decompressGzip(t *testing.T, r io.Reader) string {
 func decompressDeflate(t *testing.T, r io.Reader) string {
 	t.Helper()
 	fr := flate.NewReader(r)
-	defer fr.Close()
+	defer fr.Close() //nolint:errcheck
 	data, err := io.ReadAll(fr)
 	if err != nil {
 		t.Fatalf("reading deflate: %v", err)
@@ -295,17 +295,17 @@ func TestMiddleware(t *testing.T) {
 				case "br":
 					got = decompressBrotli(t, resp.Body)
 					if resp.Body != nil {
-						resp.Body.Close()
+						resp.Body.Close() //nolint:errcheck
 					}
 				case "gzip":
 					got = decompressGzip(t, resp.Body)
 					if resp.Body != nil {
-						resp.Body.Close()
+						resp.Body.Close() //nolint:errcheck
 					}
 				case "deflate":
 					got = decompressDeflate(t, resp.Body)
 					if resp.Body != nil {
-						resp.Body.Close()
+						resp.Body.Close() //nolint:errcheck
 					}
 				}
 				if got != tt.wantBody {
@@ -338,7 +338,7 @@ func TestMiddlewareVaryAppended(t *testing.T) {
 	mw := Middleware(Config{})
 	c := makeContext("gzip")
 	resp, _ := mw(handler)(c)
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	vary := resp.Headers.Get("Vary")
 	if !strings.Contains(strings.ToLower(vary), "accept-encoding") {
@@ -406,17 +406,17 @@ func TestMiddlewareContentLengthShortcut(t *testing.T) {
 			wantEncoding:  "",
 		},
 		{
-			name:          "content-length equal to minsize compresses",
-			contentLength: strconv.Itoa(minSize),
-			bodyStr:       body,
-			wantEncoding:  "gzip",
+			name:           "content-length equal to minsize compresses",
+			contentLength:  strconv.Itoa(minSize),
+			bodyStr:        body,
+			wantEncoding:   "gzip",
 			wantCompressed: true,
 		},
 		{
-			name:          "malformed content-length falls back to buffering",
-			contentLength: "not-a-number",
-			bodyStr:       body,
-			wantEncoding:  "gzip",
+			name:           "malformed content-length falls back to buffering",
+			contentLength:  "not-a-number",
+			bodyStr:        body,
+			wantEncoding:   "gzip",
 			wantCompressed: true,
 		},
 	}
@@ -448,7 +448,7 @@ func TestMiddlewareContentLengthShortcut(t *testing.T) {
 			if tt.wantCompressed {
 				got := decompressGzip(t, resp.Body)
 				if resp.Body != nil {
-					resp.Body.Close()
+					resp.Body.Close() //nolint:errcheck
 				}
 				if got != tt.bodyStr {
 					t.Errorf("decompressed body = %q, want %q", got, tt.bodyStr)

@@ -37,7 +37,9 @@ func TestMemoryStore_DeniesExceedingBurst(t *testing.T) {
 
 	// Exhaust the burst.
 	for range 3 {
-		store.Allow("client1")
+		if _, _, err := store.Allow("client1"); err != nil {
+			t.Fatalf("Allow: %v", err)
+		}
 	}
 
 	// Next request should be denied.
@@ -87,7 +89,9 @@ func TestMemoryStore_SeparateIdentifiers(t *testing.T) {
 	})
 
 	// Exhaust client1.
-	store.Allow("client1")
+	if _, _, err := store.Allow("client1"); err != nil {
+		t.Fatalf("Allow: %v", err)
+	}
 
 	// client2 should still be allowed.
 	allowed, _, err := store.Allow("client2")
@@ -350,7 +354,9 @@ func TestRateLimit_Denied_SetsRetryAfterHeader(t *testing.T) {
 
 	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/"})
 	// First: allowed
-	handler(web.NewContext(context.Background(), req))
+	if _, err := handler(web.NewContext(context.Background(), req)); err != nil {
+		t.Fatalf("first request (allowed): %v", err)
+	}
 	// Second: denied
 	_, err := handler(web.NewContext(context.Background(), req))
 

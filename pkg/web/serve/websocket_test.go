@@ -25,7 +25,7 @@ func TestSwitching_HijackCalled(t *testing.T) {
 		if brw == nil {
 			t.Error("HijackFunc: brw is nil")
 		}
-		conn.Close()
+		conn.Close() //nolint:errcheck
 		close(hijackCalled)
 		return nil
 	}
@@ -44,7 +44,7 @@ func TestSwitching_HijackCalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
 	// Send a minimal HTTP/1.1 GET request.
 	_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"))
@@ -116,7 +116,7 @@ func TestSwitching_ErrorPropagated(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	fn := func(conn net.Conn, brw *bufio.ReadWriter) error {
-		conn.Close()
+		conn.Close() //nolint:errcheck
 		return sentinel
 	}
 
@@ -141,14 +141,14 @@ func TestSwitching_ErrorPropagated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
 	_, _ = conn.Write([]byte("GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"))
 
 	br := bufio.NewReader(conn)
 	_, _ = http.ReadResponse(br, nil)
 	// Close client side so the hijacked conn.Close() in fn propagates.
-	conn.Close()
+	conn.Close() //nolint:errcheck
 
 	gotErr := <-errCh
 	if gotErr == nil {

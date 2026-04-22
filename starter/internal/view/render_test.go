@@ -22,7 +22,7 @@ func TestRender(t *testing.T) {
 		}
 
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck
 
 		if resp.Status != http.StatusOK {
 			t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
@@ -41,7 +41,7 @@ func TestRender(t *testing.T) {
 		}
 
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck
 
 		want := render.RenderNode(t, partial)
 		if string(body) != want {
@@ -57,7 +57,7 @@ func TestRender(t *testing.T) {
 		}
 
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck
 
 		want := render.RenderNode(t, full)
 		if string(body) != want {
@@ -89,7 +89,7 @@ func TestRenderWithStatus_Partial(t *testing.T) {
 		t.Errorf("Status = %d, want %d", resp.Status, http.StatusCreated)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	want := render.RenderNode(t, partial)
 	if string(body) != want {

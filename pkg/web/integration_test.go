@@ -107,7 +107,7 @@ func newSessionRouter(t *testing.T, csrfCfg secure.CSRFConfig) *router.Router {
 		if err != nil {
 			return web.Text(http.StatusBadRequest, "bad form"), nil
 		}
-		defer fd.Close()
+		defer fd.Close() //nolint:errcheck
 
 		name := fd.Values.Get("name")
 		if name == "" {
@@ -167,7 +167,7 @@ func newStatelessRouter(t *testing.T, csrfCfg secure.CSRFConfig) *router.Router 
 		if err != nil {
 			return web.Text(http.StatusBadRequest, "bad form"), nil
 		}
-		defer fd.Close()
+		defer fd.Close() //nolint:errcheck
 
 		name := fd.Values.Get("name")
 		if name == "" {

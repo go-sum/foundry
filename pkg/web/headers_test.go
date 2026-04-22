@@ -2,7 +2,6 @@ package web
 
 import (
 	"net/http"
-	"sort"
 	"strings"
 	"testing"
 )
@@ -445,12 +444,3 @@ func sliceEqual(a, b []string) bool {
 	return true
 }
 
-// sortedKeys returns sorted keys from a map for deterministic comparison.
-func sortedKeys(m map[string][]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}

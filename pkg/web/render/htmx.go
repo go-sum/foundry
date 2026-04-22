@@ -17,7 +17,7 @@ func HXForm(action string, children ...g.Node) g.Node {
 		g.Attr("hx-post", action),
 		g.Attr("hx-swap", "outerHTML"),
 	}
-	return h.FormEl(append(attrs, children...)...)
+	return h.Form(append(attrs, children...)...)
 }
 
 // HXGet returns an element with hx-get set to the given URL.

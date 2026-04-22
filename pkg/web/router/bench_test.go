@@ -26,7 +26,7 @@ func BenchmarkRouter_1Route(b *testing.B) {
 	c := testContext(http.MethodGet, "/route/r0/value")
 	b.ResetTimer()
 	for range b.N {
-		r.Serve(c)
+		r.Serve(c) //nolint:errcheck
 	}
 }
 
@@ -35,7 +35,7 @@ func BenchmarkRouter_10Routes(b *testing.B) {
 	c := testContext(http.MethodGet, "/route/r9/value") // last route
 	b.ResetTimer()
 	for range b.N {
-		r.Serve(c)
+		r.Serve(c) //nolint:errcheck
 	}
 }
 
@@ -44,7 +44,7 @@ func BenchmarkRouter_100Routes(b *testing.B) {
 	c := testContext(http.MethodGet, "/route/r99/value") // last route
 	b.ResetTimer()
 	for range b.N {
-		r.Serve(c)
+		r.Serve(c) //nolint:errcheck
 	}
 }
 
@@ -53,7 +53,7 @@ func BenchmarkRouter_500Routes(b *testing.B) {
 	c := testContext(http.MethodGet, "/route/r499/value") // last route
 	b.ResetTimer()
 	for range b.N {
-		r.Serve(c)
+		r.Serve(c) //nolint:errcheck
 	}
 }
 
@@ -62,7 +62,7 @@ func BenchmarkRouter_1000Routes(b *testing.B) {
 	c := testContext(http.MethodGet, "/route/r999/value") // last route
 	b.ResetTimer()
 	for range b.N {
-		r.Serve(c)
+		r.Serve(c) //nolint:errcheck
 	}
 }
 

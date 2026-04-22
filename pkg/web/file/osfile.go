@@ -22,12 +22,12 @@ type OSFile struct {
 
 // OpenOSFile opens rel within root as a Source.
 // Returns an error if the file does not exist or is a directory.
-func OpenOSFile(root *os.Root, rel string) (*OSFile, error) {
+func OpenOSFile(root *os.Root, rel string) (_ *OSFile, err error) {
 	f, err := root.Open(rel)
 	if err != nil {
 		return nil, fmt.Errorf("file: open %q: %w", rel, err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	fi, err := f.Stat()
 	if err != nil {
@@ -58,7 +58,7 @@ func (o *OSFile) ReadAt(p []byte, off int64) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	// *os.File implements io.ReaderAt directly.
 	return f.ReadAt(p, off)
