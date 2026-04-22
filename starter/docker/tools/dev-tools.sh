@@ -1,21 +1,9 @@
 #!/usr/bin/env bash
 set -eu
 
-# ── Architecture ─────────────────────────────────────────────────────────────
-case "${TARGETARCH}" in
-  amd64) TW_ARCH="x64" ;;
-  arm64) TW_ARCH="arm64" ;;
-  *)     echo "unsupported: ${TARGETARCH}" >&2; exit 1 ;;
-esac
-
-# ── System packages ──────────────────────────────────────────────────────────
+# ── System packages (libgit2 for foundry CLI subtree operations) ─────────────
 apt-get update && apt-get install -y --no-install-recommends libgit2-dev pkgconf
 rm -rf /var/lib/apt/lists/*
-
-# ── Tailwind CSS ─────────────────────────────────────────────────────────────
-curl -fsSLo /usr/local/bin/tailwindcss \
-  "https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-${TW_ARCH}"
-chmod +x /usr/local/bin/tailwindcss
 
 # ── Air (hot-reload) ─────────────────────────────────────────────────────────
 go install github.com/air-verse/air@v${AIR_VERSION}

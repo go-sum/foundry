@@ -3,6 +3,7 @@
 # ── Version pins ──────────────────────────────────────────────────────────────
 ARG GO_VERSION
 ARG HTMX_VERSION
+ARG HUGO_VERSION
 ARG TAILWIND_VERSION
 ARG TOOLS_DEV_IMAGE=foundry-tools:dev
 ARG TOOLS_PROD_IMAGE=foundry-tools:prod

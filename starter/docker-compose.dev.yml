@@ -13,7 +13,8 @@ services:
         PG_VERSION: ${PG_VERSION}
     image: foundry-db:dev
 
-  # Dev toolchain — build, lint, test, assets.
+  # Dev toolchain — build, lint, test, assets, docs, foundry CLI.
+  # Mounts monorepo root so it can access pkg/ and tools/ alongside starter/.
   # profiles: [tools] keeps it out of `docker compose up`.
   # `docker compose run --rm tools <cmd>` auto-builds if needed.
   tools:
@@ -24,19 +25,22 @@ services:
       args:
         GO_VERSION: ${GO_VERSION}
         AIR_VERSION: ${AIR_VERSION}
+        ASSETS_CLI_VERSION: ${ASSETS_CLI_VERSION}
+        DOCS_CLI_VERSION: ${DOCS_CLI_VERSION}
         GOLANGCI_LINT_VERSION: ${GOLANGCI_LINT_VERSION}
+        HUGO_VERSION: ${HUGO_VERSION}
         MKCERT_VERSION: ${MKCERT_VERSION}
         TAILWIND_VERSION: ${TAILWIND_VERSION}
     image: ${TOOLS_DEV:-foundry-tools:dev}
     volumes:
-      - .:/app
+      - ../:/app
+      - tools-cache:/root/.cache/go-build
+      - tools-gomod:/root/go/pkg/mod
     working_dir: /app
     env_file: .env
-    networks:
-      - app_net
     profiles: [tools]
 
-  # Production toolchain — Tailwind only.
+  # Production toolchain — Tailwind + Hugo only (no dev dependencies).
   prod-tools:
     build:
       context: ./docker/tools
@@ -44,6 +48,7 @@ services:
       target: production_toolchain
       args:
         GO_VERSION: ${GO_VERSION}
+        HUGO_VERSION: ${HUGO_VERSION}
         TAILWIND_VERSION: ${TAILWIND_VERSION}
     image: ${TOOLS_PROD:-foundry-tools:prod}
     volumes:
@@ -53,6 +58,11 @@ services:
     profiles: [tools]
 
   app:
+    depends_on:
+      db:
+        condition: service_healthy
+      kv:
+        condition: service_healthy
     build:
       context: .
       target: dev_target
@@ -81,3 +91,7 @@ services:
 networks:
   app_net:
   proxy_net:
+
+volumes:
+  tools-cache:
+  tools-gomod:
