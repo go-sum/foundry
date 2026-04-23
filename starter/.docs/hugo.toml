@@ -1,0 +1,34 @@
+baseURL = "/docs/"
+title = "Documentation"
+disableKinds = ["taxonomy", "term", "RSS", "sitemap", "robotsTXT"]
+
+[params]
+  description = "Documentation for this application."
+
+[markup]
+  [markup.goldmark.renderer]
+    unsafe = false
+  [markup.highlight]
+    codeFences = true
+    noClasses = false
+
+[module]
+  [[module.mounts]]
+    source = "content"
+    target = "content"
+  [[module.mounts]]
+    source = "layouts"
+    target = "layouts"
+  [[module.mounts]]
+    source = "assets"
+    target = "assets"
+  [[module.mounts]]
+    source = "../../.decisions"
+    includeFiles = ["DESIGN_GUIDE.md", "ERROR_HANDLING_GUIDE.md", "PATTERNS_PRINCIPLES.md", "UI_GUIDE.md"]
+    target = "content/decisions"
+  [[module.mounts]]
+    source = "../../pkg/componentry/README.md"
+    target = "content/packages/componentry.md"
+  [[module.mounts]]
+    source = "../../pkg/docs/README.md"
+    target = "content/packages/docs.md"

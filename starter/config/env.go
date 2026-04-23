@@ -44,6 +44,12 @@ func overlayDevelopment(cfg *Config) {
 	cfg.CSRF.CookieSecure = false
 	cfg.Session.CookieSecure = false
 	cfg.Headers.StrictTransportSecurity = ""
+	// COEP/COOP enable cross-origin isolation, which causes Chrome to enforce
+	// CORS on the service worker's same-origin SSE fetch to Air's proxy. Air
+	// does not set Access-Control-Allow-Origin, so the browser drops the
+	// connection immediately. These headers are not needed in development.
+	cfg.Headers.CrossOriginEmbedderPolicy = ""
+	cfg.Headers.CrossOriginOpenerPolicy = ""
 	cfg.Server.Addr = ":3000"
 	cfg.CSP = cfg.CSP.WithScriptHashes(airProxyCSPHash)
 }

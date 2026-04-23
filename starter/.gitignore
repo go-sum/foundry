@@ -2,6 +2,7 @@
 
 bin/
 public/static/
+public/docs/
 tmp/
 
 .env

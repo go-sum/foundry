@@ -1,0 +1,90 @@
+html {
+  color-scheme: light;
+  --docs-font-sans:  ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --docs-font-mono:  ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --docs-font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+.docs-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.docs-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.docs-theme-toggle:hover {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--foreground);
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--border));
+}
+
+.docs-theme-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.docs-theme-toggle:active {
+  transform: translateY(1px);
+}
+
+.theme-icon-light,
+.theme-icon-dark,
+.theme-icon-system {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+}
+
+.theme-icon-light svg,
+.theme-icon-dark svg,
+.theme-icon-system svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+html[data-theme-preference="light"] .theme-icon-light {
+  display: inline-flex;
+}
+
+html[data-theme-preference="dark"] .theme-icon-dark {
+  display: inline-flex;
+}
+
+html[data-theme-preference="system"] .theme-icon-system,
+html:not([data-theme-preference]) .theme-icon-system {
+  display: inline-flex;
+}
+
+@media (max-width: 900px) {
+  .docs-header-actions {
+    margin-top: 1rem;
+    justify-content: space-between;
+  }
+}

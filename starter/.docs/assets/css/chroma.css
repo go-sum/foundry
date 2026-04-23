@@ -1,0 +1,340 @@
+:root {
+  --syntax-bg: color-mix(in srgb, var(--secondary) 94%, var(--background));
+  --syntax-fg: var(--secondary-foreground);
+  --syntax-border: color-mix(in srgb, var(--primary) 14%, var(--border));
+  --syntax-line-number: var(--muted-foreground);
+  --syntax-line-highlight: color-mix(in srgb, var(--accent) 82%, transparent);
+
+  --syntax-keyword: rgb(4 120 87);
+  --syntax-keyword-soft: rgb(5 150 105);
+  --syntax-keyword-type: rgb(154 52 18);
+
+  --syntax-name: var(--syntax-fg);
+  --syntax-name-attribute: rgb(3 105 161);
+  --syntax-name-class: rgb(2 132 199);
+  --syntax-name-constant: rgb(8 145 178);
+  --syntax-name-decorator: color-mix(in srgb, var(--foreground) 62%, var(--muted-foreground));
+  --syntax-name-entity: rgb(194 65 12);
+  --syntax-name-label: rgb(30 64 175);
+  --syntax-name-tag: rgb(30 64 175);
+  --syntax-name-variable: rgb(126 34 206);
+  --syntax-name-function: rgb(29 78 216);
+
+  --syntax-string: rgb(3 105 161);
+  --syntax-string-escape: rgb(8 145 178);
+  --syntax-string-interpolated: rgb(14 116 144);
+  --syntax-string-other: rgb(180 83 9);
+  --syntax-string-regex: rgb(30 64 175);
+  --syntax-string-symbol: rgb(77 124 15);
+
+  --syntax-number: rgb(5 150 105);
+  --syntax-operator: color-mix(in srgb, var(--foreground) 60%, var(--muted-foreground));
+
+  --syntax-comment: color-mix(in srgb, var(--muted-foreground) 72%, rgb(14 116 144));
+  --syntax-comment-special-bg: color-mix(in srgb, var(--accent) 74%, transparent);
+  --syntax-preproc: rgb(4 120 87);
+
+  --syntax-error: rgb(190 24 93);
+  --syntax-generic-deleted: rgb(185 28 28);
+  --syntax-generic-inserted: rgb(21 128 61);
+  --syntax-generic-heading: rgb(30 64 175);
+  --syntax-generic-subheading: rgb(126 34 206);
+  --syntax-generic-output: var(--muted-foreground);
+  --syntax-generic-prompt: rgb(180 83 9);
+  --syntax-generic-traceback: rgb(37 99 235);
+  --syntax-whitespace: color-mix(in srgb, var(--muted-foreground) 72%, var(--border));
+}
+
+.dark {
+  --syntax-bg: color-mix(in srgb, var(--secondary) 96%, var(--background));
+  --syntax-fg: color-mix(in srgb, var(--foreground) 96%, var(--secondary-foreground));
+  --syntax-border: color-mix(in srgb, var(--primary) 12%, var(--border));
+  --syntax-line-number: color-mix(in srgb, var(--muted-foreground) 88%, var(--foreground));
+  --syntax-line-highlight: color-mix(in srgb, var(--accent) 70%, transparent);
+
+  --syntax-keyword: rgb(110 231 183);
+  --syntax-keyword-soft: rgb(52 211 153);
+  --syntax-keyword-type: rgb(253 186 116);
+
+  --syntax-name: var(--syntax-fg);
+  --syntax-name-attribute: rgb(125 211 252);
+  --syntax-name-class: rgb(56 189 248);
+  --syntax-name-constant: rgb(103 232 249);
+  --syntax-name-decorator: color-mix(in srgb, var(--foreground) 76%, var(--muted-foreground));
+  --syntax-name-entity: rgb(251 146 60);
+  --syntax-name-label: rgb(147 197 253);
+  --syntax-name-tag: rgb(147 197 253);
+  --syntax-name-variable: rgb(196 181 253);
+  --syntax-name-function: rgb(147 197 253);
+
+  --syntax-string: rgb(125 211 252);
+  --syntax-string-escape: rgb(103 232 249);
+  --syntax-string-interpolated: rgb(103 232 249);
+  --syntax-string-other: rgb(251 191 36);
+  --syntax-string-regex: rgb(147 197 253);
+  --syntax-string-symbol: rgb(190 242 100);
+
+  --syntax-number: rgb(110 231 183);
+  --syntax-operator: color-mix(in srgb, var(--foreground) 74%, var(--muted-foreground));
+
+  --syntax-comment: color-mix(in srgb, var(--muted-foreground) 78%, rgb(103 232 249));
+  --syntax-comment-special-bg: color-mix(in srgb, var(--accent) 82%, transparent);
+  --syntax-preproc: rgb(110 231 183);
+
+  --syntax-error: rgb(249 168 212);
+  --syntax-generic-deleted: rgb(252 165 165);
+  --syntax-generic-inserted: rgb(134 239 172);
+  --syntax-generic-heading: rgb(147 197 253);
+  --syntax-generic-subheading: rgb(196 181 253);
+  --syntax-generic-output: color-mix(in srgb, var(--muted-foreground) 88%, var(--foreground));
+  --syntax-generic-prompt: rgb(251 191 36);
+  --syntax-generic-traceback: rgb(96 165 250);
+  --syntax-whitespace: color-mix(in srgb, var(--muted-foreground) 82%, var(--border));
+}
+
+.chroma {
+  background: var(--syntax-bg);
+  color: var(--syntax-fg);
+  border: 1px solid var(--syntax-border);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+  -webkit-text-size-adjust: none;
+}
+
+.dark .chroma {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+
+.chroma .lnlinks {
+  color: inherit;
+  outline: none;
+  text-decoration: none;
+}
+
+.chroma .lntd {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  vertical-align: top;
+}
+
+.chroma .lntable {
+  margin: 0;
+  padding: 0;
+  border-spacing: 0;
+  border: 0;
+}
+
+.chroma .hl {
+  background-color: var(--syntax-line-highlight);
+}
+
+.chroma .lnt,
+.chroma .ln {
+  margin-right: 0.4em;
+  padding: 0 0.4em 0 0.4em;
+  color: var(--syntax-line-number);
+  white-space: pre;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.chroma .line {
+  display: flex;
+}
+
+.chroma .bg {
+  background-color: var(--syntax-bg);
+}
+
+.chroma .k,
+.chroma .kc,
+.chroma .kd,
+.chroma .kn,
+.chroma .kr,
+.chroma .ow {
+  color: var(--syntax-keyword);
+  font-weight: 700;
+}
+
+.chroma .kp,
+.chroma .nb,
+.chroma .bp,
+.chroma .ne,
+.chroma .cp,
+.chroma .cpf {
+  color: var(--syntax-keyword-soft);
+}
+
+.chroma .kt {
+  color: var(--syntax-keyword-type);
+}
+
+.chroma .na {
+  color: var(--syntax-name-attribute);
+}
+
+.chroma .nc,
+.chroma .nn {
+  color: var(--syntax-name-class);
+  font-weight: 700;
+}
+
+.chroma .no {
+  color: var(--syntax-name-constant);
+}
+
+.chroma .nd {
+  color: var(--syntax-name-decorator);
+  font-weight: 700;
+}
+
+.chroma .ni {
+  color: var(--syntax-name-entity);
+  font-weight: 700;
+}
+
+.chroma .nl {
+  color: var(--syntax-name-label);
+  font-weight: 700;
+}
+
+.chroma .nt {
+  color: var(--syntax-name-tag);
+  font-weight: 700;
+}
+
+.chroma .nv,
+.chroma .vc,
+.chroma .vg,
+.chroma .vi,
+.chroma .vm {
+  color: var(--syntax-name-variable);
+}
+
+.chroma .nf,
+.chroma .fm {
+  color: var(--syntax-name-function);
+}
+
+.chroma .nx,
+.chroma .py {
+  color: var(--syntax-name);
+}
+
+.chroma .s,
+.chroma .sa,
+.chroma .sb,
+.chroma .sc,
+.chroma .dl,
+.chroma .sh,
+.chroma .s2,
+.chroma .s1 {
+  color: var(--syntax-string);
+}
+
+.chroma .sd {
+  color: var(--syntax-string);
+  font-style: italic;
+}
+
+.chroma .se {
+  color: var(--syntax-string-escape);
+  font-weight: 700;
+}
+
+.chroma .si {
+  color: var(--syntax-string-interpolated);
+}
+
+.chroma .sx {
+  color: var(--syntax-string-other);
+}
+
+.chroma .sr {
+  color: var(--syntax-string-regex);
+}
+
+.chroma .ss {
+  color: var(--syntax-string-symbol);
+}
+
+.chroma .m,
+.chroma .mb,
+.chroma .mf,
+.chroma .mh,
+.chroma .mi,
+.chroma .il,
+.chroma .mo {
+  color: var(--syntax-number);
+}
+
+.chroma .o {
+  color: var(--syntax-operator);
+}
+
+.chroma .c,
+.chroma .ch,
+.chroma .cm,
+.chroma .c1 {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+.chroma .cs {
+  color: var(--syntax-comment);
+  background-color: var(--syntax-comment-special-bg);
+  font-style: italic;
+}
+
+.chroma .err,
+.chroma .gr {
+  color: var(--syntax-error);
+}
+
+.chroma .gd {
+  color: var(--syntax-generic-deleted);
+}
+
+.chroma .ge {
+  font-style: italic;
+}
+
+.chroma .gh {
+  color: var(--syntax-generic-heading);
+  font-weight: 700;
+}
+
+.chroma .gi {
+  color: var(--syntax-generic-inserted);
+}
+
+.chroma .go {
+  color: var(--syntax-generic-output);
+}
+
+.chroma .gp {
+  color: var(--syntax-generic-prompt);
+  font-weight: 700;
+}
+
+.chroma .gs {
+  font-weight: 700;
+}
+
+.chroma .gu {
+  color: var(--syntax-generic-subheading);
+  font-weight: 700;
+}
+
+.chroma .gt {
+  color: var(--syntax-generic-traceback);
+}
+
+.chroma .gl {
+  text-decoration: underline;
+}
+
+.chroma .w {
+  color: var(--syntax-whitespace);
+}

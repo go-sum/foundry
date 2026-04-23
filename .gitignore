@@ -6,7 +6,6 @@
 .projects/
 
 bin/
-public/static/
 tmp/
 .task/
 

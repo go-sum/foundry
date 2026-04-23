@@ -42,6 +42,8 @@ func DefaultNav() compound.NavConfig {
 			{
 				Align: compound.NavAlignEnd,
 				Items: []compound.NavItem{
+					{Label: "Documentation", Href: "/docs"},
+					{Label: "Contact", Href: "/contact"},
 					{Slot: compound.SlotThemeToggle},
 				},
 			},

@@ -5,6 +5,7 @@ use (
 	./pkg/componentry
 	./pkg/config
 	./pkg/db
+	./pkg/docs
 	./pkg/kv
 	./pkg/notification
 	./pkg/queue

@@ -13,6 +13,11 @@ cat > "${SCRIPT_DIR}/Caddyfile" <<EOF
 ${DOMAIN} {
 	${TLS_CONFIG}
 
+	@sse path /__air_internal/*
+	reverse_proxy @sse app:8080 {
+		flush_interval -1
+	}
+
 	reverse_proxy app:8080
 }
 EOF

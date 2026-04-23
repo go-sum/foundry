@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/go-sum/componentry/interactive/theme"
@@ -29,6 +30,7 @@ type ContactConfig struct {
 
 // Config is the complete application configuration.
 type Config struct {
+	PublicDir    string
 	Assets       static.AssetsConfig
 	Contact      ContactConfig
 	CSP          secure.CSPNonceConfig
@@ -60,11 +62,13 @@ func defaultProduction() (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("config: security: %w", err)
 	}
+	const publicDir = "public"
 	assets := static.DefaultAssetsConfig()
-	assets.PublicDir = "public/static"
+	assets.PublicDir = filepath.Join(publicDir, "static")
 
 	return Config{
-		Assets: assets,
+		PublicDir: publicDir,
+		Assets:    assets,
 		Contact: ContactConfig{
 			SendTo:     cfgpkg.ExpandEnv("CONTACT_SEND_TO", "admin@example.com"),
 			SendFrom:   cfgpkg.ExpandEnv("CONTACT_SEND_FROM", "noreply@example.com"),

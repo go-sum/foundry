@@ -7,6 +7,7 @@ require (
 	github.com/go-sum/componentry v0.0.0
 	github.com/go-sum/config v0.0.0
 	github.com/go-sum/db v0.0.0
+	github.com/go-sum/docs v0.0.0
 	github.com/go-sum/kv v0.0.0
 	github.com/go-sum/notification v0.0.0
 	github.com/go-sum/queue v0.0.0
@@ -15,6 +16,7 @@ require (
 	github.com/go-sum/web/render v0.0.0
 	github.com/jackc/pgx/v5 v5.9.1
 	go.opentelemetry.io/otel/trace v1.43.0
+	gopkg.in/yaml.v3 v3.0.1
 	maragu.dev/gomponents v1.3.0
 )
 
@@ -36,6 +38,7 @@ require (
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/pressly/goose/v3 v3.27.0 // indirect
 	github.com/redis/go-redis/v9 v9.7.3 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
@@ -53,6 +56,7 @@ replace (
 	github.com/go-sum/componentry => ../pkg/componentry
 	github.com/go-sum/config => ../pkg/config
 	github.com/go-sum/db => ../pkg/db
+	github.com/go-sum/docs => ../pkg/docs
 	github.com/go-sum/kv => ../pkg/kv
 	github.com/go-sum/notification => ../pkg/notification
 	github.com/go-sum/queue => ../pkg/queue
