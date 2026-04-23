@@ -106,7 +106,7 @@ func TestShutdown_NotListening(t *testing.T) {
 	}
 }
 
-func TestListenAndServeGracefully_ServeAndShutdown(t *testing.T) {
+func TestListenAndServe_ServeAndShutdown(t *testing.T) {
 	// Pick a free port.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -123,7 +123,7 @@ func TestListenAndServeGracefully_ServeAndShutdown(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- ListenAndServeGracefully(ctx, handler, ServerConfig{
+		done <- ListenAndServe(ctx, handler, ServerConfig{
 			Addr:            addr,
 			ShutdownTimeout: 5 * time.Second,
 		})
@@ -156,14 +156,14 @@ func TestListenAndServeGracefully_ServeAndShutdown(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Errorf("ListenAndServeGracefully returned error: %v", err)
+			t.Errorf("ListenAndServe returned error: %v", err)
 		}
 	case <-time.After(10 * time.Second):
-		t.Error("ListenAndServeGracefully did not return after context cancel")
+		t.Error("ListenAndServe did not return after context cancel")
 	}
 }
 
-func TestListenAndServeGracefully_DefaultShutdownTimeout(t *testing.T) {
+func TestListenAndServe_DefaultShutdownTimeout(t *testing.T) {
 	// Pick a free port.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -182,7 +182,7 @@ func TestListenAndServeGracefully_DefaultShutdownTimeout(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		// ShutdownTimeout = 0 triggers the default 15s path.
-		done <- ListenAndServeGracefully(ctx, handler, ServerConfig{Addr: addr})
+		done <- ListenAndServe(ctx, handler, ServerConfig{Addr: addr})
 	}()
 
 	// Wait for the server to be ready.
@@ -201,10 +201,10 @@ func TestListenAndServeGracefully_DefaultShutdownTimeout(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Errorf("ListenAndServeGracefully returned error: %v", err)
+			t.Errorf("ListenAndServe returned error: %v", err)
 		}
 	case <-time.After(20 * time.Second):
-		t.Error("ListenAndServeGracefully did not return after context cancel")
+		t.Error("ListenAndServe did not return after context cancel")
 	}
 }
 
@@ -234,7 +234,7 @@ func selfSignedTLSConfig(t *testing.T) *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{cert}}
 }
 
-func TestListenAndServeGracefully_TLS_ServeAndShutdown(t *testing.T) {
+func TestListenAndServe_TLS_ServeAndShutdown(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Listen: %v", err)
@@ -249,7 +249,7 @@ func TestListenAndServeGracefully_TLS_ServeAndShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- ListenAndServeGracefully(ctx, handler, ServerConfig{
+		done <- ListenAndServe(ctx, handler, ServerConfig{
 			Addr:            addr,
 			TLSConfig:       selfSignedTLSConfig(t),
 			ShutdownTimeout: 5 * time.Second,
@@ -288,14 +288,14 @@ func TestListenAndServeGracefully_TLS_ServeAndShutdown(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Errorf("ListenAndServeGracefully (TLS) returned error: %v", err)
+			t.Errorf("ListenAndServe (TLS) returned error: %v", err)
 		}
 	case <-time.After(10 * time.Second):
-		t.Error("ListenAndServeGracefully (TLS) did not return after context cancel")
+		t.Error("ListenAndServe (TLS) did not return after context cancel")
 	}
 }
 
-func TestListenAndServeGracefully_TLS_HTTP2Negotiated(t *testing.T) {
+func TestListenAndServe_TLS_HTTP2Negotiated(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Listen: %v", err)
@@ -312,7 +312,7 @@ func TestListenAndServeGracefully_TLS_HTTP2Negotiated(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- ListenAndServeGracefully(ctx, handler, ServerConfig{
+		done <- ListenAndServe(ctx, handler, ServerConfig{
 			Addr:            addr,
 			TLSConfig:       selfSignedTLSConfig(t),
 			ShutdownTimeout: 5 * time.Second,
@@ -363,7 +363,7 @@ func TestNewServer_H2C_Handler(t *testing.T) {
 	}
 }
 
-func TestListenAndServeGracefully_H2C_Cleartext(t *testing.T) {
+func TestListenAndServe_H2C_Cleartext(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Listen: %v", err)
@@ -378,7 +378,7 @@ func TestListenAndServeGracefully_H2C_Cleartext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- ListenAndServeGracefully(ctx, handler, ServerConfig{
+		done <- ListenAndServe(ctx, handler, ServerConfig{
 			Addr:            addr,
 			H2C:             true,
 			ShutdownTimeout: 5 * time.Second,
@@ -422,10 +422,10 @@ func TestListenAndServeGracefully_H2C_Cleartext(t *testing.T) {
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Errorf("ListenAndServeGracefully (H2C) returned error: %v", err)
+			t.Errorf("ListenAndServe (H2C) returned error: %v", err)
 		}
 	case <-time.After(10 * time.Second):
-		t.Error("ListenAndServeGracefully (H2C) did not return after context cancel")
+		t.Error("ListenAndServe (H2C) did not return after context cancel")
 	}
 }
 
@@ -443,13 +443,13 @@ func TestNewServer_TLSConfig(t *testing.T) {
 	}
 }
 
-func TestListenAndServeGracefully_H2C_TLS_MutuallyExclusive(t *testing.T) {
+func TestListenAndServe_H2C_TLS_MutuallyExclusive(t *testing.T) {
 	handler := func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	err := ListenAndServeGracefully(ctx, handler, ServerConfig{
+	err := ListenAndServe(ctx, handler, ServerConfig{
 		H2C:       true,
 		TLSConfig: &tls.Config{},
 	})

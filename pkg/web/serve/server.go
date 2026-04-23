@@ -110,12 +110,12 @@ func Shutdown(ctx context.Context, srv *http.Server) error {
 	return srv.Shutdown(ctx)
 }
 
-// ListenAndServeGracefully starts the HTTP or HTTPS server and blocks until ctx is
+// ListenAndServe starts the HTTP or HTTPS server and blocks until ctx is
 // canceled, then gracefully shuts down within cfg.ShutdownTimeout (defaulting to 15
 // seconds). When cfg.TLSConfig is non-nil, the server listens over TLS and HTTP/2 is
 // negotiated automatically via ALPN. H2C and TLSConfig are mutually exclusive.
 // Signal handling is the caller's responsibility — use signal.NotifyContext in main.
-func ListenAndServeGracefully(ctx context.Context, handler web.Handler, cfg ServerConfig) error {
+func ListenAndServe(ctx context.Context, handler web.Handler, cfg ServerConfig) error {
 	if cfg.H2C && cfg.TLSConfig != nil {
 		return fmt.Errorf("web/serve: H2C and TLSConfig are mutually exclusive")
 	}
