@@ -5,21 +5,34 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/trace/noop"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	cfgpkg "github.com/go-sum/config"
 	"github.com/go-sum/assets/publish"
 	"github.com/go-sum/componentry/assets/iconset"
 	"github.com/go-sum/componentry/icons"
+	"github.com/go-sum/db"
+	"github.com/go-sum/kv/redisstore"
+	"github.com/go-sum/notification"
+	"github.com/go-sum/notification/notifylog"
+	"github.com/go-sum/queue"
+	"github.com/go-sum/queue/pgstore"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/cookiecodec"
 	"github.com/go-sum/web/otelweb"
 	"github.com/go-sum/web/router"
 	"github.com/go-sum/web/session"
+	"github.com/go-sum/web/validate"
 
 	config "github.com/go-sum/foundry/config"
+	appdb "github.com/go-sum/foundry/db"
+	"github.com/go-sum/foundry/internal/features/contact"
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/internal/view/errorpage"
 )
@@ -66,11 +79,11 @@ func provideSecurity(_ context.Context, runtime Runtime) (Security, session.Stor
 	}
 
 	sec := Security{
-		CSRF:        cfg.CSRF,
-		Headers:     cfg.Headers,
-		CSP: cfg.CSP,
-		Origins:     origins,
-		Session:     sessCfg,
+		CSRF:    cfg.CSRF,
+		Headers: cfg.Headers,
+		CSP:     cfg.CSP,
+		Origins: origins,
+		Session: sessCfg,
 	}
 	return sec, store, nil
 }
@@ -102,8 +115,132 @@ func provideSession(runtime Runtime) (session.Config, session.Store, error) {
 	return session.NewConfig(runtime.Config.Session, store), store, nil
 }
 
-func provideServices(_ context.Context, _ Runtime, _ Security) (Services, error) {
-	return Services{}, nil
+func connectWithRetry(ctx context.Context, name string, logger *slog.Logger, maxAttempts int, fn func() error) error {
+	var err error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err = fn(); err == nil {
+			return nil
+		}
+		if attempt < maxAttempts {
+			backoff := time.Duration(1<<attempt) * time.Second
+			// ±25% jitter to prevent thundering herd on service restart.
+			jitter := time.Duration(rand.Int64N(int64(backoff) / 2))
+			if rand.IntN(2) == 0 {
+				backoff += jitter
+			} else {
+				backoff -= jitter
+			}
+			logger.WarnContext(ctx, "service connection failed, retrying",
+				"service", name,
+				"attempt", attempt,
+				"max_attempts", maxAttempts,
+				"backoff", backoff,
+				"error", err,
+			)
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return fmt.Errorf("%s: %w (context canceled during retry)", name, err)
+			}
+		}
+	}
+	return err
+}
+
+func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router) (Services, error) {
+	// In testing environments, skip external service wiring.
+	if runtime.Config.Env == config.Testing {
+		return Services{}, nil
+	}
+
+	// DB
+	var pool *pgxpool.Pool
+	if err := connectWithRetry(ctx, "db", runtime.Logger, 3, func() error {
+		var err error
+		pool, err = db.Connect(ctx,
+			db.WithProductionDefaults(),
+			db.WithSlowQueryLogger(runtime.Logger, 500*time.Millisecond),
+		)
+		return err
+	}); err != nil {
+		return Services{}, fmt.Errorf("services: db: %w", err)
+	}
+	db.LogPoolStats(ctx, pool, runtime.Logger, 60*time.Second)
+
+	// Schema registry — built from embedded schema.yaml; external schemas passed as extras.
+	schemaReg, err := db.LoadRegistryFromYAML(appdb.ConfigYAML, appdb.SchemaFiles,
+		db.BaseSchema,
+		db.NewSchema("queue_jobs", pgstore.SchemaSQL, 50),
+	)
+	if err != nil {
+		return Services{}, fmt.Errorf("services: schema registry: %w", err)
+	}
+
+	// Schema readiness — refuse to start if migrations are outstanding.
+	if err := db.Health(ctx, pool, schemaReg.HealthTables()...); err != nil {
+		pool.Close()
+		return Services{}, fmt.Errorf("services: schema not ready (run 'task db:migrate'): %w", err)
+	}
+
+	// KV
+	kvStore := redisstore.New(redisstore.Config{Addr: runtime.Config.KV.Addr, Password: runtime.Config.KV.Password})
+	if err := connectWithRetry(ctx, "kv", runtime.Logger, 3, func() error {
+		return kvStore.Ping(ctx)
+	}); err != nil {
+		pool.Close()
+		return Services{}, fmt.Errorf("services: kv: %w", err)
+	}
+
+	// Queue
+	qStore := pgstore.New(pool)
+	qDispatcher := queue.NewDispatcher(qStore, queue.WithDispatcherLogger(runtime.Logger))
+
+	// Notification — log sender for dev/default; configurable in production
+	senders := map[notification.Channel]notification.Sender{
+		notification.ChannelLog: notifylog.New(runtime.Logger),
+	}
+	notifier := notification.NewDispatcher(senders, runtime.Logger)
+
+	// Contact module
+	navOpt := view.WithNavConfig(config.DefaultNav())
+	contactMod := contact.NewModule(contact.ModuleConfig{
+		Pool:      pool,
+		KV:        kvStore,
+		Queue:     qDispatcher,
+		Notifier:  notifier,
+		Router:    rt,
+		Validator: validate.New(),
+		Service: contact.ServiceConfig{
+			RateLimit:  runtime.Config.Contact.RateLimit,
+			RateWindow: runtime.Config.Contact.RateWindow,
+			QueueName:  contact.QueueName,
+		},
+		Worker: contact.WorkerConfig{
+			SendTo:   runtime.Config.Contact.SendTo,
+			SendFrom: runtime.Config.Contact.SendFrom,
+		},
+		ViewOpts: []view.RequestOption{navOpt},
+		Logger:   runtime.Logger,
+	})
+
+	// Queue processor
+	processor := queue.NewProcessor(qStore, queue.WithLogger(runtime.Logger))
+	processor.Register(contact.QueueName, contactMod.QueueHandler,
+		queue.WithWorkers(2),
+		queue.WithMaxAttempts(5),
+		queue.WithTimeout(30*time.Second),
+	)
+	processor.Start(ctx)
+
+	return Services{
+		DBPool:         pool,
+		KVStore:        kvStore,
+		Queue:          qDispatcher,
+		Processor:      processor,
+		Notifier:       notifier,
+		Contact:        contactMod,
+		SchemaRegistry: schemaReg,
+	}, nil
 }
 
 func provideErrorBoundary(runtime Runtime, routing *router.Router) web.Middleware {

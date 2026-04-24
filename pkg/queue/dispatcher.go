@@ -39,15 +39,7 @@ func (d *Dispatcher) Register(name string, handler HandlerFunc, opts ...QueueOpt
 	if _, exists := d.queues[name]; exists {
 		panic(fmt.Sprintf("queue: Register called twice for queue %q", name))
 	}
-	q := &queueDef{
-		name:        name,
-		handler:     handler,
-		workers:     1,
-		maxAttempts: 3,
-		timeout:     30 * time.Second,
-		backoff:     5 * time.Second,
-		priority:    PriorityDefault,
-	}
+	q := newQueueDef(name, handler)
 	for _, o := range opts {
 		o(q)
 	}

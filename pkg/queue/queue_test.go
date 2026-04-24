@@ -22,11 +22,12 @@ type fakeStore struct {
 	failedErrs   []string
 	failedRetry  []time.Duration
 
-	enqueueErr error
-	dequeueErr error
+	enqueueErr  error
+	dequeueErr  error
 	completeErr error
-	failErr    error
-	reapErr    error
+	failErr     error
+	reapErr     error
+	purgeErr    error
 
 	reapCount int
 	closed    bool
@@ -86,6 +87,12 @@ func (f *fakeStore) Reap(_ context.Context, _ []string, _ time.Duration) (int, e
 		return 0, f.reapErr
 	}
 	return f.reapCount, nil
+}
+
+func (f *fakeStore) Purge(_ context.Context, _ time.Duration, _ int) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return 0, f.purgeErr
 }
 
 func (f *fakeStore) Ping(_ context.Context) error { return nil }
@@ -413,10 +420,11 @@ func TestProcessor_HandlerError(t *testing.T) {
 	if store.failedErrs[0] != handlerErr.Error() {
 		t.Errorf("failed err = %q, want %q", store.failedErrs[0], handlerErr.Error())
 	}
-	// attempts=1, so backoff = base * 2^0 = 5s
-	wantBackoff := 5 * time.Second
-	if store.failedRetry[0] != wantBackoff {
-		t.Errorf("retry backoff = %v, want %v", store.failedRetry[0], wantBackoff)
+	// attempts=1, backoff = base * 2^0 = 5s with ±50% jitter → [2.5s, 7.5s)
+	gotBackoff := store.failedRetry[0]
+	lo, hi := 5*time.Second/2, 5*time.Second*3/2
+	if gotBackoff < lo || gotBackoff >= hi {
+		t.Errorf("retry backoff = %v, want in [%v, %v)", gotBackoff, lo, hi)
 	}
 }
 
@@ -497,10 +505,10 @@ func TestComputeBackoff(t *testing.T) {
 	base := time.Second
 	tests := []struct {
 		attempts int
-		want     time.Duration
+		wantBase time.Duration
 	}{
-		{0, time.Second},  // shift=-1 → clamped to 0 → base * 1
-		{1, time.Second},  // shift=0 → base * 1
+		{0, time.Second},      // shift=-1 → clamped to 0 → base * 1
+		{1, time.Second},      // shift=0 → base * 1
 		{2, 2 * time.Second},
 		{3, 4 * time.Second},
 		{4, 8 * time.Second},
@@ -508,19 +516,22 @@ func TestComputeBackoff(t *testing.T) {
 	}
 	for _, tc := range tests {
 		got := computeBackoff(base, tc.attempts)
-		if got != tc.want {
-			t.Errorf("computeBackoff(%v, %d) = %v, want %v", base, tc.attempts, got, tc.want)
+		// jitter is in [0, wantBase/2), applied ±, so result is in [wantBase/2, wantBase*3/2)
+		lo, hi := tc.wantBase/2, tc.wantBase*3/2
+		if got < lo || got >= hi {
+			t.Errorf("computeBackoff(%v, %d) = %v, want in [%v, %v)", base, tc.attempts, got, lo, hi)
 		}
 	}
 }
 
 func TestComputeBackoff_Cap(t *testing.T) {
 	base := time.Second
-	// attempts=22 → shift=21, clamped to 20 → base * 2^20
+	// attempts=22 → shift=21, clamped to 20 → base * 2^20, then ±50% jitter
 	got := computeBackoff(base, 22)
-	want := base * (1 << 20)
-	if got != want {
-		t.Errorf("computeBackoff cap: got %v, want %v", got, want)
+	d := base * (1 << 20)
+	lo, hi := d/2, d*3/2
+	if got < lo || got >= hi {
+		t.Errorf("computeBackoff cap: got %v, want in [%v, %v)", got, lo, hi)
 	}
 }
 

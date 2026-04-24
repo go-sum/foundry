@@ -11,3 +11,6 @@ tmp/
 docker/caddy/Caddyfile
 docker/caddy/certs/*.pem
 docker/caddy/certs/*.key
+
+db/sql/sqlc_schema.sql
+db/.sqlc-gen-*.yaml

@@ -28,6 +28,7 @@ var (
 	reUnboundedUpdate  = regexp.MustCompile(`(?i)^\s*UPDATE\s+\S+\s+SET\b`)
 	reHasWhere         = regexp.MustCompile(`(?i)\bWHERE\b`)
 	reUnboundedDelete  = regexp.MustCompile(`(?i)^\s*DELETE\s+FROM\b`)
+	reCreateTableBlock = regexp.MustCompile(`(?i)\bCREATE\s+TABLE\b`)
 )
 
 // Lint reads all .sql files in dir and checks for dangerous DDL patterns.
@@ -65,6 +66,8 @@ func lintFile(path string) (_ []LintResult, err error) {
 
 	var results []LintResult
 	inUp := false
+	inCreateTable := false
+	inDollarQuote := false
 	lineNum := 0
 
 	scanner := bufio.NewScanner(f)
@@ -79,11 +82,29 @@ func lintFile(path string) (_ []LintResult, err error) {
 		}
 		if strings.HasPrefix(trimmed, "-- +goose Down") {
 			inUp = false
+			inCreateTable = false
+			inDollarQuote = false
 			continue
 		}
 
 		if !inUp {
 			continue
+		}
+
+		// Skip lines inside $$ dollar-quoted blocks (e.g., PL/pgSQL function bodies)
+		// to avoid false positives from DDL inside function definitions.
+		if strings.Count(line, "$$")%2 == 1 {
+			inDollarQuote = !inDollarQuote
+		}
+		if inDollarQuote {
+			continue
+		}
+
+		if reCreateTableBlock.MatchString(line) {
+			inCreateTable = true
+		}
+		if inCreateTable && strings.HasSuffix(trimmed, ");") {
+			inCreateTable = false
 		}
 
 		if reDropColumn.MatchString(line) {
@@ -106,7 +127,7 @@ func lintFile(path string) (_ []LintResult, err error) {
 			})
 		}
 
-		if reNotNullNoDefault.MatchString(line) && !reHasDefault.MatchString(line) {
+		if !inCreateTable && reNotNullNoDefault.MatchString(line) && !reHasDefault.MatchString(line) {
 			results = append(results, LintResult{
 				File:     path,
 				Line:     lineNum,
@@ -152,4 +173,14 @@ func lintFile(path string) (_ []LintResult, err error) {
 	}
 
 	return results, nil
+}
+
+// HasErrors reports whether any of the results have error severity.
+func HasErrors(results []LintResult) bool {
+	for _, r := range results {
+		if r.Severity == "error" {
+			return true
+		}
+	}
+	return false
 }

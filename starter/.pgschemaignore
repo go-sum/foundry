@@ -1,0 +1,2 @@
+[tables]
+patterns = ["goose_db_version"]

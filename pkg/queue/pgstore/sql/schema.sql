@@ -1,16 +1,5 @@
--- Queue Jobs schema
--- Source of truth for the queue_jobs table. Composed into application
--- migrations via db/sql/schemas.yaml and used by local sqlc generation.
-
--- Trigger function for automatic updated_at. Uses CREATE OR REPLACE so it
--- coexists safely if the application defines the same function.
-CREATE OR REPLACE FUNCTION update_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- Queue Jobs schema.
+-- Requires: db.BaseSchema registered at lower priority (provides update_updated_at).
 
 CREATE TABLE IF NOT EXISTS queue_jobs (
     id           UUID         PRIMARY KEY DEFAULT gen_random_uuid(),

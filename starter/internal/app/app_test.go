@@ -23,7 +23,7 @@ func setupTestEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() { os.RemoveAll(dir) }) //nolint:errcheck
 	t.Setenv("TEST_STATIC_DIR", dir)
 }
 

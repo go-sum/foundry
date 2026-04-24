@@ -107,6 +107,15 @@ func (s *Store) Reap(ctx context.Context, queues []string, staleThreshold time.D
 	return int(n), nil
 }
 
+// Purge deletes completed and dead jobs older than olderThan, up to batchSize at a time.
+func (s *Store) Purge(ctx context.Context, olderThan time.Duration, batchSize int) (int, error) {
+	n, err := s.queries.Purge(ctx, durationToInterval(olderThan), int32(batchSize))
+	if err != nil {
+		return 0, fmt.Errorf("pgstore: purge: %w", err)
+	}
+	return int(n), nil
+}
+
 // Ping verifies database connectivity.
 func (s *Store) Ping(ctx context.Context) error {
 	return s.pool.Ping(ctx)

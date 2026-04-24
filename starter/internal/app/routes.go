@@ -3,10 +3,13 @@ package app
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 
-	starterconfig "github.com/go-sum/foundry/config"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/go-sum/db"
+	"github.com/go-sum/docs"
+	"github.com/go-sum/foundry/config"
 	"github.com/go-sum/foundry/internal/features/demos"
 	"github.com/go-sum/foundry/internal/features/hello"
 	"github.com/go-sum/foundry/internal/features/home"
@@ -22,11 +25,14 @@ import (
 )
 
 // RegisterRoutes registers all application routes on the router.
-func RegisterRoutes(rt *router.Router, sec Security, assets static.AssetsConfig, s *site.Site) error {
+func RegisterRoutes(rt *router.Router, sec Security, svc Services, assets static.AssetsConfig, publicDir string, s *site.Site) error {
 	if err := registerStaticRoutes(rt, assets); err != nil {
 		return err
 	}
-	registerPublicRoutes(rt, sec, s)
+	router.Register(rt, docs.Routes(docs.DefaultConfig(publicDir))...)
+	if err := registerPublicRoutes(rt, sec, svc, s); err != nil {
+		return fmt.Errorf("public routes: %w", err)
+	}
 	return nil
 }
 
@@ -46,7 +52,7 @@ func registerStaticRoutes(rt *router.Router, assets static.AssetsConfig) error {
 		router.GroupNode(prefix,
 			router.GET("/{rest...}", "static.assets", func(c *web.Context) (web.Response, error) {
 				stripped := "/" + c.Param("rest")
-				c.Request.URL = &url.URL{Path: stripped}
+				c.Request.URL.Path = stripped
 				return staticH(c)
 			}),
 		),
@@ -54,8 +60,25 @@ func registerStaticRoutes(rt *router.Router, assets static.AssetsConfig) error {
 	return nil
 }
 
-func registerPublicRoutes(rt *router.Router, sec Security, s *site.Site) {
-	navOpt := view.WithNavConfig(starterconfig.DefaultNav())
+func healthHandler(pool *pgxpool.Pool, tables []string) web.Handler {
+	return func(c *web.Context) (web.Response, error) {
+		if pool != nil {
+			if err := db.Health(c.Context(), pool, tables...); err != nil {
+				return web.Response{}, web.ErrUnavailable("database unhealthy", err)
+			}
+		}
+		return web.Text(http.StatusOK, "ok"), nil
+	}
+}
+
+func unavailableHandler(feature string) web.Handler {
+	return func(_ *web.Context) (web.Response, error) {
+		return web.Response{}, web.ErrUnavailable(feature+" feature unavailable", nil)
+	}
+}
+
+func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site.Site) error {
+	navOpt := view.WithNavConfig(config.DefaultNav())
 	homeH := home.NewHandler(rt, navOpt)
 	helloH := hello.NewHandler(rt, navOpt)
 	demosH := demos.NewHandler(rt, navOpt)
@@ -66,9 +89,27 @@ func registerPublicRoutes(rt *router.Router, sec Security, s *site.Site) {
 				{Name: "home.show"},
 				{Name: "hello.greeting"},
 				{Name: "demos.showcase"},
+				{Name: "contact.form"},
 			},
 			DefaultChangeFreq: "weekly",
 		},
+	)
+
+	var contactForm, contactSubmit web.Handler
+	if svc.Contact != nil && svc.Contact.Handler != nil {
+		contactForm = svc.Contact.Handler.Form
+		contactSubmit = svc.Contact.Handler.Submit
+	} else {
+		contactForm = unavailableHandler("contact")
+		contactSubmit = unavailableHandler("contact")
+	}
+
+	var healthTables []string
+	if svc.SchemaRegistry != nil {
+		healthTables = svc.SchemaRegistry.HealthTables()
+	}
+	router.Register(rt,
+		router.GET("/healthz", "health.check", healthHandler(svc.DBPool, healthTables)),
 	)
 
 	router.Register(rt,
@@ -82,20 +123,27 @@ func registerPublicRoutes(rt *router.Router, sec Security, s *site.Site) {
 			),
 			router.GET("/robots.txt", "meta.robots", metaH.RobotsTxt),
 			router.GET("/sitemap.xml", "meta.sitemap", metaH.SitemapXML),
-			router.GET("/healthz", "health.check", func(_ *web.Context) (web.Response, error) {
-				return web.Text(http.StatusOK, "ok"), nil
-			}),
 			router.GET("/", "home.show", homeH.Show),
 			router.GET("/hello/greeting", "hello.greeting", helloH.Greeting),
 			router.GET("/hello/{name}", "hello.show", helloH.Show),
 
 			router.GroupNode("/componentry",
 				router.GET("/_components", "demos.showcase", demosH.Show),
+				router.GET("/demo/search", "demos.search", demosH.Search),
+				router.GET("/demo/validate", "demos.validate", demosH.Validate),
+				router.GET("/demo/paginate", "demos.paginate", demosH.Paginate),
+				router.GET("/demo/region", "demos.region", demosH.Region),
+				router.GET("/demo/region/{id}", "demos.region-by-id", demosH.Region),
+				router.GET("/demo/oob-toast", "demos.oob-toast", demosH.OOBToast),
 			),
+
+			router.GET("/contact", "contact.form", contactForm),
+			router.POST("/contact", "contact.submit", contactSubmit),
 
 			router.GroupNode("/account",
 				router.Use(session.Guard(session.DefaultGuardConfig())),
 			),
 		),
 	)
+	return nil
 }

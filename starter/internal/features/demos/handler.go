@@ -48,8 +48,8 @@ func (h *Handler) Validate(c *web.Context) (web.Response, error) {
 // Paginate returns a paginated product table fragment.
 func (h *Handler) Paginate(c *web.Context) (web.Response, error) {
 	q := c.URL().Query()
-	page, _ := strconv.Atoi(q.Get("page"))
-	perPage, _ := strconv.Atoi(q.Get("per_page"))
+	page, _ := strconv.Atoi(q.Get("page"))         // defaults to 0 on invalid input
+	perPage, _ := strconv.Atoi(q.Get("per_page")) // defaults to 0 on invalid input
 	return render.Fragment(demo.PaginatedTable(page, perPage))
 }
 

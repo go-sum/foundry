@@ -29,11 +29,13 @@ func Up(ctx context.Context, dsn, dir string) (err error) {
 	}
 	defer db.Close() //nolint:errcheck
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("migrate up: set dialect: %w", err)
+	p, err := newProvider(db, dir)
+	if err != nil {
+		return fmt.Errorf("migrate up: %w", err)
 	}
+	defer p.Close() //nolint:errcheck
 
-	if err := goose.UpContext(ctx, db, dir); err != nil {
+	if _, err := p.Up(ctx); err != nil {
 		return fmt.Errorf("migrate up: %w", err)
 	}
 
@@ -48,11 +50,13 @@ func UpTo(ctx context.Context, dsn, dir string, version int64) (err error) {
 	}
 	defer db.Close() //nolint:errcheck
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("migrate up-to: set dialect: %w", err)
+	p, err := newProvider(db, dir)
+	if err != nil {
+		return fmt.Errorf("migrate up-to: %w", err)
 	}
+	defer p.Close() //nolint:errcheck
 
-	if err := goose.UpToContext(ctx, db, dir, version); err != nil {
+	if _, err := p.UpTo(ctx, version); err != nil {
 		return fmt.Errorf("migrate up-to: %w", err)
 	}
 
@@ -67,11 +71,13 @@ func Down(ctx context.Context, dsn, dir string) (err error) {
 	}
 	defer db.Close() //nolint:errcheck
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("migrate down: set dialect: %w", err)
+	p, err := newProvider(db, dir)
+	if err != nil {
+		return fmt.Errorf("migrate down: %w", err)
 	}
+	defer p.Close() //nolint:errcheck
 
-	if err := goose.DownContext(ctx, db, dir); err != nil {
+	if _, err := p.Down(ctx); err != nil {
 		return fmt.Errorf("migrate down: %w", err)
 	}
 
@@ -86,11 +92,13 @@ func DownTo(ctx context.Context, dsn, dir string, version int64) (err error) {
 	}
 	defer db.Close() //nolint:errcheck
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("migrate down-to: set dialect: %w", err)
+	p, err := newProvider(db, dir)
+	if err != nil {
+		return fmt.Errorf("migrate down-to: %w", err)
 	}
+	defer p.Close() //nolint:errcheck
 
-	if err := goose.DownToContext(ctx, db, dir, version); err != nil {
+	if _, err := p.DownTo(ctx, version); err != nil {
 		return fmt.Errorf("migrate down-to: %w", err)
 	}
 
@@ -105,26 +113,24 @@ func Status(ctx context.Context, dsn, dir string) (_ []MigrationStatus, err erro
 	}
 	defer db.Close() //nolint:errcheck
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		return nil, fmt.Errorf("migrate status: set dialect: %w", err)
-	}
-
-	migrations, err := goose.CollectMigrations(dir, 0, goose.MaxVersion)
+	p, err := newProvider(db, dir)
 	if err != nil {
-		return nil, fmt.Errorf("migrate status: collect: %w", err)
+		return nil, fmt.Errorf("migrate status: %w", err)
 	}
+	defer p.Close() //nolint:errcheck
 
-	current, err := goose.GetDBVersionContext(ctx, db)
+	results, err := p.Status(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("migrate status: db version: %w", err)
+		return nil, fmt.Errorf("migrate status: %w", err)
 	}
 
 	var statuses []MigrationStatus
-	for _, m := range migrations {
+	for _, r := range results {
 		s := MigrationStatus{
-			Version: m.Version,
-			Source:  m.Source,
-			Applied: m.Version <= current,
+			Version:   r.Source.Version,
+			Applied:   r.State == goose.StateApplied,
+			AppliedAt: r.AppliedAt,
+			Source:    r.Source.Path,
 		}
 		statuses = append(statuses, s)
 	}
@@ -140,15 +146,16 @@ func Version(ctx context.Context, dsn string) (_ int64, err error) {
 	}
 	defer db.Close() //nolint:errcheck
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		return 0, fmt.Errorf("migrate version: set dialect: %w", err)
-	}
-
-	v, err := goose.GetDBVersionContext(ctx, db)
+	p, err := newProvider(db, os.TempDir())
 	if err != nil {
 		return 0, fmt.Errorf("migrate version: %w", err)
 	}
+	defer p.Close() //nolint:errcheck
 
+	v, err := p.GetDBVersion(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("migrate version: %w", err)
+	}
 	return v, nil
 }
 
@@ -157,10 +164,6 @@ func Version(ctx context.Context, dsn string) (_ int64, err error) {
 func Create(dir, name string) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("migrate create: mkdir: %w", err)
-	}
-
-	if err := goose.SetDialect("postgres"); err != nil {
-		return "", fmt.Errorf("migrate create: set dialect: %w", err)
 	}
 
 	if err := goose.Create(nil, dir, name, "sql"); err != nil {
@@ -180,6 +183,10 @@ func Create(dir, name string) (string, error) {
 	}
 
 	return lastSQL, nil
+}
+
+func newProvider(db *sql.DB, dir string) (*goose.Provider, error) {
+	return goose.NewProvider(goose.DialectPostgres, db, os.DirFS(dir))
 }
 
 func openDB(dsn string) (*sql.DB, error) {

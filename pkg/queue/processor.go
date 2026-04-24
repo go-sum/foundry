@@ -37,6 +37,11 @@ func NewProcessor(store Store, opts ...ProcessorOption) *Processor {
 	cfg.shutdownWait = cmp.Or(cfg.shutdownWait, 30*time.Second)
 	cfg.reapInterval = cmp.Or(cfg.reapInterval, 30*time.Second)
 	cfg.reapThreshold = cmp.Or(cfg.reapThreshold, 5*time.Minute)
+	cfg.purgeInterval = cmp.Or(cfg.purgeInterval, 1*time.Hour)
+	cfg.purgeTTL = cmp.Or(cfg.purgeTTL, 72*time.Hour)
+	if cfg.purgeBatch == 0 {
+		cfg.purgeBatch = 1000
+	}
 
 	return &Processor{
 		store:  store,
@@ -52,15 +57,7 @@ func (p *Processor) Register(name string, handler HandlerFunc, opts ...QueueOpti
 	if _, exists := p.queues[name]; exists {
 		panic(fmt.Sprintf("queue: Register called twice for queue %q", name))
 	}
-	q := &queueDef{
-		name:        name,
-		handler:     handler,
-		workers:     1,
-		maxAttempts: 3,
-		timeout:     30 * time.Second,
-		backoff:     5 * time.Second,
-		priority:    PriorityDefault,
-	}
+	q := newQueueDef(name, handler)
 	for _, o := range opts {
 		o(q)
 	}
@@ -88,6 +85,9 @@ func (p *Processor) Start(ctx context.Context) {
 
 	p.wg.Add(1)
 	go p.runReaper(ctx)
+
+	p.wg.Add(1)
+	go p.runPurger(ctx)
 
 	p.logger.Info("queue processor started", "queues", len(p.queues))
 }

@@ -107,13 +107,23 @@ tasks:
     desc: "Show database migration status"
     cmd: {task: _db:run, vars: {DB_CMD: status}}
 
-  db:seed:
-    desc: "Seed development data"
-    cmd: {task: _db:run, vars: {DB_CMD: seed}}
-
   db:health:
     desc: "Check database schema health"
     cmd: {task: _db:run, vars: {DB_CMD: health}}
+
+  db:clean:
+    desc: "Remove generated sqlcgen files (run from inside container to fix ownership issues)"
+    cmd: "{{.DCOMP_DEV}} run --rm --entrypoint '' app sh -c 'rm -f db/sqlcgen/*.go'"
+
+  db:compose:
+    desc: "Diff schema and generate migration + sqlc (task db:compose [NAME=<migration_name>])"
+    cmds:
+      - task: _db:run
+        vars: {DB_CMD: "compose{{if .NAME}} {{.NAME}}{{end}}"}
+      - task: _db:run
+        vars: {DB_CMD: "scaffold --skip-existing"}
+      - task: _db:run
+        vars: {DB_CMD: codegen}
 
   # ── Test ──────────────────────────────────────────────────────────────────────
 
@@ -186,7 +196,7 @@ tasks:
     internal: true
     requires:
       vars: [DB_CMD]
-    cmd: "{{.DCOMP_DEV}} run --rm --entrypoint '' app sh -c '{{.GO}} build -o ./tmp/db ./cmd/db && ./tmp/db {{.DB_CMD}}'"
+    cmd: "{{.DCOMP_DEV}} run --rm --entrypoint '' app sh -c '{{.GO}} run github.com/go-sum/db/cli {{.DB_CMD}}'"
 
   _net:proxy:ensure:
     internal: true

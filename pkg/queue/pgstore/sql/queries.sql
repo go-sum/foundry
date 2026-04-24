@@ -55,3 +55,13 @@ WHERE id IN (
       AND updated_at < NOW() - sqlc.arg(stale_after)::interval
     FOR UPDATE SKIP LOCKED
 );
+
+-- name: Purge :execrows
+DELETE FROM queue_jobs
+WHERE id IN (
+    SELECT id FROM queue_jobs
+    WHERE status IN ('completed', 'dead')
+      AND updated_at < NOW() - sqlc.arg(older_than)::interval
+    LIMIT sqlc.arg(batch_size)
+    FOR UPDATE SKIP LOCKED
+);

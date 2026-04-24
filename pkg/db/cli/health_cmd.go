@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newHealthCmd(cfg Config) *cobra.Command {
+func newHealthCmd(configPath *string) *cobra.Command {
 	var tablesFlag string
 
 	cmd := &cobra.Command{
@@ -17,6 +17,11 @@ func newHealthCmd(cfg Config) *cobra.Command {
 		Short: "Verify database connectivity and required tables",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			cfg, err := loadConfig(*configPath)
+			if err != nil {
+				return err
+			}
+
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err
@@ -36,6 +41,12 @@ func newHealthCmd(cfg Config) *cobra.Command {
 						tables = append(tables, t)
 					}
 				}
+			} else {
+				reg, err := cfg.buildRegistry()
+				if err != nil {
+					return err
+				}
+				tables = reg.HealthTables()
 			}
 
 			if err := db.Health(ctx, pool, tables...); err != nil {

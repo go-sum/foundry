@@ -3,11 +3,16 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/go-sum/db"
+	"github.com/go-sum/kv"
+	"github.com/go-sum/notification"
+	"github.com/go-sum/queue"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/htmx"
 	"github.com/go-sum/web/otelweb"
@@ -16,7 +21,9 @@ import (
 	"github.com/go-sum/web/serve"
 	"github.com/go-sum/web/session"
 	"github.com/go-sum/web/site"
+	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/go-sum/foundry/internal/features/contact"
 	config "github.com/go-sum/foundry/config"
 )
 
@@ -38,15 +45,42 @@ type Runtime struct {
 
 // Security holds resolved security middleware configurations.
 type Security struct {
-	CSRF        secure.CSRFConfig
-	Headers     secure.HeadersConfig
-	CSP         secure.CSPNonceConfig
-	Origins     []string
-	Session     session.Config
+	CSRF    secure.CSRFConfig
+	Headers secure.HeadersConfig
+	CSP     secure.CSPNonceConfig
+	Origins []string
+	Session session.Config
 }
 
-// Services is a placeholder for application services
-type Services struct{}
+// Services holds application-level service instances.
+type Services struct {
+	DBPool         *pgxpool.Pool
+	KVStore        kv.Store
+	Queue          *queue.Dispatcher
+	Processor      *queue.Processor
+	Notifier       *notification.Dispatcher
+	Contact        *contact.Module
+	SchemaRegistry *db.Registry
+}
+
+// Close shuts down background services and releases resources.
+func (s Services) Close() error {
+	var errs []error
+	if s.Processor != nil {
+		if err := s.Processor.Stop(); err != nil {
+			errs = append(errs, fmt.Errorf("processor: %w", err))
+		}
+	}
+	if s.KVStore != nil {
+		if err := s.KVStore.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("kv: %w", err))
+		}
+	}
+	if s.DBPool != nil {
+		s.DBPool.Close()
+	}
+	return errors.Join(errs...)
+}
 
 // New builds and wires the complete application. Returns an error on any
 // configuration or infrastructure failure — never calls os.Exit.
@@ -63,11 +97,6 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("security: %w", err)
 	}
 
-	services, err := provideServices(ctx, runtime, security)
-	if err != nil {
-		return nil, fmt.Errorf("services: %w", err)
-	}
-
 	routing := router.New()
 	routing.Use(
 		web.AsyncContext(),
@@ -82,8 +111,13 @@ func New(ctx context.Context) (*App, error) {
 		htmx.VaryMiddleware(),
 	)
 
+	services, err := provideServices(ctx, runtime, security, routing)
+	if err != nil {
+		return nil, fmt.Errorf("services: %w", err)
+	}
+
 	s := site.New(runtime.Config.Site)
-	if err := RegisterRoutes(routing, security, runtime.Config.Assets, s); err != nil {
+	if err := RegisterRoutes(routing, security, services, runtime.Config.Assets, runtime.Config.PublicDir, s); err != nil {
 		return nil, fmt.Errorf("routes: %w", err)
 	}
 	routing.Freeze()
@@ -100,5 +134,5 @@ func New(ctx context.Context) (*App, error) {
 // Run starts the HTTP server, waits for ctx to be cancelled, then gracefully
 // shuts down within the configured shutdown timeout.
 func (a *App) Run(ctx context.Context) error {
-	return serve.ListenAndServeGracefully(ctx, a.router.Serve, a.Runtime.Config.Server)
+	return serve.ListenAndServe(ctx, a.router.Serve, a.Config.Server)
 }

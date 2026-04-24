@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -67,10 +68,10 @@ func TestRegisterStaticRoutes_ServesFilesFromConfiguredPrefix(t *testing.T) {
 func TestRegisterRoutes_ReturnsErrorWhenStaticRootCannotBeOpened(t *testing.T) {
 	rt := router.New()
 	s := site.New(site.Config{BaseURL: "http://test.local"})
-	err := RegisterRoutes(rt, Security{}, static.AssetsConfig{
+	err := RegisterRoutes(rt, Security{}, Services{}, static.AssetsConfig{
 		PublicDir: filepath.Join(t.TempDir(), "missing"),
 		URLPrefix: "/assets",
-	}, s)
+	}, t.TempDir(), s)
 	if err == nil {
 		t.Fatal("RegisterRoutes() error = nil, want non-nil")
 	}
@@ -81,10 +82,10 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 	rt := router.New()
 	s := site.New(site.Config{BaseURL: "http://test.local"})
 
-	err := RegisterRoutes(rt, Security{Origins: []string{"http://test.local"}}, static.AssetsConfig{
+	err := RegisterRoutes(rt, Security{Origins: []string{"http://test.local"}}, Services{}, static.AssetsConfig{
 		PublicDir: dir,
 		URLPrefix: "/assets",
-	}, s)
+	}, dir, s)
 	if err != nil {
 		t.Fatalf("RegisterRoutes() error = %v", err)
 	}
@@ -101,6 +102,8 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 		{name: "home.show", want: "/"},
 		{name: "hello.greeting", want: "/hello/greeting"},
 		{name: "hello.show", params: map[string]string{"name": "Alice"}, want: "/hello/Alice"},
+		{name: "docs.index", want: "/docs"},
+		{name: "docs.show", params: map[string]string{"path": "guide/intro"}, want: "/docs/guide/intro"},
 	}
 
 	for _, tc := range cases {
@@ -113,5 +116,33 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 				t.Fatalf("Reverse(%q) = %q, want %q", tc.name, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestHealthHandler_ReturnsOKWhenPoolIsNil(t *testing.T) {
+	h := healthHandler(nil, nil)
+	c := testRouteContext(http.MethodGet, "/healthz")
+	resp, err := h(c)
+	if err != nil {
+		t.Fatalf("healthHandler() error = %v", err)
+	}
+	if got, want := resp.Status, http.StatusOK; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
+	}
+}
+
+func TestUnavailableHandler_ReturnsUnavailableError(t *testing.T) {
+	h := unavailableHandler("contact")
+	c := testRouteContext(http.MethodGet, "/contact")
+	_, err := h(c)
+	if err == nil {
+		t.Fatal("unavailableHandler() error = nil, want non-nil")
+	}
+	var webErr *web.Error
+	if !errors.As(err, &webErr) {
+		t.Fatalf("err type = %T, want *web.Error", err)
+	}
+	if got, want := webErr.Status, http.StatusServiceUnavailable; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
 	}
 }

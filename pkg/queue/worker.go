@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"sync/atomic"
 	"time"
 )
@@ -92,7 +93,7 @@ func safeExecute(ctx context.Context, handler HandlerFunc, job Job) (err error) 
 	return handler(ctx, job)
 }
 
-// computeBackoff returns base * 2^(attempt-1), capped at shift=20.
+// computeBackoff returns base * 2^(attempt-1) with ±25% jitter, capped at shift=20.
 func computeBackoff(base time.Duration, attempts int) time.Duration {
 	shift := attempts - 1
 	if shift < 0 {
@@ -101,7 +102,33 @@ func computeBackoff(base time.Duration, attempts int) time.Duration {
 	if shift > 20 {
 		shift = 20
 	}
-	return base * (1 << shift)
+	d := base * (1 << shift)
+	jitter := time.Duration(rand.Int64N(int64(d) / 2))
+	if rand.IntN(2) == 0 {
+		return d + jitter
+	}
+	return d - jitter
+}
+
+func (p *Processor) runPurger(ctx context.Context) {
+	defer p.wg.Done()
+	ticker := time.NewTicker(p.cfg.purgeInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := p.store.Purge(ctx, p.cfg.purgeTTL, p.cfg.purgeBatch)
+			if err != nil {
+				p.logger.WarnContext(ctx, "queue: purge error", "error", err)
+				continue
+			}
+			if n > 0 {
+				p.logger.InfoContext(ctx, "queue: purged terminal jobs", "count", n)
+			}
+		}
+	}
 }
 
 func (p *Processor) runReaper(ctx context.Context) {

@@ -128,6 +128,25 @@ func (q *Queries) Fail(ctx context.Context, arg FailParams) error {
 	return err
 }
 
+const purge = `-- name: Purge :execrows
+DELETE FROM queue_jobs
+WHERE id IN (
+    SELECT id FROM queue_jobs
+    WHERE status IN ('completed', 'dead')
+      AND updated_at < NOW() - $1::interval
+    LIMIT $2
+    FOR UPDATE SKIP LOCKED
+)
+`
+
+func (q *Queries) Purge(ctx context.Context, olderThan pgtype.Interval, batchSize int32) (int64, error) {
+	result, err := q.db.Exec(ctx, purge, olderThan, batchSize)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const reap = `-- name: Reap :execrows
 UPDATE queue_jobs
 SET status = 'pending', updated_at = NOW()

@@ -34,7 +34,10 @@ func TestHandlerShow(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("io.ReadAll: %v", err)
+	}
 	vr := view.NewRequest(c)
 	want := render.RenderNode(t, page.HomePage(vr, "/hello/World"))
 	if string(body) != want {
@@ -47,7 +50,10 @@ func TestHandlerShow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, _ = io.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("io.ReadAll: %v", err)
+	}
 	want = render.RenderNode(t, page.HomeContent(vr, "/hello/World"))
 	if string(body) != want {
 		t.Fatalf("partial body mismatch")
