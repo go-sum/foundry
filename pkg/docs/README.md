@@ -6,7 +6,7 @@ weight = 20
 
 # docs
 
-`github.com/go-sum/docs` serves Hugo-generated documentation over HTTP and provides a CLI tool for scaffolding and building the documentation site. The HTTP handler mounts at a configurable base path (default `/docs`) and serves pre-built static files from a `public/doc/` directory with content-type detection, cache control, and a custom 404 page. The CLI tool scaffolds a `.docs/` Hugo source skeleton and compiles it into the output directory. The `Routes()` function provides self-contained route registration that creates the handler and wires both routes in a single call.
+`github.com/go-sum/docs` serves Hugo-generated documentation over HTTP and provides a CLI tool for scaffolding and building the documentation site. The HTTP handler mounts at a configurable base path (default `/docs`) and serves pre-built static files from a `public/docs/` directory with content-type detection, cache control, and a custom 404 page. The CLI tool scaffolds a `.docs/` Hugo source skeleton and compiles it into the output directory. The `Routes()` function provides self-contained route registration that creates the handler and wires both routes in a single call.
 
 ## Dependencies
 
@@ -27,7 +27,7 @@ weight = 20
 - Path traversal prevention via `..` rejection
 - Content-type detection from file extensions with fallback to content sniffing
 - CLI scaffolding command (`docs init`) that generates a complete `.docs/` Hugo site skeleton
-- CLI build command (`docs build`) that invokes Hugo to compile documentation into `public/doc/`
+- CLI build command (`docs build`) that invokes Hugo to compile documentation into `public/docs/`
 
 ---
 
@@ -91,7 +91,7 @@ import (
 router.Register(rt, docs.Routes(docs.DefaultConfig("public"))...)
 ```
 
-`DefaultConfig("public")` creates a `Config` with the base path set to `/docs`, one-hour asset caching, and `no-cache` for HTML pages. The `"public"` argument specifies the top-level public directory; the handler serves files from the `doc/` subdirectory within it.
+`DefaultConfig("public")` creates a `Config` with the base path set to `/docs`, one-hour asset caching, and `no-cache` for HTML pages. The `"public"` argument specifies the top-level public directory; the handler serves files from the `docs/` subdirectory within it.
 
 ### Step 4: Add a build task
 
@@ -132,7 +132,7 @@ type Config struct {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `PublicDir` | `string` | Top-level public directory containing the `doc/` subdirectory (e.g., `"public"`) |
+| `PublicDir` | `string` | Top-level public directory containing the `docs/` subdirectory (e.g., `"public"`) |
 | `BasePath` | `string` | URL prefix where documentation is mounted (e.g., `"/docs"`) |
 | `AssetCacheControl` | `string` | `Cache-Control` header value for static assets (CSS, JS, images) |
 | `PageCacheControl` | `string` | `Cache-Control` header value for HTML pages |
@@ -159,7 +159,7 @@ handler := docs.NewHandler(docs.DefaultConfig("public"))
 
 ### Handler.Serve
 
-`Serve` is a `web.Handler` that serves a documentation page or asset for the current request. It reads the `path` parameter from the route context, resolves it to a file under `<PublicDir>/doc/`, and returns a `web.Response` with the appropriate status code, content type, and cache headers.
+`Serve` is a `web.Handler` that serves a documentation page or asset for the current request. It reads the `path` parameter from the route context, resolves it to a file under `<PublicDir>/docs/`, and returns a `web.Response` with the appropriate status code, content type, and cache headers.
 
 ### Routes
 
@@ -178,16 +178,16 @@ The function creates a route group at `cfg.BasePath` containing two named routes
 
 ### Path Resolution Rules
 
-The handler resolves request paths to files under the `<PublicDir>/doc/` root using these rules:
+The handler resolves request paths to files under the `<PublicDir>/docs/` root using these rules:
 
 | Request Path | Resolved File | Classification |
 |-------------|---------------|----------------|
-| `/docs` | `public/doc/index.html` | HTML page |
-| `/docs/` | `public/doc/index.html` | HTML page |
-| `/docs/guide` | `public/doc/guide/index.html` | HTML page |
-| `/docs/guide/setup` | `public/doc/guide/setup/index.html` | HTML page |
-| `/docs/css/main.css` | `public/doc/css/main.css` | Asset |
-| `/docs/js/theme.js` | `public/doc/js/theme.js` | Asset |
+| `/docs` | `public/docs/index.html` | HTML page |
+| `/docs/` | `public/docs/index.html` | HTML page |
+| `/docs/guide` | `public/docs/guide/index.html` | HTML page |
+| `/docs/guide/setup` | `public/docs/guide/setup/index.html` | HTML page |
+| `/docs/css/main.css` | `public/docs/css/main.css` | Asset |
+| `/docs/js/theme.js` | `public/docs/js/theme.js` | Asset |
 
 Paths with a file extension are treated as assets. Paths without an extension are treated as HTML pages and resolve to the `index.html` file within the corresponding directory.
 
@@ -200,7 +200,7 @@ Paths with a file extension are treated as assets. Paths without an extension ar
 
 ### Custom 404 Fallback
 
-When a requested HTML page does not exist, the handler looks for a `404.html` file at the documentation root (`<PublicDir>/doc/404.html`). If found, it is served with HTTP status `404` and the correct `text/html` content type. If no custom 404 page exists, the handler returns a standard not-found error.
+When a requested HTML page does not exist, the handler looks for a `404.html` file at the documentation root (`<PublicDir>/docs/404.html`). If found, it is served with HTTP status `404` and the correct `text/html` content type. If no custom 404 page exists, the handler returns a standard not-found error.
 
 Missing assets (paths with a file extension) always return a not-found error without the custom 404 page.
 
@@ -255,7 +255,7 @@ go run github.com/go-sum/docs/cli build
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--source` | `string` | `.docs` | Hugo source directory |
-| `--destination` | `string` | `public/doc` | Output directory for built documentation |
+| `--destination` | `string` | `public/docs` | Output directory for built documentation |
 
 **Behaviour:**
 
@@ -304,11 +304,11 @@ After running `docs init`, the following structure is created:
 
 ### Built Output
 
-After running `docs build`, the compiled site appears under `public/doc/`:
+After running `docs build`, the compiled site appears under `public/docs/`:
 
 ```
 public/
-  doc/
+  docs/
     index.html                       # Documentation home page
     404.html                         # Custom not-found page
     css/

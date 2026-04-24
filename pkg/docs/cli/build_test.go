@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestBuildInvokesHugoAndRebuildsOutput verifies that build():
+// TestBuildInvokesHugoAndRebuildsOutput verifies that build() with overwrite=true:
 //   - invokes hugo with --source and --destination
 //   - removes stale output before invoking hugo
 //   - accepts the newly generated files from hugo
@@ -57,7 +57,7 @@ func TestBuildInvokesHugoAndRebuildsOutput(t *testing.T) {
 		t.Fatalf("mkdir source: %v", err)
 	}
 
-	if err := build(sourceDir, outputDir); err != nil {
+	if err := build(sourceDir, outputDir, true); err != nil {
 		t.Fatalf("build() error = %v", err)
 	}
 
@@ -122,7 +122,7 @@ func TestBuildForwardsCustomSource(t *testing.T) {
 		t.Fatalf("mkdir source: %v", err)
 	}
 	outputDir := filepath.Join(tmpDir, "public", "doc")
-	if err := build(sourceDir, outputDir); err != nil {
+	if err := build(sourceDir, outputDir, false); err != nil {
 		t.Fatalf("build() error = %v", err)
 	}
 
@@ -155,7 +155,7 @@ func TestBuildReturnsErrorWhenHugoFails(t *testing.T) {
 		t.Fatalf("mkdir source: %v", err)
 	}
 
-	if err := build(sourceDir, filepath.Join(tmpDir, "public", "doc")); err == nil {
+	if err := build(sourceDir, filepath.Join(tmpDir, "public", "doc"), false); err == nil {
 		t.Fatal("build() error = nil, want non-nil when hugo exits 1")
 	}
 }
@@ -175,12 +175,116 @@ func TestBuildScaffoldsWhenSourceMissing(t *testing.T) {
 	t.Setenv("PATH", fakeHugoDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	sourceDir := filepath.Join(tmpDir, ".docs")
-	if err := build(sourceDir, filepath.Join(tmpDir, "public", "doc")); err != nil {
+	if err := build(sourceDir, filepath.Join(tmpDir, "public", "doc"), false); err != nil {
 		t.Fatalf("build() error = %v, want nil (auto-scaffold)", err)
 	}
 	// Verify the source directory was scaffolded.
 	if _, err := os.Stat(filepath.Join(sourceDir, "hugo.toml")); err != nil {
 		t.Fatalf("hugo.toml missing after auto-scaffold: %v", err)
+	}
+}
+
+// TestBuildPreservesStaleOutputWithoutOverwrite verifies that stale files in the
+// destination are NOT removed when overwrite is false.
+func TestBuildPreservesStaleOutputWithoutOverwrite(t *testing.T) {
+	tmpDir := t.TempDir()
+	outputDir := filepath.Join(tmpDir, "public", "docs")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatalf("mkdir output: %v", err)
+	}
+	stalePath := filepath.Join(outputDir, "stale.txt")
+	if err := os.WriteFile(stalePath, []byte("stale"), 0o644); err != nil {
+		t.Fatalf("write stale file: %v", err)
+	}
+
+	fakeHugoDir := filepath.Join(tmpDir, "bin")
+	if err := os.MkdirAll(fakeHugoDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fakeHugoDir, "hugo"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write fake hugo: %v", err)
+	}
+	t.Setenv("PATH", fakeHugoDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	sourceDir := filepath.Join(tmpDir, ".docs")
+	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
+		t.Fatalf("mkdir source: %v", err)
+	}
+
+	if err := build(sourceDir, outputDir, false); err != nil {
+		t.Fatalf("build() error = %v", err)
+	}
+	if _, err := os.Stat(stalePath); err != nil {
+		t.Fatal("stale file should be preserved when overwrite=false")
+	}
+}
+
+// TestBuildRejectsEmptyDestination verifies that build() returns an error for an empty destination.
+func TestBuildRejectsEmptyDestination(t *testing.T) {
+	tmpDir := t.TempDir()
+	sourceDir := filepath.Join(tmpDir, ".docs")
+	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
+		t.Fatalf("mkdir source: %v", err)
+	}
+	err := build(sourceDir, "", false)
+	if err == nil {
+		t.Fatal("build() error = nil, want non-nil for empty destination")
+	}
+	if !strings.Contains(err.Error(), "must not be empty") {
+		t.Fatalf("error = %q, want it to contain 'must not be empty'", err.Error())
+	}
+}
+
+// TestBuildRejectsRootDestination verifies that build() returns an error when destination is /.
+func TestBuildRejectsRootDestination(t *testing.T) {
+	tmpDir := t.TempDir()
+	sourceDir := filepath.Join(tmpDir, ".docs")
+	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
+		t.Fatalf("mkdir source: %v", err)
+	}
+	err := build(sourceDir, "/", false)
+	if err == nil {
+		t.Fatal("build() error = nil, want non-nil for root destination")
+	}
+	if !strings.Contains(err.Error(), "filesystem root") {
+		t.Fatalf("error = %q, want it to contain 'filesystem root'", err.Error())
+	}
+}
+
+// TestBuildRejectsSingleComponentDestination verifies that build() returns an error
+// when the destination has fewer than 2 path components.
+func TestBuildRejectsSingleComponentDestination(t *testing.T) {
+	tmpDir := t.TempDir()
+	sourceDir := filepath.Join(tmpDir, ".docs")
+	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
+		t.Fatalf("mkdir source: %v", err)
+	}
+	// Use an absolute path with only one real component beyond root.
+	err := build(sourceDir, "/tmp", false)
+	if err == nil {
+		t.Fatal("build() error = nil, want non-nil for single-component destination")
+	}
+	if !strings.Contains(err.Error(), "at least 2 components") {
+		t.Fatalf("error = %q, want it to contain 'at least 2 components'", err.Error())
+	}
+}
+
+// TestBuildReturnsErrorWhenHugoNotFound verifies that build() returns a descriptive error
+// when hugo is not available on PATH.
+func TestBuildReturnsErrorWhenHugoNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Set PATH to an empty directory so hugo cannot be found.
+	t.Setenv("PATH", tmpDir)
+	sourceDir := filepath.Join(tmpDir, ".docs")
+	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
+		t.Fatalf("mkdir source: %v", err)
+	}
+	err := build(sourceDir, filepath.Join(tmpDir, "public", "docs"), false)
+	if err == nil {
+		t.Fatal("build() error = nil, want non-nil when hugo not found")
+	}
+	if !strings.Contains(err.Error(), "hugo not found on PATH") {
+		t.Fatalf("error = %q, want it to contain 'hugo not found on PATH'", err.Error())
 	}
 }
 
@@ -222,7 +326,7 @@ func TestBuildResolvesRelativeDestination(t *testing.T) {
 		t.Fatalf("Getwd() error = %v", err)
 	}
 
-	if err := build(sourceDir, "public/doc"); err != nil {
+	if err := build(sourceDir, "public/doc", false); err != nil {
 		t.Fatalf("build() error = %v", err)
 	}
 

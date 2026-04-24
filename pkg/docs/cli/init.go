@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed template
+//go:embed all:template
 var templateFS embed.FS
 
 func newInitCmd() *cobra.Command {
@@ -38,14 +38,14 @@ func initDocs() error {
 	}
 	fmt.Printf("created %s/\n", target)
 	fmt.Println("next steps:")
-	fmt.Printf("  edit %s/hugo.toml to set the title\n", target)
-	fmt.Printf("  add markdown files under %s/content/\n", target)
+	fmt.Printf("  edit %s/hugo.toml to set the title and add files to include\n", target)
+	fmt.Printf("  or add markdown files under %s/content/\n", target)
 	fmt.Println("  go run ./pkg/docs/cli build")
 	return nil
 }
 
 // scaffold copies the embedded Hugo template into target.
-// Files with a .tmpl extension are written without that suffix (e.g. go.mod.tmpl → go.mod).
+// Stripping .tmpl extension (e.g. go.mod.tmpl → go.mod).
 func scaffold(target string) error {
 	err := fs.WalkDir(templateFS, "template", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

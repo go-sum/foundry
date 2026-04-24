@@ -2,12 +2,14 @@ package docs
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/go-sum/web"
@@ -88,8 +90,19 @@ func resolvePath(root, rel string) (string, bool, error) {
 	if rel == "" {
 		return filepath.Join(root, "index.html"), false, nil
 	}
-	if strings.Contains(rel, "..") {
-		return "", false, errPathTraversal
+
+	// Containment check on the raw (uncleaned) path to catch traversal attempts
+	// before path.Clean normalises them away.
+	absRoot, absErr := filepath.Abs(root)
+	if absErr != nil {
+		return "", false, fmt.Errorf("resolve root: %w", absErr)
+	}
+	absRaw, absErr := filepath.Abs(filepath.Join(root, filepath.FromSlash(rel)))
+	if absErr != nil {
+		return "", false, fmt.Errorf("resolve target: %w", absErr)
+	}
+	if absRaw != absRoot && !strings.HasPrefix(absRaw, absRoot+string(filepath.Separator)) {
+		return "", false, errPathContainment
 	}
 
 	cleanRel := strings.TrimPrefix(path.Clean("/"+rel), "/")
@@ -119,6 +132,7 @@ func serveFile(status int, filename, cacheControl string) (web.Response, error) 
 	hdrs := web.NewHeaders()
 	hdrs.Set("Content-Type", contentType)
 	hdrs.Set("Cache-Control", cacheControl)
+	hdrs.Set("Content-Length", strconv.Itoa(len(body)))
 
 	return web.Response{
 		Status:  status,
@@ -128,8 +142,8 @@ func serveFile(status int, filename, cacheControl string) (web.Response, error) 
 }
 
 var (
-	errEmptyRoot     = pathError("root is empty")
-	errPathTraversal = pathError("path traversal")
+	errEmptyRoot       = pathError("root is empty")
+	errPathContainment = pathError("path outside root")
 )
 
 type pathError string

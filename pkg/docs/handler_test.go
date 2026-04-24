@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/go-sum/web"
@@ -86,6 +87,13 @@ func TestResolvePath(t *testing.T) {
 			root:    root,
 			rel:     "../../etc/passwd",
 			wantErr: true,
+		},
+		{
+			name:      "double-dot in filename (not traversal)",
+			root:      root,
+			rel:       "foo..bar",
+			wantPath:  filepath.Join(root, "foo..bar"),
+			wantAsset: true,
 		},
 	}
 
@@ -229,6 +237,10 @@ func TestHandlerServesPagesAssetsAndDocs404(t *testing.T) {
 			}
 			if got := resp.Headers.Get("Content-Type"); got != tc.wantType {
 				t.Fatalf("Content-Type = %q, want %q", got, tc.wantType)
+			}
+			wantLen := strconv.Itoa(len(tc.wantBody))
+			if got := resp.Headers.Get("Content-Length"); got != wantLen {
+				t.Fatalf("Content-Length = %q, want %q", got, wantLen)
 			}
 		})
 	}
