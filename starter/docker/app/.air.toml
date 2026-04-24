@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  pre_cmd = ["go run ../pkg/assets/cli build css --incremental", "go run ../pkg/assets/cli sprites --incremental", "go run ../pkg/assets/cli build js --incremental"]
+  pre_cmd = ["assets build css --incremental", "assets sprites --incremental", "assets build js --incremental"]
   cmd = "go build -o ./tmp/server ./cmd/server"
   entrypoint = "./tmp/server"
   delay = 500

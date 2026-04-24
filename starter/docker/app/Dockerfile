@@ -18,6 +18,10 @@ FROM cgr.dev/chainguard/wolfi-base:latest AS dev_target
 COPY --from=dev_toolchain /usr/local/go /usr/local/go
 COPY --from=dev_toolchain /root/go/bin/air /usr/local/bin/air
 COPY --from=dev_toolchain /usr/local/bin/tailwindcss /usr/local/bin/tailwindcss
+COPY --from=dev_toolchain /usr/local/bin/assets /usr/local/bin/assets
+COPY --from=dev_toolchain /usr/local/bin/db /usr/local/bin/db
+COPY --from=dev_toolchain /usr/local/bin/docs /usr/local/bin/docs
+COPY --from=dev_toolchain /usr/local/bin/hugo /usr/local/bin/hugo
 RUN apk update && apk add --no-cache bash ca-certificates-bundle curl git libstdc++
 
 ENV GOPATH=/root/go

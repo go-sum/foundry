@@ -119,8 +119,8 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 	}
 }
 
-func TestHealthHandler_ReturnsOKWhenPoolIsNil(t *testing.T) {
-	h := healthHandler(nil, nil)
+func TestHealthHandler_ReturnsOKWithNoCheckers(t *testing.T) {
+	h := healthHandler()
 	c := testRouteContext(http.MethodGet, "/healthz")
 	resp, err := h(c)
 	if err != nil {
@@ -130,6 +130,27 @@ func TestHealthHandler_ReturnsOKWhenPoolIsNil(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 }
+
+func TestHealthHandler_ReturnsUnavailableWhenCheckerFails(t *testing.T) {
+	failing := &fakeHealthChecker{err: errors.New("connection refused")}
+	h := healthHandler(failing)
+	c := testRouteContext(http.MethodGet, "/healthz")
+	_, err := h(c)
+	if err == nil {
+		t.Fatal("healthHandler() error = nil, want non-nil")
+	}
+	var webErr *web.Error
+	if !errors.As(err, &webErr) {
+		t.Fatalf("err type = %T, want *web.Error", err)
+	}
+	if got, want := webErr.Status, http.StatusServiceUnavailable; got != want {
+		t.Fatalf("status = %d, want %d", got, want)
+	}
+}
+
+type fakeHealthChecker struct{ err error }
+
+func (f *fakeHealthChecker) Check(_ context.Context) error { return f.err }
 
 func TestUnavailableHandler_ReturnsUnavailableError(t *testing.T) {
 	h := unavailableHandler("contact")

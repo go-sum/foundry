@@ -9,9 +9,10 @@ vars:
   DCOMP_CADDY: "docker compose -f docker-compose.caddy.yml --project-name {{.PROJECT_NAME}}"
   DCOMP_DATA: "docker compose -f docker-compose.data.yml --project-name {{.PROJECT_NAME}}"
   DCOMP_DEV: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f docker-compose.dev.yml --project-name {{.PROJECT_NAME}}"
+  DCOMP_TOOLS: "docker compose -f docker-compose.tools.yml --project-name {{.PROJECT_NAME}}"
   DEV_DOMAIN: "{{.PROJECT_NAME}}.test"
-  RUN_IN_TOOLS: "{{.DCOMP_ALL}} --profile tools run --rm"
-  RUN_WITH_TOOLS: "{{.DCOMP_ALL}} --profile tools run --rm -w /app/{{.PROJECT_NAME}} tools"
+  RUN_IN_TOOLS: "docker compose -f docker-compose.data.yml -f docker-compose.tools.yml --project-name {{.PROJECT_NAME}} run --rm"
+  RUN_WITH_TOOLS: "docker compose -f docker-compose.data.yml -f docker-compose.tools.yml --project-name {{.PROJECT_NAME}} run --rm -w /app/{{.PROJECT_NAME}} tools"
   TOOLS_IMAGE: "{{.PROJECT_NAME}}-tools"
   TOOLS_DEV: "{{.TOOLS_IMAGE}}:dev"
   TOOLS_PROD: "{{.TOOLS_IMAGE}}:prod"
@@ -27,22 +28,21 @@ tasks:
   # included with flatten:true in the root Taskfile; starter:clone injects them.
 
   # ── Assets ────────────────────────────────────────────────────────────────────
-  # The monorepo root Taskfile overrides these to use live pkg/ source
-  # (go run ../pkg/...) instead of the published package binaries.
+  # Uses pre-built CLI binaries from the tools container.
 
   build:assets:
     desc: "Build CSS/JS static assets"
     deps: [_inspect:tools]
-    cmd: '{{.RUN_WITH_TOOLS}} go run github.com/go-sum/assets/cli build all --config .assets.yaml --minify'
+    cmd: '{{.RUN_WITH_TOOLS}} assets build all --config .assets.yaml --minify'
 
   build:docs:
     desc: "Build Hugo documentation"
     deps: [_inspect:tools]
-    cmd: '{{.RUN_WITH_TOOLS}} go run github.com/go-sum/docs/cli build'
+    cmd: '{{.RUN_WITH_TOOLS}} docs build'
 
   build:tools:
     desc: "Rebuild dev toolchain image"
-    cmd: "{{.DCOMP_DEV}} --profile tools build tools"
+    cmd: "{{.DCOMP_TOOLS}} build tools"
 
   # ── Data containers (postgres + dragonfly) ────────────────────────────────────
 
@@ -91,7 +91,8 @@ tasks:
   dev:prune:
     desc: "Remove all project containers, images, networks, and volumes"
     cmds:
-      - "{{.DCOMP_ALL}} --profile tools down -v --rmi all --remove-orphans"
+      - "{{.DCOMP_ALL}} down -v --rmi all --remove-orphans"
+      - "{{.DCOMP_TOOLS}} down -v --rmi all --remove-orphans"
 
   # ── Database ──────────────────────────────────────────────────────────────────
 
@@ -196,7 +197,7 @@ tasks:
     internal: true
     requires:
       vars: [DB_CMD]
-    cmd: "{{.DCOMP_DEV}} run --rm --entrypoint '' app sh -c '{{.GO}} run github.com/go-sum/db/cli {{.DB_CMD}}'"
+    cmd: "{{.RUN_WITH_TOOLS}} db {{.DB_CMD}}"
 
   _net:proxy:ensure:
     internal: true
@@ -208,6 +209,6 @@ tasks:
   _inspect:tools:
     status:
       - docker image inspect {{.TOOLS_DEV}} >/dev/null 2>&1
-    cmd: "{{.DCOMP_DEV}} --profile tools build tools"
+    cmd: "{{.DCOMP_TOOLS}} build tools"
     internal: true
     silent: true

@@ -165,6 +165,22 @@ func Health(ctx context.Context, pool *pgxpool.Pool, tables ...string) error {
 	return nil
 }
 
+// Checker holds the pool and table list needed to assess database health.
+type Checker struct {
+	pool   *pgxpool.Pool
+	tables []string
+}
+
+// NewChecker returns a Checker that pings pool and verifies each table is queryable.
+func NewChecker(pool *pgxpool.Pool, tables ...string) *Checker {
+	return &Checker{pool: pool, tables: tables}
+}
+
+// Check runs the health assessment and returns a non-nil error if unhealthy.
+func (c *Checker) Check(ctx context.Context) error {
+	return Health(ctx, c.pool, c.tables...)
+}
+
 // LogPoolStats starts a goroutine that logs pool statistics at every interval
 // until ctx is cancelled.
 func LogPoolStats(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger, interval time.Duration) {

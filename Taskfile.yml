@@ -22,20 +22,19 @@ tasks:
     silent: true
     cmd: task --list
 
-  # Override starter's build:assets and build:docs — monorepo uses go run against
-  # live pkg/ source rather than published package binaries.
+  # Override starter's build:assets and build:docs — monorepo uses pre-built
+  # CLI binaries from the tools container (built from workspace source).
   build:assets:pkg:
     desc: "Build static assets via assets CLI (monorepo: live source)"
     dir: ./starter
     deps: [_inspect:tools]
-    cmd: '{{.RUN_WITH_TOOLS}} go run ../pkg/assets/cli build all --config
-      .assets.yaml --minify'
+    cmd: '{{.RUN_WITH_TOOLS}} assets build all --config .assets.yaml --minify'
 
   build:docs:pkg:
     desc: "Build Hugo documentation (monorepo: live source)"
     dir: ./starter
     deps: [_inspect:tools]
-    cmd: '{{.RUN_WITH_TOOLS}} go run ../pkg/docs/cli build'
+    cmd: '{{.RUN_WITH_TOOLS}} docs build'
 
   # Override flattened app:test — run across all workspace modules, not just starter.
   test:

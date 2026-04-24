@@ -1,16 +1,15 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
+	"github.com/go-sum/componentry/showcase"
 	"github.com/go-sum/db"
 	"github.com/go-sum/docs"
 	"github.com/go-sum/foundry/config"
-	"github.com/go-sum/foundry/internal/features/demos"
 	"github.com/go-sum/foundry/internal/features/hello"
 	"github.com/go-sum/foundry/internal/features/home"
 	"github.com/go-sum/foundry/internal/view"
@@ -22,6 +21,7 @@ import (
 	"github.com/go-sum/web/session"
 	"github.com/go-sum/web/site"
 	"github.com/go-sum/web/static"
+	g "maragu.dev/gomponents"
 )
 
 // RegisterRoutes registers all application routes on the router.
@@ -60,10 +60,14 @@ func registerStaticRoutes(rt *router.Router, assets static.AssetsConfig) error {
 	return nil
 }
 
-func healthHandler(pool *pgxpool.Pool, tables []string) web.Handler {
+type healthChecker interface {
+	Check(ctx context.Context) error
+}
+
+func healthHandler(checkers ...healthChecker) web.Handler {
 	return func(c *web.Context) (web.Response, error) {
-		if pool != nil {
-			if err := db.Health(c.Context(), pool, tables...); err != nil {
+		for _, ch := range checkers {
+			if err := ch.Check(c.Context()); err != nil {
 				return web.Response{}, web.ErrUnavailable("database unhealthy", err)
 			}
 		}
@@ -81,7 +85,6 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 	navOpt := view.WithNavConfig(config.DefaultNav())
 	homeH := home.NewHandler(rt, navOpt)
 	helloH := hello.NewHandler(rt, navOpt)
-	demosH := demos.NewHandler(rt, navOpt)
 	metaH := site.NewHandlers(s, rt,
 		site.RobotsConfig{DefaultAllow: true},
 		site.SitemapConfig{
@@ -104,46 +107,41 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 		contactSubmit = unavailableHandler("contact")
 	}
 
-	var healthTables []string
-	if svc.SchemaRegistry != nil {
-		healthTables = svc.SchemaRegistry.HealthTables()
+	var checkers []healthChecker
+	if svc.DBPool != nil {
+		checkers = append(checkers, db.NewChecker(svc.DBPool, svc.SchemaRegistry.HealthTables()...))
 	}
 	router.Register(rt,
-		router.GET("/healthz", "health.check", healthHandler(svc.DBPool, healthTables)),
+		router.GET("/healthz", "health.check", healthHandler(checkers...)),
 	)
 
-	router.Register(rt,
-		router.Layout(
-			router.Use(
-				web.WithMaxBody(8<<20),
-				web.MethodOverride(web.MethodOverrideConfig{}),
-				compress.Middleware(compress.Config{}),
-				etag.Middleware(etag.Config{}),
-				secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: sec.Origins}),
-			),
-			router.GET("/robots.txt", "meta.robots", metaH.RobotsTxt),
-			router.GET("/sitemap.xml", "meta.sitemap", metaH.SitemapXML),
-			router.GET("/", "home.show", homeH.Show),
-			router.GET("/hello/greeting", "hello.greeting", helloH.Greeting),
-			router.GET("/hello/{name}", "hello.show", helloH.Show),
+	showcaseCfg := showcase.DefaultConfig()
+	showcaseCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
+		vr := view.NewRequest(c, navOpt)
+		return view.Render(vr, vr.Page(title, content), nil)
+	}
 
-			router.GroupNode("/componentry",
-				router.GET("/_components", "demos.showcase", demosH.Show),
-				router.GET("/demo/search", "demos.search", demosH.Search),
-				router.GET("/demo/validate", "demos.validate", demosH.Validate),
-				router.GET("/demo/paginate", "demos.paginate", demosH.Paginate),
-				router.GET("/demo/region", "demos.region", demosH.Region),
-				router.GET("/demo/region/{id}", "demos.region-by-id", demosH.Region),
-				router.GET("/demo/oob-toast", "demos.oob-toast", demosH.OOBToast),
-			),
-
-			router.GET("/contact", "contact.form", contactForm),
-			router.POST("/contact", "contact.submit", contactSubmit),
-
-			router.GroupNode("/account",
-				router.Use(session.Guard(session.DefaultGuardConfig())),
-			),
+	layoutNodes := []router.Node{
+		router.Use(
+			web.WithMaxBody(8<<20),
+			web.MethodOverride(web.MethodOverrideConfig{}),
+			compress.Middleware(compress.Config{}),
+			etag.Middleware(etag.Config{}),
+			secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: sec.Origins}),
 		),
-	)
+		router.GET("/robots.txt", "meta.robots", metaH.RobotsTxt),
+		router.GET("/sitemap.xml", "meta.sitemap", metaH.SitemapXML),
+		router.GET("/", "home.show", homeH.Show),
+		router.GET("/hello/greeting", "hello.greeting", helloH.Greeting),
+		router.GET("/hello/{name}", "hello.show", helloH.Show),
+		router.GET("/contact", "contact.form", contactForm),
+		router.POST("/contact", "contact.submit", contactSubmit),
+		router.GroupNode("/account",
+			router.Use(session.Guard(session.DefaultGuardConfig())),
+		),
+	}
+	layoutNodes = append(layoutNodes, showcase.Routes(showcaseCfg)...)
+
+	router.Register(rt, router.Layout(layoutNodes...))
 	return nil
 }

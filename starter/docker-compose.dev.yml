@@ -1,4 +1,4 @@
-# docker-compose.dev.yml — Dev overlay
+# docker-compose.dev.yml — Dev app overlay
 #
 # Merged via: docker compose -f docker-compose.data.yml -f docker-compose.yml -f docker-compose.dev.yml
 # Never present on production servers.
@@ -12,50 +12,6 @@ services:
       args:
         PG_VERSION: ${PG_VERSION}
     image: foundry-db:dev
-
-  # Dev toolchain — build, lint, test, assets, docs, foundry CLI.
-  # Mounts monorepo root so it can access pkg/ and tools/ alongside starter/.
-  # profiles: [tools] keeps it out of `docker compose up`.
-  # `docker compose run --rm tools <cmd>` auto-builds if needed.
-  tools:
-    build:
-      context: ./docker/tools
-      dockerfile: Dockerfile
-      target: dev_toolchain
-      args:
-        GO_VERSION: ${GO_VERSION}
-        AIR_VERSION: ${AIR_VERSION}
-        ASSETS_CLI_VERSION: ${ASSETS_CLI_VERSION}
-        DOCS_CLI_VERSION: ${DOCS_CLI_VERSION}
-        GOLANGCI_LINT_VERSION: ${GOLANGCI_LINT_VERSION}
-        HUGO_VERSION: ${HUGO_VERSION}
-        MKCERT_VERSION: ${MKCERT_VERSION}
-        TAILWIND_VERSION: ${TAILWIND_VERSION}
-    image: ${TOOLS_DEV:-foundry-tools:dev}
-    volumes:
-      - ../:/app
-      - tools-cache:/root/.cache/go-build
-      - tools-gomod:/root/go/pkg/mod
-    working_dir: /app
-    env_file: .env
-    profiles: [tools]
-
-  # Production toolchain — Tailwind + Hugo only (no dev dependencies).
-  prod-tools:
-    build:
-      context: ./docker/tools
-      dockerfile: Dockerfile
-      target: production_toolchain
-      args:
-        GO_VERSION: ${GO_VERSION}
-        HUGO_VERSION: ${HUGO_VERSION}
-        TAILWIND_VERSION: ${TAILWIND_VERSION}
-    image: ${TOOLS_PROD:-foundry-tools:prod}
-    volumes:
-      - .:/app
-    working_dir: /app
-    env_file: .env
-    profiles: [tools]
 
   app:
     depends_on:
@@ -91,7 +47,3 @@ services:
 networks:
   app_net:
   proxy_net:
-
-volumes:
-  tools-cache:
-  tools-gomod:

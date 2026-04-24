@@ -1,0 +1,55 @@
+# docker-compose.tools.yml — Dev & prod toolchains
+#
+# Independent from app orchestration. Compose with data services for DB access:
+#   docker compose -f docker-compose.data.yml -f docker-compose.tools.yml run --rm tools <cmd>
+
+services:
+  tools:
+    build:
+      context: ./docker/tools
+      additional_contexts:
+        workspace: ..
+      dockerfile: Dockerfile
+      target: dev_toolchain_monorepo
+      args:
+        GO_VERSION: ${GO_VERSION}
+        AIR_VERSION: ${AIR_VERSION}
+        ASSETS_CLI_VERSION: ${ASSETS_CLI_VERSION}
+        DOCS_CLI_VERSION: ${DOCS_CLI_VERSION}
+        GOLANGCI_LINT_VERSION: ${GOLANGCI_LINT_VERSION}
+        HUGO_VERSION: ${HUGO_VERSION}
+        MKCERT_VERSION: ${MKCERT_VERSION}
+        TAILWIND_VERSION: ${TAILWIND_VERSION}
+    image: ${TOOLS_DEV:-foundry-tools:dev}
+    volumes:
+      - ../:/app
+      - tools-cache:/root/.cache/go-build
+      - tools-gomod:/root/go/pkg/mod
+    working_dir: /app
+    env_file: .env
+    networks:
+      - app_net
+
+  prod-tools:
+    build:
+      context: ./docker/tools
+      dockerfile: Dockerfile
+      target: production_toolchain
+      args:
+        GO_VERSION: ${GO_VERSION}
+        HUGO_VERSION: ${HUGO_VERSION}
+        TAILWIND_VERSION: ${TAILWIND_VERSION}
+    image: ${TOOLS_PROD:-foundry-tools:prod}
+    volumes:
+      - .:/app
+    working_dir: /app
+    env_file: .env
+    networks:
+      - app_net
+
+networks:
+  app_net:
+
+volumes:
+  tools-cache:
+  tools-gomod:
