@@ -1,0 +1,29 @@
+schema:
+  - path: ../../pkg/db/sql/base.sql
+    priority: 0
+    external: true
+
+  - path: ../../pkg/queue/pgstore/sql/schema.sql
+    priority: 50
+    health_tables: [queue_jobs]
+    external: true
+
+  - path: sql/schema/contact.sql
+    priority: 100
+    health_tables: [contact_submissions]
+
+migrations: migrations
+
+codegen:
+  queries: sql/queries/
+  out: sqlcgen
+  package: sqlcgen
+  emit_json_tags: true
+  emit_empty_slices: true
+
+plan_db:
+  host: ${PGHOST:-db}
+  port: ${PGPORT:-5432}
+  user: ${PGUSER:-postgres}
+  password: ${PGPASSWORD:-postgres}
+  database: ${PGDATABASE:-foundry}

@@ -1,0 +1,308 @@
+package contact
+
+import (
+	"context"
+	"errors"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/go-sum/web"
+	"github.com/go-sum/web/router"
+	"github.com/go-sum/web/validate"
+)
+
+// fakeService is a manual implementation of Service for handler tests.
+type fakeService struct {
+	err error
+}
+
+func (f *fakeService) Submit(_ context.Context, _ ContactInput, _ string) error {
+	return f.err
+}
+
+func testContactRouter(t *testing.T) *router.Router {
+	t.Helper()
+	rt := router.New()
+	router.Register(rt,
+		router.GET("/contact", "contact.form", nil),
+		router.POST("/contact", "contact.submit", nil),
+	)
+	return rt
+}
+
+func newContactHandler(t *testing.T, svc Service) *Handler {
+	t.Helper()
+	rt := testContactRouter(t)
+	val := validate.New()
+	return NewHandler(rt, svc, val)
+}
+
+func TestHandler_Form_RendersPage(t *testing.T) {
+	h := newContactHandler(t, &fakeService{})
+
+	u, _ := url.Parse("/contact")
+	req := web.NewRequest(http.MethodGet, u)
+	c := web.NewContext(context.Background(), req)
+
+	resp, err := h.Form(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	got := string(body)
+
+	// Full page must include the page wrapper (html element).
+	if !strings.Contains(got, "<html") {
+		t.Errorf("expected full-page HTML, got fragment without <html>")
+	}
+	// Must contain contact form swap target.
+	if !strings.Contains(got, `id="contact-form"`) {
+		t.Errorf("expected contact form in page, missing id=\"contact-form\"")
+	}
+	// Must contain the page heading.
+	if !strings.Contains(got, "Contact Us") {
+		t.Errorf("expected 'Contact Us' heading in page body")
+	}
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	}
+}
+
+func TestHandler_Form_HTMXPartial(t *testing.T) {
+	h := newContactHandler(t, &fakeService{})
+
+	u, _ := url.Parse("/contact")
+	req := web.NewRequest(http.MethodGet, u)
+	req.Headers.Set("HX-Request", "true")
+	c := web.NewContext(context.Background(), req)
+
+	resp, err := h.Form(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	got := string(body)
+
+	// Partial must NOT include the outer html wrapper.
+	if strings.Contains(got, "<html") {
+		t.Errorf("HTMX partial must not include <html> wrapper")
+	}
+	// Must still contain the form swap target.
+	if !strings.Contains(got, `id="contact-form"`) {
+		t.Errorf("expected contact form partial, missing id=\"contact-form\"")
+	}
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	}
+}
+
+// TestHandler_Submit_ValidationError verifies that a POST with missing fields
+// returns a 422 fragment containing field error markup.
+func TestHandler_Submit_ValidationError(t *testing.T) {
+	h := newContactHandler(t, &fakeService{})
+
+	formBody := url.Values{
+		"name":    {""},
+		"email":   {""},
+		"message": {""},
+	}.Encode()
+
+	u, _ := url.Parse("/contact")
+	req := web.NewRequest(http.MethodPost, u)
+	req.Headers.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBody(io.NopCloser(strings.NewReader(formBody)))
+	c := web.NewContext(context.Background(), req)
+
+	resp, err := h.Submit(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.Status != http.StatusUnprocessableEntity {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusUnprocessableEntity)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	got := string(body)
+
+	// Must not be a full page.
+	if strings.Contains(got, "<html") {
+		t.Errorf("validation error response must not be a full page")
+	}
+	// Must contain the form.
+	if !strings.Contains(got, `id="contact-form"`) {
+		t.Errorf("expected contact form in 422 response, missing id=\"contact-form\"")
+	}
+}
+
+// TestHandler_Submit_Success verifies that a valid POST returns a 200 fragment
+// showing the success state.
+func TestHandler_Submit_Success(t *testing.T) {
+	h := newContactHandler(t, &fakeService{err: nil})
+
+	formBody := url.Values{
+		"name":    {"Alice"},
+		"email":   {"alice@example.com"},
+		"message": {"Hello there"},
+	}.Encode()
+
+	u, _ := url.Parse("/contact")
+	req := web.NewRequest(http.MethodPost, u)
+	req.Headers.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetRemoteAddr("127.0.0.1:1234")
+	req.SetBody(io.NopCloser(strings.NewReader(formBody)))
+	c := web.NewContext(context.Background(), req)
+
+	resp, err := h.Submit(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	got := string(body)
+
+	// Must not be a full page.
+	if strings.Contains(got, "<html") {
+		t.Errorf("success response must not be a full page")
+	}
+	// Must show success alert.
+	if !strings.Contains(got, "Message sent!") {
+		t.Errorf("expected success state with 'Message sent!', got: %s", got)
+	}
+	// Must not show the form fields.
+	if strings.Contains(got, `id="contact-form-inner"`) {
+		t.Errorf("success state must not contain the form inner, got: %s", got)
+	}
+}
+
+// TestHandler_Submit_RateLimited verifies that ErrRateLimited produces a 429 *web.Error.
+func TestHandler_Submit_RateLimited(t *testing.T) {
+	h := newContactHandler(t, &fakeService{err: ErrRateLimited})
+
+	formBody := url.Values{
+		"name":    {"Alice"},
+		"email":   {"alice@example.com"},
+		"message": {"Hello there"},
+	}.Encode()
+
+	u, _ := url.Parse("/contact")
+	req := web.NewRequest(http.MethodPost, u)
+	req.Headers.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetRemoteAddr("127.0.0.1:1234")
+	req.SetBody(io.NopCloser(strings.NewReader(formBody)))
+	c := web.NewContext(context.Background(), req)
+
+	resp, err := h.Submit(c)
+	if err == nil {
+		t.Fatal("expected error for rate limited submission, got nil")
+	}
+	if resp.Status != 0 {
+		t.Errorf("expected zero response on error, got status %d", resp.Status)
+	}
+
+	var webErr *web.Error
+	if !errors.As(err, &webErr) {
+		t.Fatalf("expected *web.Error, got %T: %v", err, err)
+	}
+	if webErr.Status != http.StatusTooManyRequests {
+		t.Errorf("Status = %d, want %d", webErr.Status, http.StatusTooManyRequests)
+	}
+	if webErr.Code != web.CodeTooManyRequests {
+		t.Errorf("Code = %q, want %q", webErr.Code, web.CodeTooManyRequests)
+	}
+}
+
+// TestHandler_Submit_ServiceError verifies that an unexpected service error
+// produces a 503 *web.Error.
+func TestHandler_Submit_ServiceError(t *testing.T) {
+	unexpected := errors.New("database exploded")
+	h := newContactHandler(t, &fakeService{err: unexpected})
+
+	formBody := url.Values{
+		"name":    {"Alice"},
+		"email":   {"alice@example.com"},
+		"message": {"Hello there"},
+	}.Encode()
+
+	u, _ := url.Parse("/contact")
+	req := web.NewRequest(http.MethodPost, u)
+	req.Headers.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetRemoteAddr("127.0.0.1:1234")
+	req.SetBody(io.NopCloser(strings.NewReader(formBody)))
+	c := web.NewContext(context.Background(), req)
+
+	resp, err := h.Submit(c)
+	if err == nil {
+		t.Fatal("expected error for service failure, got nil")
+	}
+	if resp.Status != 0 {
+		t.Errorf("expected zero response on error, got status %d", resp.Status)
+	}
+
+	var webErr *web.Error
+	if !errors.As(err, &webErr) {
+		t.Fatalf("expected *web.Error, got %T: %v", err, err)
+	}
+	if webErr.Status != http.StatusServiceUnavailable {
+		t.Errorf("Status = %d, want %d", webErr.Status, http.StatusServiceUnavailable)
+	}
+	if webErr.Code != web.CodeUnavailable {
+		t.Errorf("Code = %q, want %q", webErr.Code, web.CodeUnavailable)
+	}
+	// Cause chain must reach the original error.
+	if !errors.Is(webErr, unexpected) {
+		t.Errorf("expected cause chain to contain original error")
+	}
+}
+
+// TestHandler_Submit_ValidationError_PartialFields tests a partial submission
+// (only some fields missing) still returns 422 with field errors.
+func TestHandler_Submit_ValidationError_PartialFields(t *testing.T) {
+	cases := []struct {
+		name   string
+		values url.Values
+	}{
+		{
+			name:   "missing email and message",
+			values: url.Values{"name": {"Alice"}, "email": {""}, "message": {""}},
+		},
+		{
+			name:   "missing name only",
+			values: url.Values{"name": {""}, "email": {"alice@example.com"}, "message": {"Hello"}},
+		},
+		{
+			name:   "invalid email format",
+			values: url.Values{"name": {"Alice"}, "email": {"not-an-email"}, "message": {"Hello"}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newContactHandler(t, &fakeService{})
+
+			u, _ := url.Parse("/contact")
+			req := web.NewRequest(http.MethodPost, u)
+			req.Headers.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.SetBody(io.NopCloser(strings.NewReader(tc.values.Encode())))
+			c := web.NewContext(context.Background(), req)
+
+			resp, err := h.Submit(c)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resp.Status != http.StatusUnprocessableEntity {
+				t.Errorf("Status = %d, want %d", resp.Status, http.StatusUnprocessableEntity)
+			}
+		})
+	}
+}
+
