@@ -83,7 +83,7 @@ Dependencies must flow inward toward reusable primitives.
 Expected dependency direction:
 
 * `starter` → may depend on all packages
-* `pkg/queue` → may depend on `pkg/db`, `pkg/kv`
+* `pkg/showcase` → may depend on other `pkg/*` packages (it is a package showcase); must still respect all other architecture rules
 * `pkg/web` → should not depend on `starter`
 * `pkg/componentry` → should not depend on `pkg/web`, `pkg/db`
 * `pkg/db` → should not depend on `pkg/web`
@@ -94,6 +94,7 @@ Flag:
 * upward dependencies into `starter`
 * UI packages importing infrastructure packages
 * infrastructure packages importing application code
+* `pkg/showcase` violating architecture rules (ownership, rendering, runtime assembly) despite its broader import allowance
 
 ---
 
