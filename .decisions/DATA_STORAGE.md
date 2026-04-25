@@ -381,46 +381,40 @@ translation step.
 
 ### Tool
 
-Use **golang-migrate** as the standard migration tool. It supports:
+Use **goose** (via `github.com/go-sum/db/migrate`) as the standard migration
+tool. It provides:
 
-- PostgreSQL, MySQL, SQLite, and other backends
-- Embedded migrations via `go:embed`
-- Transactional DDL (PostgreSQL)
-- Advisory locks for multi-instance safety
-- CLI and programmatic usage
+- PostgreSQL support with transactional DDL by default
+- Single-file migrations with `-- +goose Up` / `-- +goose Down` annotations
+- Pre-flight lint before applying (`migrate.Lint`)
+- Schema fingerprint storage after each successful migration
+- CLI and programmatic usage via `pkg/db/cli`
 
 ### File naming
 
 ```
-{version}_{description}.{direction}.sql
+{version}_{description}.sql
 ```
 
 - Version: 6-digit zero-padded sequential number
 - Description: lowercase with underscores, describes the change
-- Direction: `up` or `down`
+- Both the `Up` and `Down` directions live in the **same file**, separated by
+  goose annotations
 
 Examples:
 
 ```
-000001_create_users_table.up.sql
-000001_create_users_table.down.sql
-000002_add_email_index.up.sql
-000002_add_email_index.down.sql
-000003_create_orders_table.up.sql
-000003_create_orders_table.down.sql
+000001_initial_schema.sql
+000002_add_email_index.sql
+000003_create_orders_table.sql
 ```
 
-### Always write both directions
+### File format
 
-Every migration must have both an `up` and a `down` file. The `down` migration
-reverses the `up` migration precisely.
-
-### Idempotency
-
-Use `IF NOT EXISTS` and `IF EXISTS` to make migrations safe for re-execution:
+Each migration file contains both directions delimited by goose annotations:
 
 ```sql
--- up
+-- +goose Up
 CREATE TABLE IF NOT EXISTS users (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email      TEXT NOT NULL UNIQUE,
@@ -428,115 +422,119 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- down
+-- +goose Down
 DROP TABLE IF EXISTS users;
+```
+
+For statements that contain semicolons internally (functions, triggers,
+procedures), wrap them in `StatementBegin` / `StatementEnd` so goose does not
+split on the internal semicolons:
+
+```sql
+-- +goose Up
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+-- +goose StatementEnd
+
+-- +goose Down
+DROP FUNCTION IF EXISTS update_updated_at();
+```
+
+### Always write both directions
+
+Every migration must contain both a `-- +goose Up` and a `-- +goose Down`
+section. The `Down` section must precisely reverse the `Up` section. Write the
+`Down` SQL manually — do not commit auto-generated Down SQL without reviewing
+it.
+
+### Idempotency
+
+Use `IF NOT EXISTS` and `IF EXISTS` to make migrations safe for re-execution:
+
+```sql
+-- +goose Up
+CREATE TABLE IF NOT EXISTS orders (
+    id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    status  TEXT NOT NULL,
+    total   BIGINT NOT NULL DEFAULT 0
+);
+
+-- +goose Down
+DROP TABLE IF EXISTS orders;
 ```
 
 ### Transactional DDL
 
 PostgreSQL supports transactional DDL — schema changes within a transaction
-either all commit or all roll back. golang-migrate wraps each migration in a
-transaction by default. Do not disable this unless the migration explicitly
-requires it (e.g., concurrent index creation).
+either all commit or all roll back. Goose wraps each migration in a transaction
+by default. Do not disable this unless the migration explicitly requires it
+(e.g., concurrent index creation).
 
-### Running migrations in code
+### Running migrations programmatically
 
-Embed migration files and run at startup:
+Use the `github.com/go-sum/db/migrate` package directly:
 
 ```go
-import (
-    "embed"
+import "github.com/go-sum/db/migrate"
 
-    "github.com/golang-migrate/migrate/v4"
-    "github.com/golang-migrate/migrate/v4/database/postgres"
-    "github.com/golang-migrate/migrate/v4/source/iofs"
-)
-
-//go:embed migrations/*.sql
-var migrationsFS embed.FS
-
-func RunMigrations(ctx context.Context, db *sql.DB) error {
-    source, err := iofs.New(migrationsFS, "migrations")
-    if err != nil {
-        return fmt.Errorf("db: migration source: %w", err)
-    }
-
-    driver, err := postgres.WithInstance(db, &postgres.Config{})
-    if err != nil {
-        return fmt.Errorf("db: migration driver: %w", err)
-    }
-
-    m, err := migrate.NewWithInstance("iofs", source, "postgres", driver)
-    if err != nil {
-        return fmt.Errorf("db: migration init: %w", err)
-    }
-
-    err = m.Up()
-    if err != nil && !errors.Is(err, migrate.ErrNoChange) {
-        return fmt.Errorf("db: migrate up: %w", err)
-    }
-    return nil
+func RunMigrations(ctx context.Context, dsn, migrDir string) error {
+    return migrate.Up(ctx, dsn, migrDir)
 }
 ```
 
-### Migration at startup
-
-Run migrations before opening the connection pool that serves application
-traffic. Use a separate single-connection `*sql.DB` for migrations, then close
-it and open the pool:
-
-```go
-func Start(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-    // Single connection for migrations
-    migrationDB, err := sql.Open("postgres", databaseURL)
-    if err != nil {
-        return nil, fmt.Errorf("db: migration connect: %w", err)
-    }
-    defer migrationDB.Close()
-
-    if err := RunMigrations(ctx, migrationDB); err != nil {
-        return nil, err
-    }
-
-    // Pool for application traffic
-    pool, err := pgxpool.New(ctx, databaseURL)
-    if err != nil {
-        return nil, fmt.Errorf("db: pool connect: %w", err)
-    }
-    return pool, nil
-}
-```
+`migrate.Up` runs all pending migrations in order. It is safe to call on every
+startup — it is a no-op when no migrations are pending.
 
 ### CLI usage
 
+The project CLI (`db migrate`, `db rollback`, `db status`) wraps the
+`github.com/go-sum/db/migrate` package. Run it from `starter/`:
+
 ```bash
 # Apply all pending migrations
-migrate -path db/migrations -database "$DATABASE_URL" up
+go run ./cmd/db migrate
 
-# Rollback the last migration
-migrate -path db/migrations -database "$DATABASE_URL" down 1
+# Preview pending migrations without applying
+go run ./cmd/db migrate --dry-run
 
-# Go to a specific version
-migrate -path db/migrations -database "$DATABASE_URL" goto 3
+# Migrate up to a specific version
+go run ./cmd/db migrate --to 3
 
-# Show current version
-migrate -path db/migrations -database "$DATABASE_URL" version
+# Rollback the last applied migration
+go run ./cmd/db rollback
 
-# Force a version (use when dirty state must be resolved)
-migrate -path db/migrations -database "$DATABASE_URL" force 3
+# Roll back to a specific version
+go run ./cmd/db rollback --to 2
+
+# Show applied / pending status
+go run ./cmd/db status
 ```
+
+A pre-flight lint runs automatically before `migrate` applies any SQL. If lint
+finds errors, no migrations are applied.
 
 ### Safe migration practices
 
 **Concurrent index creation** — large tables require `CREATE INDEX
 CONCURRENTLY` to avoid locking reads and writes. This statement cannot run
-inside a transaction. Disable transaction wrapping for that migration file and
-include only the index statement:
+inside a transaction. Opt the migration out of transactional wrapping with the
+`NO TRANSACTION` annotation and include only the index statement:
 
 ```sql
--- 000004_add_users_email_index.up.sql
--- golang-migrate: disable transaction for this migration
+-- +goose NO TRANSACTION
+
+-- +goose Up
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_email ON users (email);
+
+-- +goose Down
+DROP INDEX CONCURRENTLY IF EXISTS idx_users_email;
 ```
 
 **Separate data migrations from schema migrations** — do not mix DDL
@@ -557,26 +555,20 @@ deployments:
 Never rename or remove a column in a single deployment when the old code is
 still running.
 
-### Rolling back
+### Schema fingerprint
 
-**Dirty state** — if a migration fails mid-execution, golang-migrate marks the
-version as "dirty." To recover:
-
-1. Inspect the database to determine what parts of the migration actually
-   applied
-2. Manually fix the schema if needed
-3. Force the version to the last clean state:
-
-```bash
-migrate -path db/migrations -database "$DATABASE_URL" force <last_clean_version>
-```
-
-4. Re-run or fix the failing migration
+After each successful `migrate` run, the CLI stores a schema fingerprint in
+the database via `db.StoreFingerprint`. On application startup,
+`db.VerifyFingerprint` compares the running code's expected fingerprint against
+the stored value and refuses to start if they diverge. This prevents schema
+drift from causing silent data corruption.
 
 ### Migration rules
 
 - Never modify an already-applied migration — create a new migration to
   correct a previous one
+- Write `Down` SQL manually — never commit auto-generated rollback SQL without
+  reviewing it
 - Version-control all migration files alongside application code
 - Review migrations in pull requests with the same rigor as application code
 - Test migrations against a copy of production data when feasible
@@ -589,21 +581,6 @@ migrate -path db/migrations -database "$DATABASE_URL" force <last_clean_version>
 - In the CD pipeline, run migrations before deploying the new application
   version
 - Never run migrations manually in production when an automated pipeline exists
-
-### Multi-instance safety
-
-When multiple application instances start simultaneously, use PostgreSQL
-advisory locks to ensure only one instance runs migrations:
-
-```go
-driver, err := postgres.WithInstance(db, &postgres.Config{
-    MigrationsTable: "schema_migrations",
-    // Advisory lock prevents concurrent migration execution
-})
-```
-
-golang-migrate uses advisory locks by default with the PostgreSQL driver. Do
-not disable this in multi-instance deployments.
 
 ---
 
@@ -1050,7 +1027,8 @@ Before merging a data persistence change, confirm:
 - transactions are managed at the service layer, not inside stores
 - no external API calls occur inside a transaction
 - `context.Context` is passed to every database operation
-- migrations have both `up` and `down` files
+- each migration file has both `-- +goose Up` and `-- +goose Down` sections
+- `Down` SQL is written and reviewed manually — not auto-generated
 - migrations use `IF NOT EXISTS` / `IF EXISTS` for idempotency
 - column renames or removals follow the three-step zero-downtime approach
 - rollback errors check for `pgx.ErrTxClosed` before logging
@@ -1064,7 +1042,7 @@ Before merging a data persistence change, confirm:
 ## 9. Sources
 
 - pgx documentation: <https://github.com/jackc/pgx>
-- golang-migrate: <https://github.com/golang-migrate/migrate>
+- goose: <https://github.com/pressly/goose>
 - PostgreSQL error codes: <https://www.postgresql.org/docs/current/errcodes-appendix.html>
 - `pkg/web/idempotency` — idempotency middleware and store
 - Effective Go: <https://go.dev/doc/effective_go>
