@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"fmt"
 	"strings"
+	"sync"
 
 	uiform "github.com/go-sum/componentry/form"
 	"github.com/go-sum/componentry/icons"
@@ -34,9 +35,12 @@ import (
 //go:embed showcase.go
 var showcaseSource string
 
-var snippets map[string]string
+var (
+	snippets     map[string]string
+	snippetsOnce sync.Once
+)
 
-func init() {
+func loadSnippets() {
 	snippets = make(map[string]string)
 	var name string
 	var buf strings.Builder
@@ -1085,6 +1089,7 @@ const (
 
 // example renders a named example box with a label, optional tier dots, optional source snippet, and the component.
 func example(key, name string, node g.Node, caps ...cap) g.Node {
+	snippetsOnce.Do(loadSnippets)
 	var dots []g.Node
 	for _, c := range caps {
 		switch c {

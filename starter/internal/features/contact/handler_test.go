@@ -9,7 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-sum/foundry/internal/view"
+	"github.com/go-sum/foundry/internal/view/page"
+	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
 	"github.com/go-sum/web"
+	"github.com/go-sum/web/render"
 	"github.com/go-sum/web/router"
 	"github.com/go-sum/web/validate"
 )
@@ -52,23 +56,18 @@ func TestHandler_Form_RendersPage(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	}
+
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 
-	// Full page must include the page wrapper (html element).
-	if !strings.Contains(got, "<html") {
-		t.Errorf("expected full-page HTML, got fragment without <html>")
-	}
-	// Must contain contact form swap target.
-	if !strings.Contains(got, `id="contact-form"`) {
-		t.Errorf("expected contact form in page, missing id=\"contact-form\"")
-	}
-	// Must contain the page heading.
-	if !strings.Contains(got, "Contact Us") {
-		t.Errorf("expected 'Contact Us' heading in page body")
-	}
-	if resp.Status != http.StatusOK {
-		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	vr := view.NewRequest(c)
+	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
+	want := render.RenderNode(t, page.ContactPage(vr, submitURL, contactpartial.FormData{}))
+	if got != want {
+		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", got, want)
 	}
 }
 
@@ -85,19 +84,18 @@ func TestHandler_Form_HTMXPartial(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	if resp.Status != http.StatusOK {
+		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	}
+
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 
-	// Partial must NOT include the outer html wrapper.
-	if strings.Contains(got, "<html") {
-		t.Errorf("HTMX partial must not include <html> wrapper")
-	}
-	// Must still contain the form swap target.
-	if !strings.Contains(got, `id="contact-form"`) {
-		t.Errorf("expected contact form partial, missing id=\"contact-form\"")
-	}
-	if resp.Status != http.StatusOK {
-		t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
+	vr := view.NewRequest(c)
+	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
+	want := render.RenderNode(t, contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{}))
+	if got != want {
+		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", got, want)
 	}
 }
 
@@ -130,13 +128,18 @@ func TestHandler_Submit_ValidationError(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 
-	// Must not be a full page.
-	if strings.Contains(got, "<html") {
-		t.Errorf("validation error response must not be a full page")
+	vr := view.NewRequest(c)
+	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
+	fieldErrors := map[string][]string{
+		"name":    {"is required"},
+		"email":   {"is required"},
+		"message": {"is required"},
 	}
-	// Must contain the form.
-	if !strings.Contains(got, `id="contact-form"`) {
-		t.Errorf("expected contact form in 422 response, missing id=\"contact-form\"")
+	want := render.RenderNode(t, contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{
+		Errors: fieldErrors,
+	}))
+	if got != want {
+		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", got, want)
 	}
 }
 
@@ -170,17 +173,11 @@ func TestHandler_Submit_Success(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 
-	// Must not be a full page.
-	if strings.Contains(got, "<html") {
-		t.Errorf("success response must not be a full page")
-	}
-	// Must show success alert.
-	if !strings.Contains(got, "Message sent!") {
-		t.Errorf("expected success state with 'Message sent!', got: %s", got)
-	}
-	// Must not show the form fields.
-	if strings.Contains(got, `id="contact-form-inner"`) {
-		t.Errorf("success state must not contain the form inner, got: %s", got)
+	vr := view.NewRequest(c)
+	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
+	want := render.RenderNode(t, contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{Sent: true}))
+	if got != want {
+		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", got, want)
 	}
 }
 

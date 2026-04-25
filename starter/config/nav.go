@@ -6,36 +6,37 @@ import (
 	"github.com/go-sum/componentry/icons/render"
 	"github.com/go-sum/componentry/interactive/theme"
 	"github.com/go-sum/componentry/ui/core"
+	"github.com/go-sum/web/router"
 )
 
 // DefaultNav returns the default navigation configuration for the Starter application.
-func DefaultNav() compound.NavConfig {
+func DefaultNav(rt *router.Router) compound.NavConfig {
 	return compound.NavConfig{
 		Brand: compound.NavBrand{
 			Label: "Starter",
-			Href:  "/",
+			Href:  rt.MustReverse("home.show", nil),
 		},
 		Sections: []compound.NavSection{
 			{
 				Items: []compound.NavItem{
-					{Label: "Home", Href: "/"},
+					{Label: "Home", Href: rt.MustReverse("home.show", nil)},
 					{
 						Label: "Packages",
 						Items: []compound.NavItem{
 							{
 								Label: "Showcase",
 								Items: []compound.NavItem{
-									{Label: "Components", Href: "/showcase/componentry/components"},
-									{Label: "Database", Href: "/showcase/db"},
-									{Label: "Key-Value", Href: "/showcase/kv"},
-									{Label: "Queues", Href: "/showcase/queues"},
+									{Label: "Components", Href: rt.MustReverse("demos.showcase", nil)},
+									{Label: "Database", Href: rt.MustReverse("db.index", nil)},
+									{Label: "Key-Value", Href: rt.MustReverse("kv.index", nil)},
+									{Label: "Queues", Href: rt.MustReverse("queue.index", nil)},
 								},
 							},
 							{
 								Label: "Site",
 								Items: []compound.NavItem{
-									{Label: "Robots", Href: "/robots.txt"},
-									{Label: "Sitemap", Href: "/sitemap.xml"},
+									{Label: "Robots", Href: rt.MustReverse("meta.robots", nil)},
+									{Label: "Sitemap", Href: rt.MustReverse("meta.sitemap", nil)},
 								},
 							},
 						},
@@ -45,8 +46,8 @@ func DefaultNav() compound.NavConfig {
 			{
 				Align: compound.NavAlignEnd,
 				Items: []compound.NavItem{
-					{Label: "Documentation", Href: "/docs"},
-					{Label: "Contact", Href: "/contact"},
+					{Label: "Documentation", Href: rt.MustReverse("docs.index", nil)},
+					{Label: "Contact", Href: rt.MustReverse("contact.form", nil)},
 					{Slot: compound.SlotThemeToggle},
 				},
 			},

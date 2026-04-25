@@ -13,7 +13,7 @@ import (
 // for each request with: method, path, status, latency (duration), request_id.
 // It must be placed after web.WithRequestID() to capture the request ID.
 // Logs at Warn for status >= 400, Error for status >= 500, Info otherwise.
-func AccessLogMiddleware() web.Middleware {
+func AccessLogMiddleware(logger *slog.Logger) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
 			start := time.Now()
@@ -37,7 +37,7 @@ func AccessLogMiddleware() web.Middleware {
 				level = slog.LevelInfo
 			}
 
-			slog.LogAttrs(c.Context(), level, "http.request",
+			logger.LogAttrs(c.Context(), level, "http.request",
 				slog.String("method", c.Method()),
 				slog.String("path", path),
 				slog.Int("status", status),

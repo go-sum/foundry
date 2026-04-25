@@ -34,7 +34,7 @@ type contactService struct {
 }
 
 // NewService creates a Service with the given dependencies.
-func NewService(repo Repository, store kv.Store, q *queue.Dispatcher, cfg ServiceConfig, logger *slog.Logger) Service {
+func NewService(repo Repository, store kv.Store, q *queue.Dispatcher, cfg ServiceConfig, logger *slog.Logger) *contactService {
 	return &contactService{repo: repo, kv: store, queue: q, cfg: cfg, logger: logger}
 }
 

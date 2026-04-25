@@ -30,6 +30,10 @@ func NewNotifyHandler(notifier *notification.Dispatcher, cfg WorkerConfig) queue
 			return fmt.Errorf("contact: unmarshal payload: %w", err)
 		}
 
+		adminHTML, err := renderHTML(notificationBody(payload))
+		if err != nil {
+			return fmt.Errorf("contact: render admin html: %w", err)
+		}
 		adminNotif := notification.Notification{
 			Subject:  "New contact form submission from " + payload.Name,
 			Body:     notificationText(payload),
@@ -37,13 +41,17 @@ func NewNotifyHandler(notifier *notification.Dispatcher, cfg WorkerConfig) queue
 			Metadata: map[string]string{
 				"to":   cfg.SendTo,
 				"from": cfg.SendFrom,
-				"html": renderHTML(notificationBody(payload)),
+				"html": adminHTML,
 			},
 		}
 		if err := notifier.Send(ctx, adminNotif); err != nil {
 			return fmt.Errorf("contact: send admin notification: %w", err)
 		}
 
+		confirmHTML, err := renderHTML(confirmationBody(payload))
+		if err != nil {
+			return fmt.Errorf("contact: render confirmation html: %w", err)
+		}
 		confirmNotif := notification.Notification{
 			Subject:  "Thanks for reaching out",
 			Body:     confirmationText(payload),
@@ -51,7 +59,7 @@ func NewNotifyHandler(notifier *notification.Dispatcher, cfg WorkerConfig) queue
 			Metadata: map[string]string{
 				"to":   payload.Email,
 				"from": cfg.SendFrom,
-				"html": renderHTML(confirmationBody(payload)),
+				"html": confirmHTML,
 			},
 		}
 		if err := notifier.Send(ctx, confirmNotif); err != nil {
@@ -62,12 +70,12 @@ func NewNotifyHandler(notifier *notification.Dispatcher, cfg WorkerConfig) queue
 	}
 }
 
-func renderHTML(node g.Node) string {
+func renderHTML(node g.Node) (string, error) {
 	var buf bytes.Buffer
 	if err := node.Render(&buf); err != nil {
-		return ""
+		return "", fmt.Errorf("contact: render html: %w", err)
 	}
-	return buf.String()
+	return buf.String(), nil
 }
 
 func notificationBody(p NotificationPayload) g.Node {

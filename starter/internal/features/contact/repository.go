@@ -18,7 +18,7 @@ type pgRepository struct {
 }
 
 // NewRepository creates a Repository backed by pool.
-func NewRepository(pool *pgxpool.Pool) Repository {
+func NewRepository(pool *pgxpool.Pool) *pgRepository {
 	return &pgRepository{q: sqlcgen.New(pool)}
 }
 

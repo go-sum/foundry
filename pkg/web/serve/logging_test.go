@@ -2,6 +2,7 @@ package serve
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -71,7 +72,7 @@ func TestAccessLogMiddleware_NoPanic(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	chained := web.Chain(handler, web.WithRequestID(), AccessLogMiddleware())
+	chained := web.Chain(handler, web.WithRequestID(), AccessLogMiddleware(slog.Default()))
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	c := web.NewContext(req.Context(), adapt_fromRequest(req))
@@ -88,7 +89,7 @@ func TestAccessLogMiddleware_NilURL(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	chained := web.Chain(handler, AccessLogMiddleware())
+	chained := web.Chain(handler, AccessLogMiddleware(slog.Default()))
 
 	// Build a context with a nil URL to exercise graceful handling.
 	webReq := web.NewRequest(http.MethodGet, &url.URL{})

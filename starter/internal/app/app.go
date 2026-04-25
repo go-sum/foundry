@@ -100,9 +100,11 @@ func New(ctx context.Context) (*App, error) {
 
 	manifest, iconReg := provideAssets(runtime.Config)
 
+	routing := router.New()
+
 	pres := Presentation{
 		ViewOpts: []view.RequestOption{
-			view.WithNavConfig(config.DefaultNav()),
+			view.WithNavConfig(config.DefaultNav(routing)),
 			view.WithPathFunc(manifest.Path),
 			view.WithIconRegistry(iconReg),
 		},
@@ -114,13 +116,12 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("security: %w", err)
 	}
 
-	routing := router.New()
 	routing.Use(
 		web.AsyncContext(),
 		otelweb.Middleware(runtime.Tracer),
 		web.WithRequestID(),
 		provideErrorBoundary(runtime, routing),
-		serve.AccessLogMiddleware(),
+		serve.AccessLogMiddleware(runtime.Logger),
 		secure.Headers(security.Headers),
 		secure.CSPNonce(security.CSP),
 		session.Middleware(security.Session),
