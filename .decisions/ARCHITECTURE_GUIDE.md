@@ -9,10 +9,12 @@ weight: 15
 > This guide is the authoritative source for how Go applications are structured,
 > wired, and run.
 >
-> It complements [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md), which defines ownership
-> boundaries and runtime assembly for a specific application, and
-> [`PATTERNS_PRINCIPLES.md`](./PATTERNS_PRINCIPLES.md), which defines function,
-> type, and package design rules.
+> It complements [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) (handler, middleware, and
+> service patterns), [`CODE_REVIEW.md`](./CODE_REVIEW.md) (review checklists),
+> [`DATA_STORAGE.md`](./DATA_STORAGE.md) (persistence patterns), and
+> [`WEB_DESIGN.md`](./WEB_DESIGN.md) (concurrency and runtime safety).
+>
+> Read this together with [`CLAUDE.md`](../CLAUDE.md) for behavioral rules.
 >
 > Use this guide to answer:
 >
@@ -160,6 +162,54 @@ Move from flat to modular when any of these conditions hold:
 3. Update the composition root to wire the new package.
 4. Keep the remaining flat code untouched until the next extraction.
 5. Never extract "just in case." Extract when a concrete signal triggers it.
+
+---
+
+## 2a. This Application's Technology Stack
+
+This is a server-rendered Go web application built around:
+
+- **Go types that directly model W3C Web API primitives** (Request, Response,
+  Headers, ReadableStream) — the HTTP layer uses these primitives directly
+  rather than framework-specific abstractions
+- **Gomponents** for HTML rendering — all views are composed from Go functions
+  that produce `g.Node` trees
+- **HTMX** for progressive enhancement — server-rendered HTML with client-side
+  interactivity via HTMX attributes
+- **Reusable external modules** from `github.com/go-sum/*` consumed as ordinary
+  Go dependencies via `go.mod`
+
+### Source zone
+
+All application code lives in `internal/`. External modules are ordinary Go
+dependencies — they are not part of this repository and are consumed via their
+public API.
+
+### Runtime assembly
+
+The composition root lives in `internal/app/`. It wires:
+
+- config loading and environment resolution
+- logging setup
+- asset registration
+- security middleware and CSRF protection
+- database pool and schema migrations
+- session management
+- queue client and background services
+- external modules (auth, queue storage, sessions, senders, site metadata)
+- app-owned feature modules and views
+
+### Hybrid architecture
+
+The application is intentionally hybrid:
+
+- Some domains are provided by external modules and integrated into the app
+  (auth, queue storage, sessions, senders, site metadata)
+- Some domains are app-owned (contact flow, availability handling, page
+  composition, showcase)
+
+When consuming external modules, use only their public API. Never reach into
+an external module's internals. To change behavior, upstream the change.
 
 ---
 
@@ -657,6 +707,132 @@ an exported symbol is part of the package's public contract.
 
 ---
 
+## 7a. Core Programming Principles
+
+### DRY
+
+Reduce repetition in behavior, policies, and data mapping, but do not create a
+shared abstraction until the duplication is real and stable.
+
+### YAGNI
+
+Do not add hooks, wrappers, config keys, or extension points for hypothetical
+future use. Be conservative.
+
+### Separation of Concerns
+
+Split code by responsibility:
+
+- transport concerns in handlers
+- orchestration and business rules in services
+- persistence in repositories
+- presentation in views
+- assembly in the composition root
+
+### SOLID, applied pragmatically
+
+- **SRP**: each function, type, and file has one primary reason to change.
+- **ISP**: prefer narrow interfaces with a clear consumer.
+- **DIP**: depend on abstractions only where that reduces coupling at a real
+  boundary; do not create speculative interfaces.
+
+### Favor composition and encapsulation
+
+Prefer small collaborating types over inheritance-style layering or broad
+utility packages. Expose the smallest public API that the next caller actually
+needs.
+
+### Layer discipline
+
+Do not let a lower layer depend on a higher one:
+
+- handlers do not own data
+- services do not render HTML
+- repositories do not decide redirects or HTTP status codes
+- views do not own business rules or persistence
+
+---
+
+## 7b. Recommended Design Patterns
+
+Patterns are tools, not goals. Use them where they simplify existing code.
+
+### Factory / Registry
+
+Use when protocol or provider selection is a real requirement: sender/provider
+selection, transport/backend selection, constructing different implementations
+behind one entry point.
+
+### Chain of Responsibility
+
+Use when the request or operation passes through a sequence of orthogonal
+behaviors: middleware stacks, request guards, layered cross-cutting policies.
+
+### Adapter
+
+Use when an external-module interface must be satisfied by app-owned rendering,
+session, form, or redirect behavior.
+
+### Enum-to-value maps
+
+When a function maps a typed enum to a fixed value, use a package-level map
+literal instead of a switch:
+
+```go
+var variantClasses = map[Variant]string{
+    VariantDestructive: "bg-destructive text-white",
+    VariantOutline:     "border bg-background",
+}
+
+func variantClass(v Variant) string {
+    if c, ok := variantClasses[v]; ok {
+        return c
+    }
+    return "bg-primary text-primary-foreground"
+}
+```
+
+This applies when every case returns a value and has no side effects.
+
+### Pattern selection by problem type
+
+Diagnose the problem before reaching for a pattern:
+
+- **Object creation** (complex construction, too many args): Factory, Builder
+- **Structural** (incompatible interfaces, adding behavior): Decorator, Adapter, Facade
+- **Behavioral** (swap algorithms, notify observers, state-dependent behavior): Strategy, Observer, Command, State
+
+If no pattern simplifies the code that exists today, do not introduce one.
+
+---
+
+## 7c. Rendering Model
+
+The application supports multiple HTML response modes without splitting into
+separate rendering stacks.
+
+### Canonical rendering modes
+
+| Mode | Handler pattern |
+|------|-----------------|
+| Full page + HTMX partial | `view.Render(c, req, fullPage, partial)` |
+| Fragment-only | `render.Fragment(c, node)` or `render.FragmentWithStatus(c, status, node)` |
+| HTMX removal | `c.String(http.StatusOK, "")` |
+| JSON / problem | Selected by the global error handler based on request headers |
+| Redirect | HTMX-aware redirect helpers |
+
+### Rules
+
+- Use `view.NewRequest(...)` to build request-scoped presentation state.
+- Use `view.Render(...)` when one endpoint serves both full-page and HTMX
+  partial modes.
+- Use `render.Fragment(...)` only when the endpoint exists purely for fragment
+  swapping.
+- Let the global error handler decide between HTML, HTMX fragment, and problem
+  JSON responses.
+
+---
+
 ## 8. Anti-Patterns
 
 ### Global database variables
@@ -749,9 +925,25 @@ Before merging a structural change, confirm:
 
 ---
 
+## 10a. How The Guides Fit Together
+
+| Guide | Answers |
+|-------|---------|
+| **ARCHITECTURE_GUIDE.md** (this guide) | Where code belongs, how to structure, wire, and run |
+| [**DESIGN_PATTERNS.md**](./DESIGN_PATTERNS.md) | How handlers, middleware, services, logging, and testing work |
+| [**CODE_REVIEW.md**](./CODE_REVIEW.md) | How to review Go code: checklists, severity, verification |
+| [**DATA_STORAGE.md**](./DATA_STORAGE.md) | How to persist: drivers, pooling, migrations, transactions |
+| [**WEB_DESIGN.md**](./WEB_DESIGN.md) | How to handle concurrency, rate limiting, race detection |
+| [**UI_GUIDE.md**](./UI_GUIDE.md) | Visual and UI composition guidance |
+
+---
+
 ## 10. Sources
 
 - Go standard library: <https://pkg.go.dev/net/http>
 - Go 1.22 ServeMux enhancements: <https://go.dev/blog/routing-enhancements>
 - Effective Go: <https://go.dev/doc/effective_go>
 - Go Code Review Comments: <https://go.dev/wiki/CodeReviewComments>
+- Refactoring Guru, design patterns in Go: <https://refactoring.guru/design-patterns/go>
+- `internal/app/` — composition root and runtime assembly
+- `pkg/web/` — HTTP boundary, error handling, security

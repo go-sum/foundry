@@ -8,7 +8,7 @@ weight: 30
 
 > This guide defines how UI should be designed and composed in this application.
 > It is the visual companion to [`CLAUDE.md`](../CLAUDE.md) and the
-> implementation companion to [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md).
+> implementation companion to [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md).
 >
 > It incorporates the relevant design principles from [`tailwindcss.com`](https://tailwindcss.com/) 
 > and one of the definitive guides on design [`Refactoring UI`](https://refactoringui.com/) 

@@ -9,11 +9,12 @@ weight: 35
 > This guide is the authoritative source for concurrency, performance, and
 > runtime safety patterns in Go web applications.
 >
-> It complements [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md) (architecture and
-> ownership), [`PATTERNS_PRINCIPLES.md`](./PATTERNS_PRINCIPLES.md) (code
-> structure and type design), and
-> [`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md) (error classification
-> and boundary behavior).
+> It complements [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md) (project
+> structure, wiring, and shutdown), [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) (handler,
+> middleware, error taxonomy, and resilience patterns), and
+> [`CODE_REVIEW.md`](./CODE_REVIEW.md) (review checklists).
+>
+> Read this together with [`CLAUDE.md`](../CLAUDE.md) for behavioral rules.
 >
 > Use this guide to answer:
 >
@@ -86,6 +87,13 @@ func handleOrder(c echo.Context) error {
     return c.JSON(http.StatusCreated, order)
 }
 ```
+
+### Prefer synchronous code first
+
+Do not add goroutines, workers, or async dispatch until there is a concrete
+correctness, latency, or throughput requirement. Synchronous code is simpler
+to reason about, test, and debug. Concurrency is justified when measured
+performance or architectural needs demand it.
 
 ---
 
@@ -331,8 +339,8 @@ func (s *Server) handleOrder(c echo.Context) error {
 ### Retry with exponential backoff
 
 For transient failures in worker tasks, use exponential backoff with jitter.
-See [`ERROR_HANDLING_GUIDE.md` section 11.1](./ERROR_HANDLING_GUIDE.md) for the
-canonical backoff policy and `pkg/web/retry` for the reference implementation.
+See [`DESIGN_PATTERNS.md` section 5g](./DESIGN_PATTERNS.md) for the canonical backoff
+policy and `pkg/web/retry` for the reference implementation.
 
 ---
 
@@ -1119,6 +1127,7 @@ Before merging code that introduces concurrency, confirm:
 
 ## 10. Sources
 
+- [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) -- retry, circuit breaker, and resilience patterns
 - Go Concurrency Patterns: <https://go.dev/blog/pipelines>
 - Effective Go - Concurrency: <https://go.dev/doc/effective_go#concurrency>
 - Go Data Race Detector: <https://go.dev/doc/articles/race_detector>

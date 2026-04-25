@@ -9,12 +9,12 @@ weight: 28
 > This guide is the authoritative source for data persistence patterns in this
 > application.
 >
-> It complements [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md), which defines
-> architecture and ownership,
-> [`PATTERNS_PRINCIPLES.md`](./PATTERNS_PRINCIPLES.md), which defines how new
-> code should be structured, and
-> [`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md), which defines how
-> database and dependency failures should be classified and surfaced.
+> It complements [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md) (project
+> structure, wiring, and shutdown), [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) (handler,
+> middleware, error taxonomy, and retry/resilience patterns), and
+> [`CODE_REVIEW.md`](./CODE_REVIEW.md) (review checklists).
+>
+> Read this together with [`CLAUDE.md`](../CLAUDE.md) for behavioral rules.
 >
 > Use this guide to answer:
 >
@@ -850,6 +850,25 @@ _, err = tx.Exec(ctx, "SAVEPOINT sp1")
 _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT sp1")
 ```
 
+### Idempotency for database operations
+
+Non-idempotent operations (insert, payment capture, email dispatch) must not be
+retried without an idempotency key:
+
+- Generate or accept an **idempotency key** — a stable identifier for the
+  logical request (UUID derived from request ID, or deterministic hash of
+  immutable parameters).
+- Deduplicate by key using persistent storage (database row or persistent cache).
+  In-memory maps are not sufficient — they disappear on restart.
+- Returning a cached response for a duplicate key is correct behavior; do not
+  re-execute.
+- The key's TTL must exceed the maximum retry window plus observable clock skew.
+
+Retrying a non-idempotent operation without a key is a correctness bug — reject
+in code review.
+
+Reference implementation: `pkg/web/idempotency`.
+
 ---
 
 ## 7. Anti-Patterns
@@ -1047,4 +1066,5 @@ Before merging a data persistence change, confirm:
 - pgx documentation: <https://github.com/jackc/pgx>
 - golang-migrate: <https://github.com/golang-migrate/migrate>
 - PostgreSQL error codes: <https://www.postgresql.org/docs/current/errcodes-appendix.html>
+- `pkg/web/idempotency` — idempotency middleware and store
 - Effective Go: <https://go.dev/doc/effective_go>

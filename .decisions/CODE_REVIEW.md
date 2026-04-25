@@ -10,11 +10,11 @@ weight: 30
 > repository. It consolidates review checklists, severity calibration,
 > verification protocol, and recognized valid patterns into one reference.
 >
-> It complements [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md) (architecture and
-> ownership), [`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md) (error
-> classification and logging), and
-> [`PATTERNS_PRINCIPLES.md`](./PATTERNS_PRINCIPLES.md) (code structure and
-> design rules).
+> It complements [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md) (project
+> structure, wiring, and shutdown), [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) (handler,
+> middleware, and service patterns), [`DATA_STORAGE.md`](./DATA_STORAGE.md)
+> (persistence patterns), and [`WEB_DESIGN.md`](./WEB_DESIGN.md) (concurrency
+> and runtime safety).
 
 ---
 
@@ -73,6 +73,10 @@ Group findings by file, then by severity (critical first).
 - [ ] Domain errors returned from services; transport mapping at handler boundary
 - [ ] No logging-and-returning the same error in intermediate layers
 - [ ] `*web.Error` not constructed with `&web.Error{...}` outside `pkg/web`
+- [ ] Typed errors used only when callers need to extract structured data via `errors.As`; sentinels for all other branching
+- [ ] Const message strings used when the same literal appears in 2+ places in a package
+- [ ] `errors.Join` used for multi-error accumulation (Go 1.20+), not string concatenation
+- [ ] No `fmt.Errorf("...: %w: %w", ...)` double-wrapping — use `errors.Join` instead
 
 ```go
 // Bad: string matching on error
@@ -283,6 +287,9 @@ for _, f := range files {
 - [ ] Early returns preferred over nested `if` blocks
 - [ ] `cmp.Or` used for zero-value defaults (not `if x == "" { x = "default" }`)
 - [ ] No `context.Background()` in services or repos (use passed context)
+- [ ] `var x T` used when zero value is meaningful; `:=` for non-zero initialization
+- [ ] Signal-boosting comments added when `err == nil` branch does significant work (`// if NO error`)
+- [ ] `context.Context` never placed in option structs — always a direct function parameter
 
 ```go
 // Bad: stuttering
@@ -385,6 +392,16 @@ if len(items) > 0 {
 }
 ```
 
+### 2.8 Function and Type Design
+
+- [ ] Functions focused on one job with obvious happy path
+- [ ] Early returns preferred over nested branching
+- [ ] Side effects explicit (no hidden I/O in constructors)
+- [ ] Concrete types preferred by default; interfaces added only when a consumer needs a substitution seam
+- [ ] No field-for-field wrapper types that add no semantics
+- [ ] Helper functions private unless another package genuinely needs them
+- [ ] Option structs used when most callers need config; functional options when most need zero options
+
 ---
 
 ## 3. Common Mistakes Reference
@@ -437,6 +454,8 @@ slog.ErrorContext(ctx, "user: save",
 | Error identity by string matching | Use `errors.Is` / `errors.As` |
 | Missing error path coverage | Add test cases for every handler error path |
 | Unencoded HTML entities in test strings | Use `&#39;` for apostrophes, `&amp;` for ampersands |
+| Missing sentinel tests | Every exported sentinel has a test triggering the condition and asserting `errors.Is` |
+| Missing handler error path tests | Every error path in a handler has a dedicated test case |
 
 ### 3.6 Sync Misuse
 
@@ -468,6 +487,19 @@ func New(opts ...Option) *Service {
     return &Service{cfg: cfg}
 }
 ```
+
+### 3.8 Structural Anti-Patterns
+
+| Mistake | Fix |
+|---|---|
+| Speculative abstractions | Only abstract when duplication is real and stable |
+| Package globals as hidden request-time dependencies | Pass via constructor injection |
+| Duplicated defaults across app and external-module layers | Single source of truth for defaults |
+| Field-for-field wrapper types with no semantic change | Use the original type directly |
+| Transport code that owns SQL or business rules | Separate into service/repository layers |
+| Business logic embedded in views | Move to services; views only render |
+| Hardcoded route paths where named routes exist | Use named route references |
+| Pointless error wrapping (`fmt.Errorf("%w", err)` with no added context) | Return the error directly |
 
 ---
 
@@ -613,7 +645,7 @@ unless a specific additional condition makes them incorrect:
 | `context.Background()` in `main()` or tests | No parent context available at the process root |
 | `select` with `default` for non-blocking send/receive | Standard non-blocking channel pattern |
 | Short variable names in small scope (`i`, `n`, `ok`, `err`) | Go convention for limited-scope variables |
-| `cmp.Or` for zero-value defaults | Project convention per PATTERNS_PRINCIPLES.md |
+| `cmp.Or` for zero-value defaults | Project convention per ARCHITECTURE_GUIDE.md |
 | Table-driven tests with subtests | Preferred test structure per project rules |
 | Hand-written fakes over mock libraries | Project convention per test rules |
 
@@ -643,7 +675,7 @@ unconditionally:
 ## 8. Architecture and Layer Compliance
 
 In addition to the code-level checklists above, every review must verify layer
-discipline as defined in [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md):
+discipline as defined in [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md):
 
 - [ ] Handlers do not import repositories directly
 - [ ] Services do not import Echo or render HTML
@@ -654,6 +686,13 @@ discipline as defined in [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md):
 - [ ] No circular dependencies between packages
 - [ ] Reusable packages do not perform application bootstrapping
 - [ ] External module internals are not reached into (use public API only)
+- [ ] Intermediate layers do not log returned errors; the boundary emits the error event
+- [ ] Transient dependency failures marked with `web.ErrTransient` where callers may retry
+- [ ] Server-owned deadlines marked with `web.ErrDependencyTimeout` before reaching boundary
+- [ ] `*web.Error.Error()` not called in intermediate code outside the boundary
+- [ ] Recovered panics not double-logged between boundary and `OnPanic` hook
+- [ ] Structured error events conform to the field schema in DESIGN_PATTERNS.md section 5c
+- [ ] When OTel tracing installed, `trace_id` and `span_id` included in structured events
 
 ---
 
@@ -661,6 +700,7 @@ discipline as defined in [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md):
 
 - Go Code Review Comments: <https://go.dev/wiki/CodeReviewComments>
 - Effective Go: <https://go.dev/doc/effective_go>
-- [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md)
-- [`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md)
-- [`PATTERNS_PRINCIPLES.md`](./PATTERNS_PRINCIPLES.md)
+- [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md)
+- [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md)
+- [`DATA_STORAGE.md`](./DATA_STORAGE.md)
+- [`WEB_DESIGN.md`](./WEB_DESIGN.md)

@@ -25,9 +25,11 @@
 
 ## Guide Index
 > Before writing code, depending on the requirement consult:
-- [`DESIGN_GUIDE.md`](.decisions/DESIGN_GUIDE.md): authoritative source for the current architecture and ownership rules.
-- [`ERROR_HANDLING_GUIDE.md`](.decisions/ERROR_HANDLING_GUIDE.md): authoritative source for classifying, logging, and notifying on unexpected behavior.
-- [`PATTERNS_PRINCIPLES.md`](.decisions/PATTERNS_PRINCIPLES.md): authoritative source for how new functions, types, packages, and features should be structured and maintained.
+- [`ARCHITECTURE_GUIDE.md`](.decisions/ARCHITECTURE_GUIDE.md): project structure, dependency injection, routing, server design, graceful shutdown, and design patterns.
+- [`DESIGN_PATTERNS.md`](.decisions/DESIGN_PATTERNS.md): handler, middleware, service, logging, error taxonomy, validation, testing, and resilience patterns.
+- [`CODE_REVIEW.md`](.decisions/CODE_REVIEW.md): review checklists, severity calibration, verification protocol, and valid patterns.
+- [`DATA_STORAGE.md`](.decisions/DATA_STORAGE.md): driver selection, connection pooling, migrations, transactions, and the repository pattern.
+- [`WEB_DESIGN.md`](.decisions/WEB_DESIGN.md): concurrency, worker pools, rate limiting, race detection, and runtime safety.
 - [`UI_GUIDE.md`](.decisions/UI_GUIDE.md): defines how UI should be designed and composed.
 
 ---

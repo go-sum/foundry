@@ -10,11 +10,12 @@ weight: 22
 > be designed at the handler, service, middleware, context, logging, and testing
 > layers.
 >
-> It complements [`DESIGN_GUIDE.md`](./DESIGN_GUIDE.md), which defines
-> architecture and ownership, [`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md),
-> which defines error classification and boundary behavior, and
-> [`PATTERNS_PRINCIPLES.md`](./PATTERNS_PRINCIPLES.md), which defines function,
-> type, and package structure.
+> It complements [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md) (project
+> structure, wiring, and shutdown), [`CODE_REVIEW.md`](./CODE_REVIEW.md) (review
+> checklists and severity), [`DATA_STORAGE.md`](./DATA_STORAGE.md) (persistence
+> patterns), and [`WEB_DESIGN.md`](./WEB_DESIGN.md) (concurrency and safety).
+>
+> Read this together with [`CLAUDE.md`](../CLAUDE.md) for behavioral rules.
 >
 > This guide is derived from:
 >
@@ -83,9 +84,8 @@ if err != nil {
 Wrapping convention: `"verbing noun: %w"` -- lowercase, no trailing period.
 
 For HTTP APIs, use a structured application error type that carries status,
-code, and a user-safe message. See
-[`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md) section 3.5 for the
-canonical `*web.Error` type.
+code, and a user-safe message. See section 5a below for the canonical
+`*web.Error` type and error taxonomy.
 
 Never discard an error with `_ =`. If the error genuinely cannot be handled,
 document why with a comment.
@@ -346,9 +346,8 @@ readability.
 | Warn | 4 | Client errors, safe degradations, unusual but handled conditions |
 | Error | 8 | Server failures, dependency failures, recovered panics |
 
-Do not use log level as a substitute for notification policy. See
-[`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md) section 8 for when to
-notify.
+Do not use log level as a substitute for notification policy. See section 5a
+below for notification policy.
 
 ### Logging Middleware
 
@@ -556,7 +555,223 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
   or repositories.
 
 For the canonical transport error type used in this project, see
-[`ERROR_HANDLING_GUIDE.md`](./ERROR_HANDLING_GUIDE.md) section 3.5.
+section 5a below.
+
+---
+
+## 5a. Error Handling Taxonomy
+
+### Core principles
+
+- **Return by default.** Unexpected behavior is returned as an error to the owning boundary. Do not log at every stack frame.
+- **Log at ownership boundaries.** The code that can add operational context and decide impact should log. Intermediate layers wrap and return.
+- **Classify at transport boundaries.** Reusable packages do not decide HTTP status codes. Handlers and boundaries own mapping.
+- **Notify only on actionable server-side failures.** Notification is stricter than logging.
+- **Panic only for programmer or invariant faults.**
+
+### Shared taxonomy
+
+| Category | Examples | Handling |
+|----------|----------|----------|
+| Expected domain outcomes | Not found, validation failures, version conflicts, unauthorized | Return typed/sentinel errors; do not log; map at boundary; do not notify |
+| Client or input misuse | Invalid content type, oversized body, malformed headers | Return contextual errors; classify 4xx at boundary; log only if rate/pattern matters |
+| Dependency or integration failures | DB timeout, failed write, upstream 5xx | Wrap with operation context; log once at boundary; notify if actionable |
+| Internal invariant faults | Impossible state, nil required dependency, invalid config | Fail fast; use panic only for invariant violations; recover at boundaries; notify |
+
+### The `*web.Error` transport primitive
+
+`*web.Error` (in `pkg/web/errors.go`) is the canonical transport-facing error type. It carries HTTP status, a machine-readable `Code`, a user-safe `Message`, an internal `Cause`, and RFC 7807 fields (`TypeURI`, `Instance`).
+
+**Construction rule:** Always use constructors in `pkg/web/errors.go` (`web.ErrBadRequest`, `web.ErrInternal`, `web.ErrConflict`, etc.). Never build `&web.Error{...}` outside `pkg/web`.
+
+**Rendering rule:** `PublicMessage()` is the user-safe accessor. `.Error()` returns `Message`, never surfacing `Cause`. Do not call `.Error()` on `*web.Error` in intermediate code — use `errors.Is`/`errors.As` for branching.
+
+### Package error rules
+
+Packages should:
+- return ordinary Go errors
+- wrap with `%w` and operation context
+- keep sentinel errors near the owning domain
+- document errors callers branch on
+- use `errors.Is` and `errors.As`
+
+Packages should not:
+- decide HTTP status codes
+- emit duplicate logs for returned failures
+- notify external systems directly (unless owning a background boundary)
+- panic for expected runtime failures
+
+### Boundary two-signal design
+
+The HTTP boundary emits two log entries per request:
+
+- **`http.error`**: causal error, request ID, status, error code — for alerting and trace correlation
+- **`http.request`**: method, path, latency, status — for traffic analysis and audit
+
+The "do not log at every stack frame" rule applies to intermediate layers. It does not restrict the boundary from emitting both signals.
+
+### Notification policy
+
+Notify when the event is:
+- production-impacting and server-side
+- likely to require operator action
+- a repeated dependency failure
+- a recovered panic
+- security-relevant
+- a data-loss or consistency risk
+
+Do not notify for: routine 4xx, expected domain errors, one-off user mistakes, self-healing failures, `context.Canceled` from client disconnect.
+
+### Error decision table
+
+| Situation | Return | Log | Notify | Panic |
+|----------|--------|-----|--------|-------|
+| Validation or not-found | Yes | No | No | No |
+| Malformed request | Yes | Usually no | No | No |
+| Dependency timeout or failed I/O | Yes | Yes, once at boundary | Maybe | No |
+| Recovered runtime panic | Converted at boundary | Yes, error with stack | Yes | Originating code may |
+| Client context cancelled | Yes | No (or DEBUG) | No | No |
+| Server-set deadline exceeded | Yes | Yes, at boundary (ERROR) | Maybe | No |
+
+---
+
+## 5b. Error Codes and Stability
+
+`pkg/web/errors.go` defines `Code` string constants (`CodeInternal`, `CodeForbidden`, `CodeNotFound`, ...) for machine-readable API error responses.
+
+### Stability rules
+
+- Codes are **additive-only**: new codes may be added in any release.
+- Codes are **never renamed or removed**.
+- Codes are **never reused** for a different meaning.
+- Document the condition and HTTP status mapping for every new code.
+
+Only boundaries assign codes. Package internals return plain or sentinel errors.
+
+---
+
+## 5c. Structured Error Event Schema
+
+Every boundary error event must include these fields:
+
+| Field | Type | When present |
+|---|---|---|
+| `event` | string | always (`"http.error"`, `"job.error"`, `"queue.error"`, `"lifecycle.error"`, `"panic.goroutine"`) |
+| `severity` | log level | always (WARN for <500, ERROR for >=500) |
+| `request_id` | string | when available |
+| `trace_id` / `span_id` | string | when OTel tracing enabled |
+| `status` | int | HTTP only |
+| `code` | string | HTTP only (web.Code constant) |
+| `op` | string | always (operation name) |
+| `subsystem` | string | always (package/component) |
+| `cause` | string | 5xx and server-owned timeouts |
+| `stack` | string | recovered panics; 5xx when enabled |
+| `dedupe_key` | string | notify-worthy events |
+
+Non-HTTP boundaries (jobs, queue consumers, background goroutines) use the same schema. Omit `status` and `code` when not applicable.
+
+---
+
+## 5d. OpenTelemetry Tracing
+
+When an OTel tracer is installed:
+
+- Attach `trace_id` and `span_id` to every boundary event alongside `request_id`.
+- On 5xx and recovered panics, set the span status to `codes.Error` and call `span.RecordError(err)`.
+- Use OTel HTTP semantic conventions: `http.request.method`, `http.response.status_code`, `error.type`.
+- `request_id` is user-facing (safe in error responses). `trace_id` is engineer-facing (not in client responses). Emit both where available.
+
+Reference: `pkg/web/otelweb` — `otelweb.Middleware`, `otelweb.ExtractTraceID`, `otelweb.MakeOnError`.
+
+---
+
+## 5e. Panic Policy
+
+### Panic is allowed for
+
+- impossible internal states
+- documented `Must*` constructors and fail-fast assembly helpers
+- duplicate or invalid route registration at assembly time
+
+### Panic is not allowed for
+
+- malformed request input
+- dependency outages
+- validation failures
+- missing records
+- any runtime condition a caller can reasonably handle
+- crossing a package boundary — recover before returning
+
+### Recovery rules
+
+- Recover at top-level boundaries only.
+- Attach stack traces. Convert to safe 5xx response.
+- Recovery exists to convert crashes into logged, classified errors — not to silently suppress failures.
+
+### Goroutine panics
+
+A panic inside a goroutine crashes the entire process unless a `recover` is installed within that goroutine. The HTTP boundary recovery does not extend into goroutines started by package code.
+
+- Every goroutine must install its own `recover`.
+- On recovery, log panic and stack at ERROR, then exit cleanly or signal failure.
+- `errgroup` propagates returned errors but does **not** recover panics. Install `recover` within each errgroup goroutine.
+
+---
+
+## 5f. Security at Boundaries
+
+- **Stack traces never reach the client.** Recovered panics capture `runtime/debug.Stack()` for the server log only.
+- **Error messages must not leak internal paths, SQL, schema, or filesystem structure.** Wrap in `*web.Error` before responding.
+- **Do not embed untrusted input verbatim in log messages.** Use `slog` structured attributes.
+- **Redact PII before logging.** Log categories (`"email: present"`), not raw values.
+- **Auth-sensitive paths use constant-time comparison.** Verify MAC/signature before semantic checks (expiry, scope).
+- **`context.Canceled` is not a server fault.** Do not log at ERROR or notify.
+- **`context.DeadlineExceeded` is ownership-dependent.** Server-set deadline → 504/ERROR. Client-set deadline → non-fault.
+
+### Deadline provenance
+
+Code that sets a server-owned deadline must mark the timeout before returning. Use `web.ErrDependencyTimeout` or a typed error. Bare `context.DeadlineExceeded` reaching the boundary is treated as client-set unless documented otherwise.
+
+---
+
+## 5g. Retry, Transience, and Resilience
+
+### Marking transient failures
+
+Use `errors.Join(web.ErrTransient, cause)` to mark retryable failures:
+
+```go
+cause := fmt.Errorf("cache: get: %w", err)
+return errors.Join(web.ErrTransient, cause)
+```
+
+Only the package that owns the dependency classifies it as transient.
+
+### Backoff and jitter
+
+Transient retries use exponential backoff with full jitter:
+```
+delay = random_between(0, min(cap, base * 2^attempt))
+```
+- Cap attempts at ≤3.
+- Never retry past the caller's deadline.
+- Reference implementation: `pkg/web/retry`.
+
+### Idempotency
+
+Non-idempotent operations (create, payment, email) must not be retried without an idempotency key. The key must be deduplicated in persistent storage (not in-memory).
+
+### Retry budget
+
+Retries share a global per-upstream budget. When exhausted, fail fast. Budget exhaustion is notification-worthy. Reference: `pkg/web/retrybudget`.
+
+### Circuit breakers
+
+Open the breaker when transient failure rate exceeds a threshold. While open, reject with 503 + `Retry-After`. After recovery window, allow one probe. Reference: `pkg/web/breaker`.
+
+### Bulkheads
+
+Assign dedicated resource pools per upstream. When exhausted, fail fast with transient error. Reference: `pkg/web/bulkhead`.
 
 ---
 
@@ -606,36 +821,7 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 
 ## 7. Input Validation
 
-Use `go-playground/validator` at the HTTP boundary. Validate once, trust
-downstream.
-
-### Common Validation Tags
-
-**String constraints:**
-
-| Tag | Meaning |
-|-----|---------|
-| `required` | must not be zero value |
-| `min=3` | minimum length 3 |
-| `max=100` | maximum length 100 |
-| `oneof=admin user guest` | must be one of the listed values |
-
-**Format constraints:**
-
-| Tag | Meaning |
-|-----|---------|
-| `email` | valid email format |
-| `url` | valid URL format |
-| `uuid` | valid UUID format |
-
-**Numeric constraints:**
-
-| Tag | Meaning |
-|-----|---------|
-| `gt=0` | greater than 0 |
-| `gte=1` | greater than or equal to 1 |
-| `lt=100` | less than 100 |
-| `lte=99` | less than or equal to 99 |
+Use `go-playground/validator` at the HTTP boundary. Validate once, trust downstream.
 
 ### Custom Validators
 
@@ -1390,3 +1576,12 @@ code review.
 - Go documentation: <https://go.dev/doc/effective_go>
 - Go Code Review Comments: <https://go.dev/wiki/CodeReviewComments>
 - go-playground/validator: <https://github.com/go-playground/validator>
+- `pkg/web/errors.go` — sentinels, `*web.Error`, constructors
+- `pkg/web/boundary.go` — `ErrorBoundary`, `BoundaryConfig`
+- `pkg/web/serve/logging.go` — access log
+- `pkg/web/retry` — retry with backoff
+- `pkg/web/breaker` — circuit breaker
+- `pkg/web/bulkhead` — bulkhead
+- `pkg/web/retrybudget` — retry budget
+- `pkg/web/otelweb` — OpenTelemetry integration
+- `pkg/web/idempotency` — idempotency middleware
