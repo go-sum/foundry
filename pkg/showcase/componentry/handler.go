@@ -14,7 +14,7 @@ func newHandler(cfg Config) *handler { return &handler{cfg: cfg} }
 
 // Show renders the component showcase full page.
 func (h *handler) Show(c *web.Context) (web.Response, error) {
-	return h.cfg.Page(c, "Component Showcase", Showcase())
+	return h.cfg.Page(c, "Component Showcase", Showcase(h.cfg.Icons, demo.NewPaths(h.cfg.BasePath)))
 }
 
 // Search returns a filtered user table fragment for the live search demo.
@@ -39,7 +39,7 @@ func (h *handler) Paginate(c *web.Context) (web.Response, error) {
 	q := c.URL().Query()
 	page, _ := strconv.Atoi(q.Get("page"))        // defaults to 0 on invalid input
 	perPage, _ := strconv.Atoi(q.Get("per_page")) // defaults to 0 on invalid input
-	return render.Fragment(demo.PaginatedTable(page, perPage))
+	return render.Fragment(demo.PaginatedTable(page, perPage, demo.NewPaths(h.cfg.BasePath).Paginate))
 }
 
 // OOBToast returns an out-of-band toast fragment. The trigger must use

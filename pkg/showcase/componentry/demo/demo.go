@@ -19,16 +19,27 @@ import (
 	h "maragu.dev/gomponents/html"
 )
 
-// URL path constants for the demo endpoints. Import these both from the
-// showcase (for hx-get attribute values) and from the starter (for route
-// registration) so the URLs never diverge.
-const (
-	PathSearch   = "/showcase/componentry/demo/search"
-	PathValidate = "/showcase/componentry/demo/validate"
-	PathPaginate = "/showcase/componentry/demo/paginate"
-	PathRegion   = "/showcase/componentry/demo/region"
-	PathOOBToast = "/showcase/componentry/demo/oob-toast"
-)
+// Paths holds the resolved URL paths for every demo endpoint.
+// Construct one with NewPaths so the values stay consistent with whatever
+// BasePath the showcase is mounted at.
+type Paths struct {
+	Search   string
+	Validate string
+	Paginate string
+	Region   string
+	OOBToast string
+}
+
+// NewPaths derives all demo endpoint paths from basePath (e.g. "/showcase/componentry").
+func NewPaths(basePath string) Paths {
+	return Paths{
+		Search:   basePath + "/demo/search",
+		Validate: basePath + "/demo/validate",
+		Paginate: basePath + "/demo/paginate",
+		Region:   basePath + "/demo/region",
+		OOBToast: basePath + "/demo/oob-toast",
+	}
+}
 
 // OOBToast returns a success toast fragment with an hx-swap-oob attribute that
 // instructs HTMX to append it to #toast-container out-of-band, independent of
@@ -168,8 +179,9 @@ var catalog = func() []item {
 
 // PaginatedTable returns a table fragment for the given page. The fragment
 // includes both the table rows and pagination controls so HTMX can replace
-// the entire region in one swap.
-func PaginatedTable(page, perPage int) g.Node {
+// the entire region in one swap. paginatePath is the URL for the paginate
+// endpoint (e.g. "/showcase/componentry/demo/paginate").
+func PaginatedTable(page, perPage int, paginatePath string) g.Node {
 	total := len(catalog)
 	if perPage < 1 {
 		perPage = 10
@@ -200,11 +212,11 @@ func PaginatedTable(page, perPage int) g.Node {
 
 	prevURL := ""
 	if page > 1 {
-		prevURL = fmt.Sprintf("%s?page=%d&per_page=%d", PathPaginate, page-1, perPage)
+		prevURL = fmt.Sprintf("%s?page=%d&per_page=%d", paginatePath, page-1, perPage)
 	}
 	nextURL := ""
 	if page < totalPages {
-		nextURL = fmt.Sprintf("%s?page=%d&per_page=%d", PathPaginate, page+1, perPage)
+		nextURL = fmt.Sprintf("%s?page=%d&per_page=%d", paginatePath, page+1, perPage)
 	}
 
 	paginationAttrs := func(url string) []g.Node {
@@ -232,8 +244,8 @@ func PaginatedTable(page, perPage int) g.Node {
 		),
 		pagination.Root(
 			pagination.Content(
-				pagination.Item(pagination.Previous(prevURL, page == 1, paginationAttrs(prevURL)...)),
-				pagination.Item(pagination.Next(nextURL, page == totalPages, paginationAttrs(nextURL)...)),
+				pagination.Item(pagination.Previous(nil, prevURL, page == 1, paginationAttrs(prevURL)...)),
+				pagination.Item(pagination.Next(nil, nextURL, page == totalPages, paginationAttrs(nextURL)...)),
 			),
 		),
 		h.P(

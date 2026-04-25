@@ -79,7 +79,7 @@ func dedent(s string) string {
 }
 
 // Showcase returns the full component showcase as a single renderable node.
-func Showcase() g.Node {
+func Showcase(r *icons.Registry, paths demo.Paths) g.Node {
 	return h.Div(
 		h.ID("top"),
 		h.Class("max-w-4xl mx-auto space-y-12 py-8"),
@@ -151,15 +151,15 @@ func Showcase() g.Node {
 				// src:accordion-three-items
 				accordion.Root(accordion.RootProps{},
 					accordion.Item(
-						accordion.Trigger(g.Text("Is it accessible?")),
+						accordion.Trigger(r, g.Text("Is it accessible?")),
 						accordion.Content(g.Text("Yes. It uses native <details>/<summary> elements with WAI-ARIA semantics.")),
 					),
 					accordion.Item(
-						accordion.Trigger(g.Text("Is it styled?")),
+						accordion.Trigger(r, g.Text("Is it styled?")),
 						accordion.Content(g.Text("Yes. It uses Tailwind utility classes with shadcn/ui design tokens.")),
 					),
 					accordion.Item(
-						accordion.Trigger(g.Text("Is it animated?")),
+						accordion.Trigger(r, g.Text("Is it animated?")),
 						accordion.Content(g.Text("The chevron rotates on expand via CSS details[open] .details-chevron rule.")),
 					),
 				),
@@ -204,7 +204,7 @@ func Showcase() g.Node {
 				),
 				example("avatars-icon", "Lucide icon",
 					// src:avatars-icon
-					core.Icon(iconrender.PropsFor(icons.ChevronDown, core.IconProps{
+					core.Icon(iconrender.PropsForRegistry(r, icons.ChevronDown, core.IconProps{
 						Size:  "size-10",
 						Label: "User account",
 					})),
@@ -345,7 +345,7 @@ func Showcase() g.Node {
 				// src:dropdown-native
 				dropdown.Root(
 					dropdown.Props{},
-					dropdown.Trigger(dropdown.TriggerProps{}, g.Text("Options")),
+					dropdown.Trigger(dropdown.TriggerProps{Icons: r}, g.Text("Options")),
 					dropdown.Content(
 						dropdown.Label("Account"),
 						dropdown.Item(dropdown.ItemProps{Label: "View Profile", Href: "#"}),
@@ -483,7 +483,7 @@ func Showcase() g.Node {
 							Name:        "q",
 							Placeholder: "Search users...",
 							Extra: htmx.Attrs(htmx.AttrsProps{
-								Get:     demo.PathSearch,
+								Get:     paths.Search,
 								Target:  "#search-results",
 								Trigger: "input changed delay:300ms",
 							}),
@@ -501,7 +501,7 @@ func Showcase() g.Node {
 							Name: "email",
 							Type: uiform.TypeEmail,
 							Extra: htmx.Attrs(htmx.AttrsProps{
-								Get:     demo.PathValidate + "?field=email",
+								Get:     paths.Validate + "?field=email",
 								Target:  "#validate-field",
 								Trigger: "blur",
 							}),
@@ -520,7 +520,7 @@ func Showcase() g.Node {
 							Variant: core.VariantOutline,
 							Size:    core.SizeSm,
 							Extra: htmx.Attrs(htmx.AttrsProps{
-								Get:    demo.PathPaginate + "?page=1&per_page=5",
+								Get:    paths.Paginate + "?page=1&per_page=5",
 								Target: "#paginate-region",
 								Swap:   "outerHTML",
 							}),
@@ -542,7 +542,7 @@ func Showcase() g.Node {
 								{Value: "de", Label: "Germany"},
 							},
 							Extra: htmx.Attrs(htmx.AttrsProps{
-								Get:     demo.PathRegion,
+								Get:     paths.Region,
 								Target:  "#region-field",
 								Trigger: "change",
 								Params:  "country",
@@ -568,7 +568,7 @@ func Showcase() g.Node {
 							Variant: core.VariantOutline,
 							Size:    core.SizeSm,
 							Extra: htmx.Attrs(htmx.AttrsProps{
-								Get:  demo.PathOOBToast,
+								Get:  paths.OOBToast,
 								Swap: htmx.SwapNone,
 							}),
 						}),
@@ -725,13 +725,13 @@ func Showcase() g.Node {
 				// src:pagination-five
 				pagination.Root(
 					pagination.Content(
-						pagination.Item(pagination.Previous("/users?page=2", false)),
+						pagination.Item(pagination.Previous(r, "/users?page=2", false)),
 						pagination.Item(pagination.Link("/users?page=1", false, g.Text("1"))),
 						pagination.Item(pagination.Link("/users?page=2", false, g.Text("2"))),
 						pagination.Item(pagination.Link("/users?page=3", true, g.Text("3"))),
 						pagination.Item(pagination.Link("/users?page=4", false, g.Text("4"))),
 						pagination.Item(pagination.Link("/users?page=5", false, g.Text("5"))),
-						pagination.Item(pagination.Next("/users?page=4", false)),
+						pagination.Item(pagination.Next(r, "/users?page=4", false)),
 					),
 				),
 				// src:end
@@ -761,7 +761,7 @@ func Showcase() g.Node {
 				),
 				example("pager-ui", "PageRange driving the Pagination UI",
 					// src:pager-ui
-					h.Div(h.Class("overflow-x-auto"), pagerShowcase()),
+					h.Div(h.Class("overflow-x-auto"), pagerShowcase(r)),
 					// src:end
 				),
 			),
@@ -1035,7 +1035,7 @@ func Showcase() g.Node {
 				tooltip.ClickRoot(
 					tooltip.ClickTrigger(
 						g.Attr("aria-describedby", "click-tooltip"),
-						core.Icon(iconrender.PropsFor(icons.ChevronDown, core.IconProps{
+						core.Icon(iconrender.PropsForRegistry(r, icons.ChevronDown, core.IconProps{
 							Size:  "size-5",
 							Label: "Help",
 						})),
@@ -1161,14 +1161,14 @@ func toastTemplate(id string, variant feedback.ToastVariant, title, desc string)
 }
 
 // pagerShowcase builds a live pagination example using a hardcoded Pager state.
-func pagerShowcase() g.Node {
+func pagerShowcase(r *icons.Registry) g.Node {
 	// Simulate page 5 of 10 with per_page=10, total=100
 	p := &pager.Pager{Page: 5, PerPage: 10, TotalItems: 100, TotalPages: 10}
 	pages := p.PageRange(2) // [1, -1, 3, 4, 5, 6, 7, -1, 10]
 
 	var items []g.Node
 	items = append(items, pagination.Item(pagination.Previous(
-		fmt.Sprintf("/items?page=%d", p.PrevPage()), p.IsFirst(),
+		r, fmt.Sprintf("/items?page=%d", p.PrevPage()), p.IsFirst(),
 	)))
 	for _, pg := range pages {
 		if pg == -1 {
@@ -1182,7 +1182,7 @@ func pagerShowcase() g.Node {
 		}
 	}
 	items = append(items, pagination.Item(pagination.Next(
-		fmt.Sprintf("/items?page=%d", p.NextPage()), p.IsLast(),
+		r, fmt.Sprintf("/items?page=%d", p.NextPage()), p.IsLast(),
 	)))
 	return pagination.Root(pagination.Content(items...))
 }

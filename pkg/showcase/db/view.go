@@ -107,7 +107,7 @@ func tableDetailContent(basePath, tableName string, columns []ColumnInfo, indexe
 func infoAccordion(columns []ColumnInfo, indexes []IndexInfo) g.Node {
 	return accordion.Root(accordion.RootProps{},
 		accordion.Item(
-			accordion.Trigger(
+			accordion.Trigger(nil,
 				h.Span(
 					h.Class("flex items-center gap-2"),
 					g.Text("Schema"),
@@ -120,7 +120,7 @@ func infoAccordion(columns []ColumnInfo, indexes []IndexInfo) g.Node {
 			accordion.Content(schemaTable(columns)),
 		),
 		accordion.Item(
-			accordion.Trigger(
+			accordion.Trigger(nil,
 				h.Span(
 					h.Class("flex items-center gap-2"),
 					g.Text("Indexes"),
@@ -315,7 +315,7 @@ func paginationControls(basePath, tableName string, pg pager.Pager) g.Node {
 	}
 
 	items := []g.Node{
-		pagination.Item(pagination.Previous(dataURL(pg.PrevPage()), pg.IsFirst(), prevExtra...)),
+		pagination.Item(pagination.Previous(nil, dataURL(pg.PrevPage()), pg.IsFirst(), prevExtra...)),
 	}
 
 	for _, p := range pg.PageRange(2) {
@@ -334,7 +334,7 @@ func paginationControls(basePath, tableName string, pg pager.Pager) g.Node {
 		}
 	}
 
-	items = append(items, pagination.Item(pagination.Next(dataURL(pg.NextPage()), pg.IsLast(), nextExtra...)))
+	items = append(items, pagination.Item(pagination.Next(nil, dataURL(pg.NextPage()), pg.IsLast(), nextExtra...)))
 
 	return h.Div(
 		h.Class("border-t p-3"),

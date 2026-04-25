@@ -2,20 +2,15 @@ package kv
 
 import (
 	kvstore "github.com/go-sum/kv"
-	"github.com/go-sum/web"
+	"github.com/go-sum/showcase"
 	"github.com/go-sum/web/router"
-	g "maragu.dev/gomponents"
 )
-
-// PageFunc renders a full HTML page within the host application's layout.
-// The showcase/kv package stays decoupled from starter/internal/view.
-type PageFunc func(c *web.Context, title string, content g.Node) (web.Response, error)
 
 // Config holds configuration for the KV panel.
 type Config struct {
 	BasePath   string
 	Store      kvstore.Store
-	Page       PageFunc
+	Page       showcase.PageFunc
 	PerPage    int
 	MaxPerPage int
 }

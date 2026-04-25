@@ -235,7 +235,7 @@ func paginationControls(basePath, queueName, activeStatus string, pg pager.Pager
 	}
 
 	items := []g.Node{
-		pagination.Item(pagination.Previous(pageURL(pg.PrevPage()), pg.IsFirst(), prevExtra...)),
+		pagination.Item(pagination.Previous(nil, pageURL(pg.PrevPage()), pg.IsFirst(), prevExtra...)),
 	}
 
 	for _, p := range pg.PageRange(2) {
@@ -254,7 +254,7 @@ func paginationControls(basePath, queueName, activeStatus string, pg pager.Pager
 		}
 	}
 
-	items = append(items, pagination.Item(pagination.Next(pageURL(pg.NextPage()), pg.IsLast(), nextExtra...)))
+	items = append(items, pagination.Item(pagination.Next(nil, pageURL(pg.NextPage()), pg.IsLast(), nextExtra...)))
 
 	return h.Div(
 		h.Class("border-t p-3"),

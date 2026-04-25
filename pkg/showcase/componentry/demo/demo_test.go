@@ -67,7 +67,7 @@ func TestValidationResult_UsernameShort(t *testing.T) {
 }
 
 func TestPaginatedTable_FirstPage(t *testing.T) {
-	out := render(t, demo.PaginatedTable(1, 10))
+	out := render(t, demo.PaginatedTable(1, 10, "/showcase/componentry/demo/paginate"))
 	if !strings.Contains(out, "paginate-region") {
 		t.Errorf("expected paginate-region id in output")
 	}
@@ -77,7 +77,7 @@ func TestPaginatedTable_FirstPage(t *testing.T) {
 }
 
 func TestPaginatedTable_LastPage(t *testing.T) {
-	out := render(t, demo.PaginatedTable(3, 10))
+	out := render(t, demo.PaginatedTable(3, 10, "/showcase/componentry/demo/paginate"))
 	if !strings.Contains(out, "Page 3 of 3") {
 		t.Errorf("expected Page 3 of 3")
 	}
@@ -107,11 +107,23 @@ func TestRegionOptions_Unknown(t *testing.T) {
 	}
 }
 
-func TestPathConstants(t *testing.T) {
-	paths := []string{demo.PathSearch, demo.PathValidate, demo.PathPaginate, demo.PathRegion}
-	for _, p := range paths {
-		if !strings.HasPrefix(p, "/showcase/componentry/") {
-			t.Errorf("path constant %q missing /showcase/componentry/ prefix", p)
+func TestNewPaths(t *testing.T) {
+	const base = "/my/custom/base"
+	p := demo.NewPaths(base)
+	cases := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"Search", p.Search, base + "/demo/search"},
+		{"Validate", p.Validate, base + "/demo/validate"},
+		{"Paginate", p.Paginate, base + "/demo/paginate"},
+		{"Region", p.Region, base + "/demo/region"},
+		{"OOBToast", p.OOBToast, base + "/demo/oob-toast"},
+	}
+	for _, tc := range cases {
+		if tc.got != tc.want {
+			t.Errorf("NewPaths.%s = %q, want %q", tc.name, tc.got, tc.want)
 		}
 	}
 }

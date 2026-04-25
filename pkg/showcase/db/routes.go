@@ -1,21 +1,16 @@
 package db
 
 import (
-	"github.com/go-sum/web"
+	"github.com/go-sum/showcase"
 	"github.com/go-sum/web/router"
 	"github.com/jackc/pgx/v5/pgxpool"
-	g "maragu.dev/gomponents"
 )
-
-// PageFunc renders a full HTML page within the host application's layout.
-// The showcase/db package stays decoupled from starter/internal/view.
-type PageFunc func(c *web.Context, title string, content g.Node) (web.Response, error)
 
 // Config holds configuration for the database panel.
 type Config struct {
 	BasePath   string
 	Pool       *pgxpool.Pool
-	Page       PageFunc
+	Page       showcase.PageFunc
 	Schema     string
 	PerPage    int
 	MaxPerPage int
