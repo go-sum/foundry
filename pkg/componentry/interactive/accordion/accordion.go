@@ -40,13 +40,13 @@ func Item(children ...g.Node) g.Node {
 }
 
 // Trigger renders the clickable <summary> header that toggles open/close.
-func Trigger(children ...g.Node) g.Node {
+func Trigger(r *icons.Registry, children ...g.Node) g.Node {
 	return h.Summary(
 		h.Class("flex w-full items-center justify-between py-4 text-sm font-medium transition-all hover:underline text-left cursor-pointer"),
 		g.Group(children),
 		h.Span(
 			h.Class("transition-transform duration-200 details-chevron"),
-			core.Icon(iconrender.PropsFor(icons.ChevronDown, core.IconProps{Size: "size-4 shrink-0"})),
+			core.Icon(iconrender.PropsForRegistry(r, icons.ChevronDown, core.IconProps{Size: "size-4 shrink-0"})),
 		),
 	)
 }

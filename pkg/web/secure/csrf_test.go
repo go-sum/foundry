@@ -748,6 +748,81 @@ func TestCSRF_RotatedKey_IssuesWithPrimaryOnly(t *testing.T) {
 	}
 }
 
+func TestCSRFToken_BackwardCompat(t *testing.T) {
+	cfg := testCSRFConfig()
+	mw := CSRF(cfg)
+
+	var capturedToken string
+	handler := mw(func(c *web.Context) (web.Response, error) {
+		capturedToken = CSRFToken(c)
+		return web.Respond(http.StatusOK), nil
+	})
+
+	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/test"})
+	resp, _ := handler(web.NewContext(context.Background(), req))
+
+	if resp.Status != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.Status, http.StatusOK)
+	}
+	if capturedToken == "" {
+		t.Fatal("CSRFToken() returned empty string after context data struct change")
+	}
+}
+
+func TestCSRFFieldName_ReturnsConfiguredName(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.FormField = "custom_field"
+	mw := CSRF(cfg)
+
+	var capturedName string
+	handler := mw(func(c *web.Context) (web.Response, error) {
+		capturedName = CSRFFieldName(c)
+		return web.Respond(http.StatusOK), nil
+	})
+
+	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/test"})
+	resp, _ := handler(web.NewContext(context.Background(), req))
+
+	if resp.Status != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.Status, http.StatusOK)
+	}
+	if capturedName != "custom_field" {
+		t.Errorf("CSRFFieldName() = %q, want %q", capturedName, "custom_field")
+	}
+}
+
+func TestCSRFHeaderName_ReturnsConfiguredName(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.HeaderName = "X-Custom"
+	mw := CSRF(cfg)
+
+	var capturedName string
+	handler := mw(func(c *web.Context) (web.Response, error) {
+		capturedName = CSRFHeaderName(c)
+		return web.Respond(http.StatusOK), nil
+	})
+
+	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/test"})
+	resp, _ := handler(web.NewContext(context.Background(), req))
+
+	if resp.Status != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.Status, http.StatusOK)
+	}
+	if capturedName != "X-Custom" {
+		t.Errorf("CSRFHeaderName() = %q, want %q", capturedName, "X-Custom")
+	}
+}
+
+func TestCSRFToken_NoTokenInContext_ReturnsEmptyViaNewAccessors(t *testing.T) {
+	// nil context: all accessors return zero values
+	if got := CSRFFieldName(nil); got != "" {
+		t.Errorf("CSRFFieldName(nil) = %q, want empty", got)
+	}
+	if got := CSRFHeaderName(nil); got != "" {
+		t.Errorf("CSRFHeaderName(nil) = %q, want empty", got)
+	}
+}
+
 func TestCSRF_PanicsOnShortPreviousKey(t *testing.T) {
 	defer func() {
 		r := recover()

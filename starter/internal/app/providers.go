@@ -49,11 +49,12 @@ func provideRuntime(_ context.Context) (Runtime, error) {
 	}, nil
 }
 
-func provideAssets(cfg *config.Config) {
-	publish.MustInit(cfg.Assets.PublicDir, cfg.Assets.URLPrefix)
+func provideAssets(cfg *config.Config) (*publish.Manifest, *icons.Registry) {
+	manifest := publish.Must(publish.New(cfg.Assets.PublicDir, cfg.Assets.URLPrefix))
 	publish.RegisterSprites(iconset.Default.Sprites)
-	publish.SetPathFunc(publish.Path)
+	publish.SetPathFunc(manifest.Path)
 
+	iconReg := icons.NewRegistry()
 	resolved := make(map[icons.Key]icons.Ref, len(iconset.Default.Icons))
 	for key, ref := range iconset.Default.Icons {
 		resolved[key] = icons.Ref{
@@ -61,7 +62,8 @@ func provideAssets(cfg *config.Config) {
 			ID:     ref.ID,
 		}
 	}
-	icons.RegisterSet(resolved)
+	iconReg.RegisterSet(resolved)
+	return manifest, iconReg
 }
 
 func provideSecurity(_ context.Context, runtime Runtime) (Security, session.Store, error) {
@@ -147,7 +149,7 @@ func connectWithRetry(ctx context.Context, name string, logger *slog.Logger, max
 	return err
 }
 
-func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router) (Services, error) {
+func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router, pres Presentation) (Services, error) {
 	// In testing environments, skip external service wiring.
 	if runtime.Config.Env == config.Testing {
 		return Services{}, nil
@@ -167,17 +169,16 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 	}
 	db.LogPoolStats(ctx, pool, runtime.Logger, 60*time.Second)
 
-	// Schema registry — built from embedded schema.yaml; external schemas passed as extras.
+	// Schema registry — built from embedded schema.yaml; external schemas resolved by name.
 	schemaReg, err := db.LoadRegistryFromYAML(appdb.ConfigYAML, appdb.SchemaFiles,
-		db.BaseSchema,
-		db.NewSchema("queue_jobs", pgstore.SchemaSQL, 50),
+		db.WithResolver(appdb.ExternalSchemas()),
 	)
 	if err != nil {
 		return Services{}, fmt.Errorf("services: schema registry: %w", err)
 	}
 
-	// Schema readiness — refuse to start if migrations are outstanding.
-	if err := db.Health(ctx, pool, schemaReg.HealthTables()...); err != nil {
+	// Schema readiness — refuse to start if the database schema does not match this binary.
+	if err := db.VerifyFingerprint(ctx, pool, schemaReg.Fingerprint()); err != nil {
 		pool.Close()
 		return Services{}, fmt.Errorf("services: schema not ready (run 'task db:migrate'): %w", err)
 	}
@@ -202,7 +203,6 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 	notifier := notification.NewDispatcher(senders, runtime.Logger)
 
 	// Contact module
-	navOpt := view.WithNavConfig(config.DefaultNav())
 	contactMod := contact.NewModule(contact.ModuleConfig{
 		Pool:      pool,
 		KV:        kvStore,
@@ -219,7 +219,7 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 			SendTo:   runtime.Config.Contact.SendTo,
 			SendFrom: runtime.Config.Contact.SendFrom,
 		},
-		ViewOpts: []view.RequestOption{navOpt},
+		ViewOpts: pres.ViewOpts,
 		Logger:   runtime.Logger,
 	})
 

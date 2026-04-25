@@ -3,6 +3,7 @@ package view
 
 import (
 	"github.com/go-sum/componentry/compound"
+	"github.com/go-sum/componentry/icons"
 	"github.com/go-sum/foundry/internal/view/layout"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/render"
@@ -17,11 +18,15 @@ type Request struct {
 	CurrentPath     string
 	HTMX            HTMXRequest
 	CSRFToken       string             // CSRF token for form rendering; set via WithCSRFToken.
+	CSRFFieldName   string             // CSRF form field name; auto-populated from context.
+	CSRFHeaderName  string             // CSRF header name; auto-populated from context.
 	RequestID       string             // Correlation ID; set via WithRequestID.
 	Nonce           string             // CSP nonce; set via WithNonce.
 	Flash           []string           // Flash messages; set via WithFlash.
 	IsAuthenticated bool               // Auth state; set via WithIsAuthenticated.
 	NavConfig       compound.NavConfig // Declarative nav config; set via WithNavConfig.
+	PathFunc        func(string) string // Asset path resolver; set via WithPathFunc.
+	Icons           *icons.Registry    // Icon registry; set via WithIconRegistry.
 }
 
 // HTMXRequest holds HTMX-specific request state parsed from headers.
@@ -67,6 +72,16 @@ func WithNavConfig(cfg compound.NavConfig) RequestOption {
 	return func(r *Request) { r.NavConfig = cfg }
 }
 
+// WithPathFunc sets the asset path resolver used by the page layout.
+func WithPathFunc(fn func(string) string) RequestOption {
+	return func(r *Request) { r.PathFunc = fn }
+}
+
+// WithIconRegistry sets the icon registry used for rendering nav icons.
+func WithIconRegistry(r *icons.Registry) RequestOption {
+	return func(req *Request) { req.Icons = r }
+}
+
 // NewRequest builds request-scoped presentation state from a web.Context.
 // Fields are auto-populated from context values (RequestID, CSRFToken, Nonce,
 // Flash); explicit WithX options run after and override auto-populated values.
@@ -88,6 +103,8 @@ func NewRequest(c *web.Context, opts ...RequestOption) Request {
 	if c != nil {
 		r.RequestID = web.RequestID(c)
 		r.CSRFToken = secure.CSRFToken(c)
+		r.CSRFFieldName = secure.CSRFFieldName(c)
+		r.CSRFHeaderName = secure.CSRFHeaderName(c)
 		r.Nonce = secure.Nonce(c)
 		if sess, ok := session.FromContext(c); ok {
 			if msgs, popped, _ := session.FlashPop[[]string](sess, "flash"); popped {
@@ -129,15 +146,19 @@ func (r Request) Page(title string, children ...g.Node) g.Node {
 			Config:          r.NavConfig,
 			CurrentPath:     r.CurrentPath,
 			IsAuthenticated: r.IsAuthenticated,
+			Icons:           r.Icons,
 		})
 	}
 	return layout.Page(layout.Props{
-		Title:     title,
-		Nonce:     r.Nonce,
-		CSRFToken: r.CSRFToken,
-		Flash:     r.Flash,
-		Nav:       nav,
-		Children:  children,
+		Title:          title,
+		Nonce:          r.Nonce,
+		CSRFToken:      r.CSRFToken,
+		CSRFFieldName:  r.CSRFFieldName,
+		CSRFHeaderName: r.CSRFHeaderName,
+		Flash:          r.Flash,
+		Nav:            nav,
+		PathFunc:       r.PathFunc,
+		Children:       children,
 	})
 }
 

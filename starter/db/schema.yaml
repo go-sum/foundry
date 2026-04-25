@@ -1,9 +1,11 @@
 schema:
-  - path: ../../pkg/db/sql/base.sql
+  - name: base
+    path: ../../pkg/db/sql/base.sql
     priority: 0
     external: true
 
-  - path: ../../pkg/queue/pgstore/sql/schema.sql
+  - name: queue
+    path: ../../pkg/queue/pgstore/sql/schema.sql
     priority: 50
     health_tables: [queue_jobs]
     external: true

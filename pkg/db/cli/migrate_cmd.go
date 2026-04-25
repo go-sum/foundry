@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
+	"github.com/go-sum/db"
 	"github.com/go-sum/db/migrate"
 	"github.com/spf13/cobra"
 )
@@ -70,9 +71,17 @@ func newMigrateCmd(configPath *string) *cobra.Command {
 			}
 
 			if toVersion > 0 {
-				return migrate.UpTo(ctx, dsn, migrDir, toVersion)
+				if err := migrate.UpTo(ctx, dsn, migrDir, toVersion); err != nil {
+					return err
+				}
+				storeFingerprintAfterMigrate(ctx, cfg, dsn)
+				return nil
 			}
-			return migrate.Up(ctx, dsn, migrDir)
+			if err := migrate.Up(ctx, dsn, migrDir); err != nil {
+				return err
+			}
+			storeFingerprintAfterMigrate(ctx, cfg, dsn)
+			return nil
 		},
 	}
 
@@ -172,4 +181,24 @@ func newStatusCmd(configPath *string) *cobra.Command {
 	cmd.Flags().StringVar(&dir, "dir", "", "migrations directory (default: from config)")
 
 	return cmd
+}
+
+// storeFingerprintAfterMigrate computes the schema fingerprint and stores it in
+// the database after a successful migration. Errors are logged as warnings and
+// do not cause the migrate command to fail.
+func storeFingerprintAfterMigrate(ctx context.Context, cfg *dbConfig, dsn string) {
+	reg, err := cfg.buildRegistry()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "warning: fingerprint: build registry:", err)
+		return
+	}
+	pool, err := db.ConnectDSN(ctx, dsn)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "warning: fingerprint: connect:", err)
+		return
+	}
+	defer pool.Close()
+	if err := db.StoreFingerprint(ctx, pool, reg.Fingerprint()); err != nil {
+		fmt.Fprintln(os.Stderr, "warning: fingerprint: store:", err)
+	}
 }

@@ -26,7 +26,7 @@ func TestContactForm_FormState(t *testing.T) {
 		` hx-post="/contact"` +
 		` hx-target="#contact-form"` +
 		` hx-swap="outerHTML"` +
-		` hx-headers="{&#34;X-CSRF-Token&#34;: &#34;&#34;}">` +
+		` hx-headers="{&#34;X-CSRF-Token&#34;:&#34;&#34;}">` +
 		`<div class="grid gap-4">` +
 		`<div class="grid gap-2">` +
 		`<label class="text-sm font-medium leading-none inline-block" for="name">Name<span class="ml-0.5 text-destructive" aria-hidden="true">*</span></label>` +

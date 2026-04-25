@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-sum/db"
 	"github.com/go-sum/docs"
-	"github.com/go-sum/foundry/config"
 	"github.com/go-sum/foundry/internal/features/hello"
 	"github.com/go-sum/foundry/internal/features/home"
 	"github.com/go-sum/foundry/internal/view"
@@ -28,12 +27,12 @@ import (
 )
 
 // RegisterRoutes registers all application routes on the router.
-func RegisterRoutes(rt *router.Router, sec Security, svc Services, assets static.AssetsConfig, publicDir string, s *site.Site) error {
+func RegisterRoutes(rt *router.Router, sec Security, svc Services, assets static.AssetsConfig, publicDir string, s *site.Site, pres Presentation) error {
 	if err := registerStaticRoutes(rt, assets); err != nil {
 		return err
 	}
 	router.Register(rt, docs.Routes(docs.DefaultConfig(publicDir))...)
-	if err := registerPublicRoutes(rt, sec, svc, s); err != nil {
+	if err := registerPublicRoutes(rt, sec, svc, s, pres); err != nil {
 		return fmt.Errorf("public routes: %w", err)
 	}
 	return nil
@@ -84,10 +83,9 @@ func unavailableHandler(feature string) web.Handler {
 	}
 }
 
-func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site.Site) error {
-	navOpt := view.WithNavConfig(config.DefaultNav())
-	homeH := home.NewHandler(rt, navOpt)
-	helloH := hello.NewHandler(rt, navOpt)
+func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site.Site, pres Presentation) error {
+	homeH := home.NewHandler(rt, pres.ViewOpts...)
+	helloH := hello.NewHandler(rt, pres.ViewOpts...)
 	metaH := site.NewHandlers(s, rt,
 		site.RobotsConfig{DefaultAllow: true},
 		site.SitemapConfig{
@@ -139,8 +137,9 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 	}
 
 	showcaseCfg := componentry.DefaultConfig()
+	showcaseCfg.Icons = pres.Icons
 	showcaseCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-		vr := view.NewRequest(c, navOpt)
+		vr := view.NewRequest(c, pres.ViewOpts...)
 		return view.Render(vr, vr.Page(title, content), nil)
 	}
 	layoutNodes = append(layoutNodes, componentry.Routes(showcaseCfg)...)
@@ -149,7 +148,7 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 		dbCfg := showcasedb.DefaultConfig()
 		dbCfg.Pool = svc.DBPool
 		dbCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := view.NewRequest(c, navOpt)
+			vr := view.NewRequest(c, pres.ViewOpts...)
 			return view.Render(vr, vr.Page(title, content), nil)
 		}
 		layoutNodes = append(layoutNodes, showcasedb.Routes(dbCfg)...)
@@ -159,7 +158,7 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 		kvCfg := showcasekv.DefaultConfig()
 		kvCfg.Store = svc.KVStore
 		kvCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := view.NewRequest(c, navOpt)
+			vr := view.NewRequest(c, pres.ViewOpts...)
 			return view.Render(vr, vr.Page(title, content), nil)
 		}
 		layoutNodes = append(layoutNodes, showcasekv.Routes(kvCfg)...)
@@ -169,7 +168,7 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 		queueCfg := showcasequeue.DefaultConfig()
 		queueCfg.Pool = svc.DBPool
 		queueCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := view.NewRequest(c, navOpt)
+			vr := view.NewRequest(c, pres.ViewOpts...)
 			return view.Render(vr, vr.Page(title, content), nil)
 		}
 		layoutNodes = append(layoutNodes, showcasequeue.Routes(queueCfg)...)

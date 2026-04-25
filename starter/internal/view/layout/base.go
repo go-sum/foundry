@@ -2,7 +2,9 @@
 package layout
 
 import (
-	"github.com/go-sum/assets/publish"
+	"path/filepath"
+	"strings"
+
 	"github.com/go-sum/componentry/interactive/runtime"
 	"github.com/go-sum/componentry/interactive/theme"
 	"github.com/go-sum/componentry/ui/feedback"
@@ -14,35 +16,48 @@ import (
 
 // Props configures the full-page HTML shell.
 type Props struct {
-	Title     string
-	Nonce     string
-	CSRFToken string
-	Flash     []string
-	Nav       g.Node   // optional navigation bar rendered above page content
-	Children  []g.Node
+	Title          string
+	Nonce          string
+	CSRFToken      string
+	CSRFFieldName  string
+	CSRFHeaderName string
+	Flash          []string
+	Nav            g.Node              // optional navigation bar rendered above page content
+	PathFunc       func(string) string // asset path resolver; nil falls back to bare /name
+	Children       []g.Node
 }
 
 // Page renders a complete HTML5 document with locally served HTMX and Tailwind CSS.
 func Page(p Props) g.Node {
+	pathFn := p.PathFunc
+	if pathFn == nil {
+		pathFn = func(name string) string {
+			return "/" + strings.TrimPrefix(filepath.ToSlash(name), "/")
+		}
+	}
 	return c.HTML5(c.HTML5Props{
 		Title:    p.Title,
 		Language: "en",
 		Head: []g.Node{
 			h.Meta(h.Name("viewport"), h.Content("width=device-width, initial-scale=1")),
 			h.Meta(h.Name("csrf-token"), h.Content(p.CSRFToken)),
-			render.HXCSRFMeta(p.CSRFToken),
-			h.Link(h.Rel("stylesheet"), h.Href(publish.Path("css/app.css"))),
+			render.HXCSRFMeta(render.CSRFProps{
+				Token:      p.CSRFToken,
+				FieldName:  p.CSRFFieldName,
+				HeaderName: p.CSRFHeaderName,
+			}),
+			h.Link(h.Rel("stylesheet"), h.Href(pathFn("css/app.css"))),
 			theme.InitScript(),
 		},
 		Body: []g.Node{
 			h.Class("bg-background text-foreground min-h-screen flex flex-col"),
-			h.Script(h.Src(publish.Path("js/htmx.min.js")), h.Defer(), g.Attr("nonce", p.Nonce)),
+			h.Script(h.Src(pathFn("js/htmx.min.js")), h.Defer(), g.Attr("nonce", p.Nonce)),
 			flashRegion(p.Flash),
 			p.Nav,
 			h.Main(h.Class("container mx-auto px-4 py-6 flex-1"),
 				g.Group(p.Children),
 			),
-			runtime.ScriptSrc(publish.Path("js/componentry.min.js")),
+			runtime.ScriptSrc(pathFn("js/componentry.min.js")),
 		},
 	})
 }

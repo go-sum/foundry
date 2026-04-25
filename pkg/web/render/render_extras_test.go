@@ -10,11 +10,20 @@ import (
 // ---- CSRFField ----
 
 func TestCSRFField_RendersHiddenInput(t *testing.T) {
-	node := CSRFField("tok123")
+	node := CSRFField(CSRFProps{Token: "tok123"})
 	got := RenderNode(t, node)
 	want := `<input type="hidden" name="_csrf" value="tok123">`
 	if got != want {
 		t.Fatalf("CSRFField = %q, want %q", got, want)
+	}
+}
+
+func TestCSRFField_CustomFieldName(t *testing.T) {
+	node := CSRFField(CSRFProps{Token: "t", FieldName: "my_csrf"})
+	got := RenderNode(t, node)
+	want := `<input type="hidden" name="my_csrf" value="t">`
+	if got != want {
+		t.Fatalf("CSRFField custom field name = %q, want %q", got, want)
 	}
 }
 
@@ -150,7 +159,7 @@ func TestNewSSEResponse_RoundTrip(t *testing.T) {
 // ---- HXCSRFHeaders ----
 
 func TestHXCSRFHeaders_BasicToken(t *testing.T) {
-	got := renderAttrInDiv(t, HXCSRFHeaders("abc123"))
+	got := renderAttrInDiv(t, HXCSRFHeaders(CSRFProps{Token: "abc123"}))
 	want := `<div hx-headers="{&#34;X-CSRF-Token&#34;:&#34;abc123&#34;}"></div>`
 	if got != want {
 		t.Errorf("HXCSRFHeaders = %q, want %q", got, want)
@@ -158,17 +167,25 @@ func TestHXCSRFHeaders_BasicToken(t *testing.T) {
 }
 
 func TestHXCSRFHeaders_TokenWithQuote(t *testing.T) {
-	got := renderAttrInDiv(t, HXCSRFHeaders(`tok"en`))
+	got := renderAttrInDiv(t, HXCSRFHeaders(CSRFProps{Token: `tok"en`}))
 	want := `<div hx-headers="{&#34;X-CSRF-Token&#34;:&#34;tok\&#34;en&#34;}"></div>`
 	if got != want {
 		t.Errorf("HXCSRFHeaders = %q, want %q", got, want)
 	}
 }
 
+func TestHXCSRFHeaders_CustomHeaderName(t *testing.T) {
+	got := renderAttrInDiv(t, HXCSRFHeaders(CSRFProps{Token: "t", HeaderName: "X-Custom"}))
+	want := `<div hx-headers="{&#34;X-Custom&#34;:&#34;t&#34;}"></div>`
+	if got != want {
+		t.Errorf("HXCSRFHeaders custom header = %q, want %q", got, want)
+	}
+}
+
 // ---- HXCSRFMeta ----
 
 func TestHXCSRFMeta_BasicToken(t *testing.T) {
-	node := HXCSRFMeta("tok")
+	node := HXCSRFMeta(CSRFProps{Token: "tok"})
 	got := RenderNode(t, node)
 	want := `<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false,&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;tok&#34;}}">`
 	if got != want {
@@ -177,11 +194,20 @@ func TestHXCSRFMeta_BasicToken(t *testing.T) {
 }
 
 func TestHXCSRFMeta_TokenAppearsInContent(t *testing.T) {
-	node := HXCSRFMeta("mytoken42")
+	node := HXCSRFMeta(CSRFProps{Token: "mytoken42"})
 	got := RenderNode(t, node)
 	want := `<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false,&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-CSRF-Token&#34;,&#34;parameterName&#34;:&#34;_csrf&#34;,&#34;token&#34;:&#34;mytoken42&#34;}}">`
 	if got != want {
 		t.Errorf("HXCSRFMeta = %q, want %q", got, want)
+	}
+}
+
+func TestHXCSRFMeta_CustomNames(t *testing.T) {
+	node := HXCSRFMeta(CSRFProps{Token: "tok", FieldName: "my_csrf", HeaderName: "X-Custom-Header"})
+	got := RenderNode(t, node)
+	want := `<meta name="htmx-config" content="{&#34;includeIndicatorStyles&#34;:false,&#34;antiForgery&#34;:{&#34;headerName&#34;:&#34;X-Custom-Header&#34;,&#34;parameterName&#34;:&#34;my_csrf&#34;,&#34;token&#34;:&#34;tok&#34;}}">`
+	if got != want {
+		t.Errorf("HXCSRFMeta custom names = %q, want %q", got, want)
 	}
 }
 

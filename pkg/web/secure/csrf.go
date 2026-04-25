@@ -93,6 +93,12 @@ type CSRFConfig struct {
 
 type csrfContextKey struct{}
 
+type csrfContextData struct {
+	token      string
+	fieldName  string
+	headerName string
+}
+
 var csrfSameSiteDefaults = map[string]string{
 	"Strict": "Strict",
 	"None":   "None",
@@ -102,8 +108,22 @@ var csrfSameSiteDefaults = map[string]string{
 // CSRFToken retrieves the CSRF token from the request context.
 // Returns "" if no token is available.
 func CSRFToken(c *web.Context) string {
-	tok, _ := web.Get[string](c, csrfContextKey{})
-	return tok
+	data, _ := web.Get[csrfContextData](c, csrfContextKey{})
+	return data.token
+}
+
+// CSRFFieldName retrieves the configured CSRF form field name from the request context.
+// Returns "" if the CSRF middleware has not run.
+func CSRFFieldName(c *web.Context) string {
+	data, _ := web.Get[csrfContextData](c, csrfContextKey{})
+	return data.fieldName
+}
+
+// CSRFHeaderName retrieves the configured CSRF header name from the request context.
+// Returns "" if the CSRF middleware has not run.
+func CSRFHeaderName(c *web.Context) string {
+	data, _ := web.Get[csrfContextData](c, csrfContextKey{})
+	return data.headerName
 }
 
 func applyCSRFDefaults(c *CSRFConfig) {
@@ -212,7 +232,11 @@ func CSRF(cfg CSRFConfig) web.Middleware {
 				}
 			}
 
-			c.Set(csrfContextKey{}, token)
+			c.Set(csrfContextKey{}, csrfContextData{
+				token:      token,
+				fieldName:  cfg.FormField,
+				headerName: cfg.HeaderName,
+			})
 			resp, herr := next(c)
 			if !hasSession {
 				sameSite := resolveSameSite(cfg.CookieSameSite)

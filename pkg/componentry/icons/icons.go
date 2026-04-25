@@ -60,14 +60,3 @@ func (r *Registry) Resolve(key Key) (Ref, bool) {
 	return ref, ok
 }
 
-// Default is the package-level semantic icon registry.
-var Default = NewRegistry()
-
-// Register associates a semantic component icon key with a concrete sprite symbol on Default.
-func Register(key Key, ref Ref) { Default.Register(key, ref) }
-
-// RegisterSet adds or replaces multiple semantic icon registrations on Default.
-func RegisterSet(symbols map[Key]Ref) { Default.RegisterSet(symbols) }
-
-// Resolve returns the concrete sprite symbol for a semantic icon key on Default.
-func Resolve(key Key) (Ref, bool) { return Default.Resolve(key) }

@@ -53,9 +53,9 @@ func DefaultNav() compound.NavConfig {
 		},
 		Slots: compound.NavSlots{
 			compound.SlotThemeToggle: compound.ControlSlot("Theme", theme.ThemeSelector(theme.ThemeSelectorProps{
-				LightIcon:  core.Icon(render.PropsFor(icons.ThemeLight, core.IconProps{})),
-				DarkIcon:   core.Icon(render.PropsFor(icons.ThemeDark, core.IconProps{})),
-				SystemIcon: core.Icon(render.PropsFor(icons.ThemeSystem, core.IconProps{})),
+				LightIcon:  core.Icon(render.PropsForRegistry(nil, icons.ThemeLight, core.IconProps{})),
+				DarkIcon:   core.Icon(render.PropsForRegistry(nil, icons.ThemeDark, core.IconProps{})),
+				SystemIcon: core.Icon(render.PropsForRegistry(nil, icons.ThemeSystem, core.IconProps{})),
 			})),
 		},
 	}

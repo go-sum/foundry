@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sum/componentry/icons"
 	"github.com/go-sum/foundry/internal/view/layout"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/render"
@@ -74,6 +75,23 @@ func TestRequestOptions(t *testing.T) {
 	}
 	if len(got.Flash) != 2 || got.Flash[0] != "Saved" || got.Flash[1] != "Sent" {
 		t.Fatalf("Flash = %#v, want %#v", got.Flash, want.Flash)
+	}
+}
+
+func TestWithIconRegistry(t *testing.T) {
+	r := icons.NewRegistry()
+	req := Request{}
+	WithIconRegistry(r)(&req)
+	if req.Icons != r {
+		t.Fatalf("WithIconRegistry: got %v, want %v", req.Icons, r)
+	}
+}
+
+func TestWithIconRegistry_nil(t *testing.T) {
+	req := Request{}
+	WithIconRegistry(nil)(&req)
+	if req.Icons != nil {
+		t.Fatalf("WithIconRegistry nil: got non-nil Icons")
 	}
 }
 

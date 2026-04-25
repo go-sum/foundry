@@ -36,19 +36,19 @@ func TestPagination(t *testing.T) {
 		},
 		{
 			name: "previous enabled",
-			node: pagination.Previous("/page/1", false),
+			node: pagination.Previous(nil, "/page/1", false),
 		},
 		{
 			name: "previous disabled",
-			node: pagination.Previous("", true),
+			node: pagination.Previous(nil, "", true),
 		},
 		{
 			name: "next enabled",
-			node: pagination.Next("/page/3", false),
+			node: pagination.Next(nil, "/page/3", false),
 		},
 		{
 			name: "next disabled",
-			node: pagination.Next("", true),
+			node: pagination.Next(nil, "", true),
 		},
 		{
 			name: "ellipsis",

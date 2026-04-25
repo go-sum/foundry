@@ -71,7 +71,7 @@ func TestRegisterRoutes_ReturnsErrorWhenStaticRootCannotBeOpened(t *testing.T) {
 	err := RegisterRoutes(rt, Security{}, Services{}, static.AssetsConfig{
 		PublicDir: filepath.Join(t.TempDir(), "missing"),
 		URLPrefix: "/assets",
-	}, t.TempDir(), s)
+	}, t.TempDir(), s, Presentation{})
 	if err == nil {
 		t.Fatal("RegisterRoutes() error = nil, want non-nil")
 	}
@@ -85,7 +85,7 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 	err := RegisterRoutes(rt, Security{Origins: []string{"http://test.local"}}, Services{}, static.AssetsConfig{
 		PublicDir: dir,
 		URLPrefix: "/assets",
-	}, dir, s)
+	}, dir, s, Presentation{})
 	if err != nil {
 		t.Fatalf("RegisterRoutes() error = %v", err)
 	}

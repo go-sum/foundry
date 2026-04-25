@@ -22,6 +22,7 @@ type dbConfig struct {
 }
 
 type schemaEntry struct {
+	Name         string   `yaml:"name"`
 	Path         string   `yaml:"path"`
 	Priority     int      `yaml:"priority"`
 	HealthTables []string `yaml:"health_tables"`

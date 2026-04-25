@@ -2,9 +2,8 @@
 package contactpartial
 
 import (
-	"fmt"
-
 	"github.com/go-sum/componentry/form"
+	pform "github.com/go-sum/componentry/patterns/form"
 	"github.com/go-sum/componentry/ui/core"
 	"github.com/go-sum/componentry/ui/feedback"
 	"github.com/go-sum/foundry/internal/view"
@@ -42,7 +41,10 @@ func formState(req view.Request, submitURL string, data FormData) g.Node {
 		g.Attr("hx-post", submitURL),
 		g.Attr("hx-target", "#contact-form"),
 		g.Attr("hx-swap", "outerHTML"),
-		g.Attr("hx-headers", fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, req.CSRFToken)),
+		pform.CSRFHeaders(pform.CSRFProps{
+			Token:      req.CSRFToken,
+			HeaderName: req.CSRFHeaderName,
+		}),
 		h.Div(h.Class("grid gap-4"),
 		form.Field(form.FieldProps{
 			ID:       "name",

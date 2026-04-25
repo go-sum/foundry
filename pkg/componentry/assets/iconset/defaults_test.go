@@ -62,15 +62,3 @@ func TestInstallTo(t *testing.T) {
 	}
 }
 
-func TestInstall(t *testing.T) {
-	Install()
-
-	ref, ok := icons.Default.Resolve(icons.ChevronDown)
-	if !ok {
-		t.Fatal("Install: icons.Default missing ChevronDown after Install()")
-	}
-	want := icons.Ref{Sprite: "lucide", ID: "chevron-down"}
-	if ref != want {
-		t.Errorf("Install: ChevronDown = %+v, want %+v", ref, want)
-	}
-}

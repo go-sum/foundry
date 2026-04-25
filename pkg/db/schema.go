@@ -1,6 +1,8 @@
 package db
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"path"
@@ -73,6 +75,29 @@ func (r *Registry) HealthTables() []string {
 	return tables
 }
 
+// Fingerprint returns the hex-encoded SHA-256 hash of the composed schema SQL.
+func (r *Registry) Fingerprint() string {
+	hash := sha256.Sum256([]byte(r.Compose()))
+	return hex.EncodeToString(hash[:])
+}
+
+// ExternalResolver maps external schema names (from schema.yaml `name` field)
+// to their embedded SQL content.
+type ExternalResolver map[string]string
+
+// LoadOption configures LoadRegistryFromYAML.
+type LoadOption func(*loadConfig)
+
+type loadConfig struct {
+	resolver ExternalResolver
+}
+
+// WithResolver returns a LoadOption that supplies an ExternalResolver for
+// external: true YAML entries.
+func WithResolver(r ExternalResolver) LoadOption {
+	return func(cfg *loadConfig) { cfg.resolver = r }
+}
+
 type simpleSchema struct {
 	name     string
 	sql      string
@@ -96,6 +121,7 @@ type yamlSchemaCfg struct {
 }
 
 type yamlSchemaEntry struct {
+	Name         string   `yaml:"name"`
 	Path         string   `yaml:"path"`
 	Priority     int      `yaml:"priority"`
 	HealthTables []string `yaml:"health_tables"`
@@ -116,26 +142,45 @@ func (y yamlSchema) Priority() int          { return y.priority }
 func (y yamlSchema) HealthTables() []string { return y.tables }
 
 // LoadRegistryFromYAML parses a schema.yaml config, loads non-external schema
-// files from schemaFiles, and registers them together with the explicitly
-// provided extras (which supply SQL for external: true entries).
-func LoadRegistryFromYAML(configYAML []byte, schemaFiles fs.FS, extras ...SchemaProvider) (*Registry, error) {
+// files from schemaFiles, and resolves external: true entries via the provided
+// ExternalResolver (supplied via WithResolver).
+func LoadRegistryFromYAML(configYAML []byte, schemaFiles fs.FS, opts ...LoadOption) (*Registry, error) {
 	var cfg yamlSchemaCfg
 	if err := yaml.Unmarshal(configYAML, &cfg); err != nil {
 		return nil, fmt.Errorf("db: parse schema yaml: %w", err)
 	}
 
+	var lc loadConfig
+	for _, o := range opts {
+		o(&lc)
+	}
+
 	reg := NewRegistry()
-	reg.Register(extras...)
 
 	for _, entry := range cfg.Schema {
+		name := entry.Name
+		if name == "" {
+			name = strings.TrimSuffix(path.Base(entry.Path), ".sql")
+		}
+
 		if entry.External {
+			sql, ok := lc.resolver[name]
+			if !ok {
+				return nil, fmt.Errorf("db: external schema %q not in resolver", name)
+			}
+			reg.Register(yamlSchema{
+				name:     name,
+				sql:      sql,
+				priority: entry.Priority,
+				tables:   entry.HealthTables,
+			})
 			continue
 		}
+
 		sql, err := fs.ReadFile(schemaFiles, entry.Path)
 		if err != nil {
 			return nil, fmt.Errorf("db: read schema %s: %w", entry.Path, err)
 		}
-		name := strings.TrimSuffix(path.Base(entry.Path), ".sql")
 		reg.Register(yamlSchema{
 			name:     name,
 			sql:      string(sql),

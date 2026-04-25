@@ -70,20 +70,3 @@ func TestMust_noError(t *testing.T) {
 	}
 }
 
-func TestInit_Default(t *testing.T) {
-	t.Cleanup(func() { Default = nil })
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "style.css"), []byte("body{}"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := Init(dir, "/public"); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	if Default == nil {
-		t.Fatal("Default should be set after Init")
-	}
-	got := Path("style.css")
-	if !strings.HasPrefix(got, "/public/style.css?v=") {
-		t.Errorf("Path = %q, want prefix /public/style.css?v=", got)
-	}
-}

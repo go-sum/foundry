@@ -15,9 +15,6 @@ type Manifest struct {
 	urlPrefix string
 }
 
-// Default is the package-level manifest used by Path.
-var Default *Manifest
-
 // New walks publicDir, hashes each file (SHA-256, first 8 hex chars),
 // and builds a manifest keyed by relative path. A missing dir returns
 // an empty manifest with no error.
@@ -71,31 +68,6 @@ func (m *Manifest) Path(name string) string {
 		return url + "?v=" + hash
 	}
 	return url
-}
-
-// Init initializes the package-level Default manifest.
-func Init(publicDir, prefix string) error {
-	m, err := New(publicDir, prefix)
-	if err != nil {
-		return err
-	}
-	Default = m
-	return nil
-}
-
-// MustInit initializes Default and panics on error.
-func MustInit(publicDir, prefix string) {
-	if err := Init(publicDir, prefix); err != nil {
-		panic(err)
-	}
-}
-
-// Path returns the URL for name from the Default manifest.
-func Path(name string) string {
-	if Default == nil {
-		return "/" + strings.TrimPrefix(filepath.ToSlash(name), "/")
-	}
-	return Default.Path(name)
 }
 
 func hashFile(path string) (_ string, err error) {

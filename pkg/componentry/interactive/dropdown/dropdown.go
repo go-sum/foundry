@@ -19,6 +19,7 @@ type Props struct {
 
 // TriggerProps configures the native <summary> trigger.
 type TriggerProps struct {
+	Icons *icons.Registry
 	Extra []g.Node
 }
 
@@ -41,7 +42,7 @@ func Root(p Props, children ...g.Node) g.Node {
 
 // Trigger renders a styled <summary> via core.Popover.Trigger.
 func Trigger(p TriggerProps, children ...g.Node) g.Node {
-	chevron := core.Icon(iconrender.PropsFor(icons.ChevronDown, core.IconProps{Size: "size-4 shrink-0 text-muted-foreground"}))
+	chevron := core.Icon(iconrender.PropsForRegistry(p.Icons, icons.ChevronDown, core.IconProps{Size: "size-4 shrink-0 text-muted-foreground"}))
 	return core.Popover.Trigger(core.PopoverTriggerProps{
 		Class: "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground",
 		Extra: p.Extra,

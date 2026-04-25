@@ -56,9 +56,9 @@ func Link(href string, isActive bool, children ...g.Node) g.Node {
 
 // Previous renders a "previous" navigation button.
 // Renders a <span> when disabled to carry correct semantics for assistive technology.
-func Previous(href string, disabled bool, extra ...g.Node) g.Node {
+func Previous(r *icons.Registry, href string, disabled bool, extra ...g.Node) g.Node {
 	baseCls := "inline-flex items-center gap-1 px-2.5 h-9 rounded-md text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50"
-	icon := core.Icon(iconrender.PropsFor(icons.ChevronLeft, core.IconProps{}))
+	icon := core.Icon(iconrender.PropsForRegistry(r, icons.ChevronLeft, core.IconProps{}))
 	ariaLabel := g.Attr("aria-label", "Go to previous page")
 	if disabled {
 		return h.Span(
@@ -82,9 +82,9 @@ func Previous(href string, disabled bool, extra ...g.Node) g.Node {
 
 // Next renders a "next" navigation button.
 // Renders a <span> when disabled to carry correct semantics for assistive technology.
-func Next(href string, disabled bool, extra ...g.Node) g.Node {
+func Next(r *icons.Registry, href string, disabled bool, extra ...g.Node) g.Node {
 	baseCls := "inline-flex items-center gap-1 px-2.5 h-9 rounded-md text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50"
-	icon := core.Icon(iconrender.PropsFor(icons.ChevronRight, core.IconProps{}))
+	icon := core.Icon(iconrender.PropsForRegistry(r, icons.ChevronRight, core.IconProps{}))
 	ariaLabel := g.Attr("aria-label", "Go to next page")
 	if disabled {
 		return h.Span(

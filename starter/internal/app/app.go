@@ -9,6 +9,7 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/go-sum/componentry/icons"
 	"github.com/go-sum/db"
 	"github.com/go-sum/kv"
 	"github.com/go-sum/notification"
@@ -23,8 +24,9 @@ import (
 	"github.com/go-sum/web/site"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/go-sum/foundry/internal/features/contact"
 	config "github.com/go-sum/foundry/config"
+	"github.com/go-sum/foundry/internal/features/contact"
+	"github.com/go-sum/foundry/internal/view"
 )
 
 // App is the assembled application.
@@ -63,6 +65,12 @@ type Services struct {
 	SchemaRegistry *db.Registry
 }
 
+// Presentation consolidates view-layer dependencies assembled at the composition root.
+type Presentation struct {
+	ViewOpts []view.RequestOption
+	Icons    *icons.Registry
+}
+
 // Close shuts down background services and releases resources.
 func (s Services) Close() error {
 	var errs []error
@@ -90,7 +98,16 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("runtime: %w", err)
 	}
 
-	provideAssets(runtime.Config)
+	manifest, iconReg := provideAssets(runtime.Config)
+
+	pres := Presentation{
+		ViewOpts: []view.RequestOption{
+			view.WithNavConfig(config.DefaultNav()),
+			view.WithPathFunc(manifest.Path),
+			view.WithIconRegistry(iconReg),
+		},
+		Icons: iconReg,
+	}
 
 	security, store, err := provideSecurity(ctx, runtime)
 	if err != nil {
@@ -111,13 +128,13 @@ func New(ctx context.Context) (*App, error) {
 		htmx.VaryMiddleware(),
 	)
 
-	services, err := provideServices(ctx, runtime, security, routing)
+	services, err := provideServices(ctx, runtime, security, routing, pres)
 	if err != nil {
 		return nil, fmt.Errorf("services: %w", err)
 	}
 
 	s := site.New(runtime.Config.Site)
-	if err := RegisterRoutes(routing, security, services, runtime.Config.Assets, runtime.Config.PublicDir, s); err != nil {
+	if err := RegisterRoutes(routing, security, services, runtime.Config.Assets, runtime.Config.PublicDir, s, pres); err != nil {
 		return nil, fmt.Errorf("routes: %w", err)
 	}
 	routing.Freeze()

@@ -142,6 +142,7 @@ type NavMenuProps struct {
 	Slots           NavSlots
 	CurrentPath     string
 	IsAuthenticated bool
+	Icons           *icons.Registry
 }
 
 // NavMenu renders a full responsive navigation bar assembled from NavConfig and NavSlots.
@@ -157,6 +158,7 @@ func NavMenu(p NavMenuProps) g.Node {
 		Sections:        buildSections(p.Config.Sections, slots),
 		CurrentPath:     p.CurrentPath,
 		IsAuthenticated: p.IsAuthenticated,
+		Icons:           p.Icons,
 	})
 }
 

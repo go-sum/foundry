@@ -37,6 +37,7 @@ type NavbarProps struct {
 	Sections        []NavbarSection
 	IsAuthenticated bool
 	CurrentPath     string
+	Icons           *icons.Registry
 }
 
 // NavbarBrand configures the logo/wordmark shown at the start of the nav bar.
@@ -99,7 +100,7 @@ func (i NavLink) render(ctx navbarItemContext) g.Node {
 	if current {
 		nodes = append(nodes, g.Attr("aria-current", "page"))
 	}
-	nodes = append(nodes, navItemContent(i.Icon, i.Label)...)
+	nodes = append(nodes, navItemContent(ctx.icons, i.Icon, i.Label)...)
 	return h.A(nodes...)
 }
 
@@ -185,7 +186,7 @@ func (i NavText) render(ctx navbarItemContext) g.Node {
 	}
 	cls := navTextClass(ctx.viewport, ctx.depth)
 	nodes := []g.Node{h.Class(cls)}
-	nodes = append(nodes, navItemContent(i.Icon, i.Text)...)
+	nodes = append(nodes, navItemContent(ctx.icons, i.Icon, i.Text)...)
 	return h.Span(nodes...)
 }
 
@@ -272,7 +273,7 @@ func (i NavForm) render(ctx navbarItemContext) g.Node {
 			Size:      core.SizeSm,
 			Type:      "submit",
 			FullWidth: false,
-			Children:  buttonChildren(i.Icon, label),
+			Children:  buttonChildren(ctx.icons, i.Icon, label),
 		})
 		nodes = append(nodes, button)
 		return h.Form(nodes...)
@@ -281,7 +282,7 @@ func (i NavForm) render(ctx navbarItemContext) g.Node {
 		h.Type("submit"),
 		h.Class(navActionClass(ctx.viewport, ctx.depth)),
 	}
-	buttonNodes = append(buttonNodes, navItemContent(i.Icon, label)...)
+	buttonNodes = append(buttonNodes, navItemContent(ctx.icons, i.Icon, label)...)
 	nodes = append(nodes, h.Button(buttonNodes...))
 	return h.Form(nodes...)
 }
@@ -297,6 +298,7 @@ type navbarItemContext struct {
 	NavbarContext
 	viewport navbarViewport
 	depth    int
+	icons    *icons.Registry
 }
 
 const defaultNavbarID = "navbar"
@@ -394,7 +396,7 @@ func renderSections(viewport navbarViewport, p NavbarProps, align NavbarSectionA
 		if sectionAlign(section.Align) != align {
 			continue
 		}
-		node := renderSection(viewport, section, ctx)
+		node := renderSection(viewport, section, ctx, p.Icons)
 		if node != nil {
 			nodes = append(nodes, node)
 		}
@@ -409,8 +411,8 @@ func sectionAlign(align NavbarSectionAlign) NavbarSectionAlign {
 	return AlignStart
 }
 
-func renderSection(viewport navbarViewport, section NavbarSection, ctx NavbarContext) g.Node {
-	items := renderItems(section.Items, navbarItemContext{NavbarContext: ctx, viewport: viewport})
+func renderSection(viewport navbarViewport, section NavbarSection, ctx NavbarContext, r *icons.Registry) g.Node {
+	items := renderItems(section.Items, navbarItemContext{NavbarContext: ctx, viewport: viewport, icons: r})
 	if len(items) == 0 && section.Label == "" {
 		return nil
 	}
@@ -461,13 +463,14 @@ func submenuNodes(href, label string, matchPrefix bool, icon icons.Key, items []
 		if current {
 			linkNodes = append(linkNodes, g.Attr("aria-current", "page"))
 		}
-		linkNodes = append(linkNodes, navItemContent(icon, label)...)
+		linkNodes = append(linkNodes, navItemContent(ctx.icons, icon, label)...)
 		nodes = append(nodes, h.A(linkNodes...))
 	}
 	childNodes := renderItems(items, navbarItemContext{
 		NavbarContext: ctx.NavbarContext,
 		viewport:      ctx.viewport,
 		depth:         ctx.depth + 1,
+		icons:         ctx.icons,
 	})
 	if len(nodes) > 0 && len(childNodes) > 0 {
 		nodes = append(nodes, navSeparator(ctx.viewport, ctx.depth+1))
@@ -508,8 +511,8 @@ func navActionClass(viewport navbarViewport, depth int) string {
 }
 
 func groupSummary(label string, icon icons.Key, ctx navbarItemContext) g.Node {
-	children := navItemContent(icon, label)
-	children = append(children, chevronIcon())
+	children := navItemContent(ctx.icons, icon, label)
+	children = append(children, chevronIcon(ctx.icons))
 	if ctx.viewport == viewportDesktop && ctx.depth == 0 {
 		return h.Summary(
 			h.Class("navmenu-summary flex list-none cursor-pointer items-center gap-2 rounded-md px-4 py-3 text-sm font-medium outline-none transition-colors hover:bg-accent/60 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"),
@@ -552,10 +555,10 @@ func separatorClass(viewport navbarViewport, depth int) string {
 	return "mx-2 my-2"
 }
 
-func navItemContent(icon icons.Key, label string) []g.Node {
+func navItemContent(r *icons.Registry, icon icons.Key, label string) []g.Node {
 	nodes := []g.Node{}
 	if icon != "" {
-		nodes = append(nodes, core.Icon(iconrender.PropsFor(icon, core.IconProps{
+		nodes = append(nodes, core.Icon(iconrender.PropsForRegistry(r, icon, core.IconProps{
 			Size: "size-4 shrink-0 text-muted-foreground",
 		})))
 	}
@@ -563,18 +566,18 @@ func navItemContent(icon icons.Key, label string) []g.Node {
 	return nodes
 }
 
-func buttonChildren(icon icons.Key, label string) []g.Node {
+func buttonChildren(r *icons.Registry, icon icons.Key, label string) []g.Node {
 	if icon == "" {
 		return []g.Node{g.Text(label)}
 	}
 	return []g.Node{
-		core.Icon(iconrender.PropsFor(icon, core.IconProps{Size: "size-4 shrink-0"})),
+		core.Icon(iconrender.PropsForRegistry(r, icon, core.IconProps{Size: "size-4 shrink-0"})),
 		g.Text(label),
 	}
 }
 
-func chevronIcon() g.Node {
-	return core.Icon(iconrender.PropsFor(icons.ChevronDown, core.IconProps{
+func chevronIcon(r *icons.Registry) g.Node {
+	return core.Icon(iconrender.PropsForRegistry(r, icons.ChevronDown, core.IconProps{
 		Size: "navmenu-chevron size-4 shrink-0 text-muted-foreground transition-transform",
 	}))
 }

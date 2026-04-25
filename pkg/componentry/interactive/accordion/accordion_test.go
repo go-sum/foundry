@@ -36,11 +36,11 @@ func TestAccordion(t *testing.T) {
 		},
 		{
 			name: "trigger with children",
-			node: accordion.Trigger(g.Text("Click me")),
+			node: accordion.Trigger(nil, g.Text("Click me")),
 		},
 		{
 			name: "trigger no children",
-			node: accordion.Trigger(),
+			node: accordion.Trigger(nil),
 		},
 		{
 			name: "content with children",

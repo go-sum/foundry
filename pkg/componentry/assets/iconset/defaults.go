@@ -29,14 +29,7 @@ var Default = Catalog{
 	},
 }
 
-// Install registers Default onto the package-level icons.Default registry.
-// Call this once at application startup before rendering any components.
-func Install() {
-	InstallTo(icons.Default)
-}
-
 // InstallTo registers Default onto the specified registry.
-// Use when managing multiple isolated registries.
 func InstallTo(r *icons.Registry) {
 	r.RegisterSet(Default.Icons)
 }

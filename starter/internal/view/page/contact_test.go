@@ -25,7 +25,7 @@ func TestContactContent_ContainsForm(t *testing.T) {
 		` hx-post="/contact"` +
 		` hx-target="#contact-form"` +
 		` hx-swap="outerHTML"` +
-		` hx-headers="{&#34;X-CSRF-Token&#34;: &#34;&#34;}">`
+		` hx-headers="{&#34;X-CSRF-Token&#34;:&#34;&#34;}">`
 
 	if !strings.HasPrefix(got, want) {
 		t.Errorf("ContactContent output mismatch\ngot:  %s\nwant prefix: %s", got, want)

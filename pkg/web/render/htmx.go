@@ -55,12 +55,13 @@ func HXPushURL(url string) g.Node {
 // into all HTMX requests from the element and its children. Apply to <body>
 // or the root HTMX container:
 //
-//	g.Body(render.HXCSRFHeaders(secure.CSRFToken(c)), ...)
+//	g.Body(render.HXCSRFHeaders(render.CSRFProps{Token: secure.CSRFToken(c)}), ...)
 //
+// HeaderName defaults to "X-CSRF-Token".
 // This produces: hx-headers="{\"X-CSRF-Token\":\"<token>\"}"
 // which HTMX includes as a request header on every triggered request.
-func HXCSRFHeaders(token string) g.Node {
-	return g.Attr("hx-headers", jsonCSRFHeader(token))
+func HXCSRFHeaders(p CSRFProps) g.Node {
+	return g.Attr("hx-headers", `{"`+jsonEscapeToken(p.headerName())+`":"`+jsonEscapeToken(p.Token)+`"}`)
 }
 
 // HXCSRFMeta returns a <meta name="htmx-config"> element that configures
@@ -68,22 +69,22 @@ func HXCSRFHeaders(token string) g.Node {
 // This is an alternative to HXCSRFHeaders for apps that cannot easily add
 // attributes to the HTMX root element.
 //
+// FieldName defaults to "_csrf"; HeaderName defaults to "X-CSRF-Token".
 // includeIndicatorStyles is disabled to prevent HTMX from injecting a runtime <style> element,
 // which would violate Content-Security-Policy. Indicator styles are provided by the static CSS bundle.
 //
 // Produces:
 //
 //	<meta name="htmx-config" content='{"includeIndicatorStyles":false,"antiForgery":{"headerName":"X-CSRF-Token","parameterName":"_csrf","token":"<token>"}}'>
-func HXCSRFMeta(token string) g.Node {
-	content := `{"includeIndicatorStyles":false,"antiForgery":{"headerName":"X-CSRF-Token","parameterName":"_csrf","token":"` + jsonEscapeToken(token) + `"}}`
+func HXCSRFMeta(p CSRFProps) g.Node {
+	content := `{"includeIndicatorStyles":false,"antiForgery":{"headerName":"` +
+		jsonEscapeToken(p.headerName()) + `","parameterName":"` +
+		jsonEscapeToken(p.fieldName()) + `","token":"` +
+		jsonEscapeToken(p.Token) + `"}}`
 	return g.El("meta",
 		g.Attr("name", "htmx-config"),
 		g.Attr("content", content),
 	)
-}
-
-func jsonCSRFHeader(token string) string {
-	return `{"X-CSRF-Token":"` + jsonEscapeToken(token) + `"}`
 }
 
 // jsonEscapeToken escapes special characters in a CSRF token for safe
