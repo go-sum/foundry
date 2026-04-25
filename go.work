@@ -2,6 +2,7 @@ go 1.26.0
 
 use (
 	./pkg/assets
+	./pkg/auth
 	./pkg/componentry
 	./pkg/config
 	./pkg/db
