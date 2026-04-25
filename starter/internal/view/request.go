@@ -72,6 +72,13 @@ func WithNavConfig(cfg compound.NavConfig) RequestOption {
 	return func(r *Request) { r.NavConfig = cfg }
 }
 
+// WithNavFunc sets a lazy nav configuration evaluated on each request.
+// Use this when the nav requires route URL reversal, which is only valid
+// after all routes are registered.
+func WithNavFunc(fn func() compound.NavConfig) RequestOption {
+	return func(r *Request) { r.NavConfig = fn() }
+}
+
 // WithPathFunc sets the asset path resolver used by the page layout.
 func WithPathFunc(fn func(string) string) RequestOption {
 	return func(r *Request) { r.PathFunc = fn }

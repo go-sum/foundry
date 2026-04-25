@@ -200,10 +200,10 @@ func TestResource_Dispatch(t *testing.T) {
 	}
 }
 
-func TestResources_ComposesWithGroupNode(t *testing.T) {
+func TestResources_ComposesWithGroup(t *testing.T) {
 	r := New()
 	Register(r,
-		GroupNode("/api/v1",
+		Group("/api/v1",
 			Resources("/users", "api.users", ResourceHandlers{
 				Index: okHandler(),
 				Show:  okHandler(),

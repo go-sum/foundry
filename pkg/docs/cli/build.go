@@ -24,7 +24,7 @@ func newBuildCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&source, "source", ".docs", "Hugo source directory")
-	cmd.Flags().StringVar(&destination, "destination", filepath.Join("public", docs.DefaultDocsDir), "output directory for built documentation")
+	cmd.Flags().StringVar(&destination, "destination", filepath.Join("public", docs.DefaultDocsDir), "destination for documentation")
 	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "remove destination directory before building to clear stale output")
 
 	return cmd
@@ -61,11 +61,11 @@ func validateDestination(dest string) error {
 // When overwrite is true, destination is removed first to clear stale output.
 // Relative paths are resolved against the current working directory.
 func build(source, destination string, overwrite bool) error {
-	if _, err := exec.LookPath("hugo"); err != nil {
-		return fmt.Errorf("hugo not found on PATH — install from https://gohugo.io/installation/")
-	}
 	if err := validateDestination(destination); err != nil {
 		return err
+	}
+	if _, err := exec.LookPath("hugo"); err != nil {
+		return fmt.Errorf("hugo not found on PATH — install from https://gohugo.io/installation/")
 	}
 	if _, err := os.Stat(source); os.IsNotExist(err) {
 		fmt.Printf("%s not found — scaffolding from template\n", source)

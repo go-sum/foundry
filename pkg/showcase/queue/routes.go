@@ -29,7 +29,7 @@ func DefaultConfig() Config {
 func Routes(cfg Config) []router.Node {
 	h := newHandler(cfg)
 	return []router.Node{
-		router.GroupNode(cfg.BasePath,
+		router.Group(cfg.BasePath,
 			router.GET("", "queue.index", h.Index),
 			router.GET("/{queue}", "queue.detail", h.Detail),
 			router.GET("/{queue}/jobs", "queue.jobs", h.Jobs),

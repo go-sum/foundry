@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -13,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/go-sum/web"
+	"github.com/go-sum/web/static"
 )
 
 // DefaultDocsDir is the subdirectory under PublicDir where Hugo output is stored.
@@ -124,7 +124,8 @@ func serveFile(status int, filename, cacheControl string) (web.Response, error) 
 		return web.Response{}, err
 	}
 
-	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename)))
+	ext := strings.ToLower(filepath.Ext(filename))
+	contentType := static.MimeType(ext, nil)
 	if contentType == "" {
 		contentType = http.DetectContentType(body)
 	}

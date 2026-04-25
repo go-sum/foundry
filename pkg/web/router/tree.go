@@ -103,14 +103,23 @@ func Match(methods []string, pattern, name string, h web.Handler) []Node {
 	return nodes
 }
 
-// GroupNode creates a URL prefix + children node.
-// Named GroupNode (not Group) to avoid collision with the removed Group struct.
-func GroupNode(prefix string, children ...Node) Node {
+// Group creates a URL prefix + children node.
+func Group(prefix string, children ...Node) Node {
 	return Node{
 		kind:     nodeGroup,
 		pattern:  prefix,
 		children: children,
 	}
+}
+
+// Nodes flattens multiple slices of Node into a single slice.
+// Use this to compose conditional route groups into a declarative tree.
+func Nodes(groups ...[]Node) []Node {
+	var out []Node
+	for _, g := range groups {
+		out = append(out, g...)
+	}
+	return out
 }
 
 // Layout scopes middleware to children without changing URL prefix.

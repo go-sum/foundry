@@ -49,9 +49,8 @@ func registerStaticRoutes(rt *router.Router, assets static.AssetsConfig) error {
 	})
 	staticH := static.VersionedCacheControl("v")(rawH)
 
-	prefix := assets.URLPrefix
 	router.Register(rt,
-		router.GroupNode(prefix,
+		router.Group(assets.URLPrefix,
 			router.GET("/{rest...}", "static.assets", func(c *web.Context) (web.Response, error) {
 				stripped := "/" + c.Param("rest")
 				c.Request.URL.Path = stripped
@@ -112,68 +111,64 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 	if svc.DBPool != nil {
 		checkers = append(checkers, db.NewChecker(svc.DBPool, svc.SchemaRegistry.HealthTables()...))
 	}
+
 	router.Register(rt,
 		router.GET("/healthz", "health.check", healthHandler(checkers...)),
+		router.Layout(router.Nodes(
+			[]router.Node{
+				router.Use(
+					web.WithMaxBody(8<<20),
+					web.MethodOverride(web.MethodOverrideConfig{}),
+					compress.Middleware(compress.Config{}),
+					etag.Middleware(etag.Config{}),
+					secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: sec.Origins}),
+				),
+				router.GET("/robots.txt", "meta.robots", metaH.RobotsTxt),
+				router.GET("/sitemap.xml", "meta.sitemap", metaH.SitemapXML),
+				router.GET("/", "home.show", homeH.Show),
+				router.GET("/hello/greeting", "hello.greeting", helloH.Greeting),
+				router.GET("/hello/{name}", "hello.show", helloH.Show),
+				router.GET("/contact", "contact.form", contactForm),
+				router.POST("/contact", "contact.submit", contactSubmit),
+				router.Group("/account",
+					router.Use(session.Guard(session.DefaultGuardConfig())),
+				),
+			},
+			showcaseNodes(svc, pres),
+		)...),
 	)
+	return nil
+}
 
-	layoutNodes := []router.Node{
-		router.Use(
-			web.WithMaxBody(8<<20),
-			web.MethodOverride(web.MethodOverrideConfig{}),
-			compress.Middleware(compress.Config{}),
-			etag.Middleware(etag.Config{}),
-			secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: sec.Origins}),
-		),
-		router.GET("/robots.txt", "meta.robots", metaH.RobotsTxt),
-		router.GET("/sitemap.xml", "meta.sitemap", metaH.SitemapXML),
-		router.GET("/", "home.show", homeH.Show),
-		router.GET("/hello/greeting", "hello.greeting", helloH.Greeting),
-		router.GET("/hello/{name}", "hello.show", helloH.Show),
-		router.GET("/contact", "contact.form", contactForm),
-		router.POST("/contact", "contact.submit", contactSubmit),
-		router.GroupNode("/account",
-			router.Use(session.Guard(session.DefaultGuardConfig())),
-		),
+func showcaseNodes(svc Services, pres Presentation) []router.Node {
+	pageFn := func(c *web.Context, title string, content g.Node) (web.Response, error) {
+		vr := view.NewRequest(c, pres.ViewOpts...)
+		return view.Render(vr, vr.Page(title, content), nil)
 	}
 
 	showcaseCfg := componentry.DefaultConfig()
 	showcaseCfg.Icons = pres.Icons
-	showcaseCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-		vr := view.NewRequest(c, pres.ViewOpts...)
-		return view.Render(vr, vr.Page(title, content), nil)
-	}
-	layoutNodes = append(layoutNodes, componentry.Routes(showcaseCfg)...)
+	showcaseCfg.Page = pageFn
+	nodes := componentry.Routes(showcaseCfg)
 
 	if svc.DBPool != nil {
 		dbCfg := showcasedb.DefaultConfig()
 		dbCfg.Pool = svc.DBPool
-		dbCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := view.NewRequest(c, pres.ViewOpts...)
-			return view.Render(vr, vr.Page(title, content), nil)
-		}
-		layoutNodes = append(layoutNodes, showcasedb.Routes(dbCfg)...)
+		dbCfg.Page = pageFn
+		nodes = append(nodes, showcasedb.Routes(dbCfg)...)
+
+		queueCfg := showcasequeue.DefaultConfig()
+		queueCfg.Pool = svc.DBPool
+		queueCfg.Page = pageFn
+		nodes = append(nodes, showcasequeue.Routes(queueCfg)...)
 	}
 
 	if svc.KVStore != nil {
 		kvCfg := showcasekv.DefaultConfig()
 		kvCfg.Store = svc.KVStore
-		kvCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := view.NewRequest(c, pres.ViewOpts...)
-			return view.Render(vr, vr.Page(title, content), nil)
-		}
-		layoutNodes = append(layoutNodes, showcasekv.Routes(kvCfg)...)
+		kvCfg.Page = pageFn
+		nodes = append(nodes, showcasekv.Routes(kvCfg)...)
 	}
 
-	if svc.DBPool != nil {
-		queueCfg := showcasequeue.DefaultConfig()
-		queueCfg.Pool = svc.DBPool
-		queueCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := view.NewRequest(c, pres.ViewOpts...)
-			return view.Render(vr, vr.Page(title, content), nil)
-		}
-		layoutNodes = append(layoutNodes, showcasequeue.Routes(queueCfg)...)
-	}
-
-	router.Register(rt, router.Layout(layoutNodes...))
-	return nil
+	return nodes
 }

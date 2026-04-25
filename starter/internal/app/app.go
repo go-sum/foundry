@@ -104,7 +104,7 @@ func New(ctx context.Context) (*App, error) {
 
 	pres := Presentation{
 		ViewOpts: []view.RequestOption{
-			view.WithNavConfig(config.DefaultNav(routing)),
+			config.DefaultNav(routing),
 			view.WithPathFunc(manifest.Path),
 			view.WithIconRegistry(iconReg),
 		},

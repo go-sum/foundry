@@ -6,7 +6,7 @@ import "github.com/go-sum/web/router"
 func Routes(cfg Config) []router.Node {
 	h := NewHandler(cfg)
 	return []router.Node{
-		router.GroupNode(cfg.BasePath,
+		router.Group(cfg.BasePath,
 			router.GET("", "docs.index", h.Serve),
 			router.GET("/{path...}", "docs.show", h.Serve),
 		),

@@ -76,11 +76,11 @@ var builtinMIME = map[string]string{
 	".ico":   "image/x-icon",
 }
 
-// mimeFor resolves the MIME type for ext using three-level precedence:
-// caller-supplied MimeTypes → builtinMIME → OS mime package.
+// MimeType resolves the MIME type for ext using three-level precedence:
+// caller-supplied custom map → builtinMIME → OS mime package.
 // Returns empty string when nothing matches, causing file.Serve to fall
 // back to the source's own ContentType.
-func mimeFor(ext string, custom map[string]string) string {
+func MimeType(ext string, custom map[string]string) string {
 	if ct, ok := custom[ext]; ok {
 		return ct
 	}
@@ -134,7 +134,7 @@ func Handler(root *os.Root, opts Options) web.Handler {
 				if err2 == nil {
 					return file.Serve(req, src2, file.ServeOptions{
 						ETag: opts.ETag, CacheControl: opts.CacheControl,
-						ContentType: mimeFor(path.Ext(idxPath), opts.MimeTypes),
+						ContentType: MimeType(path.Ext(idxPath), opts.MimeTypes),
 					})
 				}
 			}
@@ -155,7 +155,7 @@ func Handler(root *os.Root, opts Options) web.Handler {
 				sidecarPath := rel + suffix
 				sidecar, sidecarErr := file.OpenOSFile(root, sidecarPath)
 				if sidecarErr == nil {
-					ct := cmp.Or(mimeFor(path.Ext(rel), opts.MimeTypes), "application/octet-stream")
+					ct := cmp.Or(MimeType(path.Ext(rel), opts.MimeTypes), "application/octet-stream")
 					resp, err := file.Serve(req, sidecar, file.ServeOptions{
 						ETag:         opts.ETag,
 						CacheControl: opts.CacheControl,
@@ -173,7 +173,7 @@ func Handler(root *os.Root, opts Options) web.Handler {
 
 		return file.Serve(req, src, file.ServeOptions{
 			ETag: opts.ETag, CacheControl: opts.CacheControl,
-			ContentType: mimeFor(path.Ext(rel), opts.MimeTypes),
+			ContentType: MimeType(path.Ext(rel), opts.MimeTypes),
 		})
 	}
 }

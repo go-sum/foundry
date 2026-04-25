@@ -69,9 +69,9 @@ func TestTreeBuilderScopes(t *testing.T) {
 		t.Fatalf("Match()[1] = %#v, want DELETE resource.delete", match[1])
 	}
 
-	group := GroupNode("/api", GET("/users", "users.index", handler))
+	group := Group("/api", GET("/users", "users.index", handler))
 	if group.kind != nodeGroup || group.pattern != "/api" || len(group.children) != 1 {
-		t.Fatalf("GroupNode() = %#v, want group /api with one child", group)
+		t.Fatalf("Group() = %#v, want group /api with one child", group)
 	}
 
 	layout := Layout(GET("/", "home.show", handler))

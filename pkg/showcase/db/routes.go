@@ -31,7 +31,7 @@ func DefaultConfig() Config {
 func Routes(cfg Config) []router.Node {
 	h := newHandler(cfg)
 	return []router.Node{
-		router.GroupNode(cfg.BasePath,
+		router.Group(cfg.BasePath,
 			router.GET("", "db.index", h.Index),
 			router.GET("/tables/{table}", "db.table", h.Table),
 			router.GET("/tables/{table}/data", "db.table.data", h.TableData),

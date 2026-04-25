@@ -59,7 +59,7 @@ func FSHandler(fsys fs.FS, opts Options) web.Handler {
 				if err2 == nil {
 					return file.Serve(req, src2, file.ServeOptions{
 						ETag: opts.ETag, CacheControl: opts.CacheControl,
-						ContentType: mimeFor(path.Ext(idxPath), opts.MimeTypes),
+						ContentType: MimeType(path.Ext(idxPath), opts.MimeTypes),
 					})
 				}
 			}
@@ -71,7 +71,7 @@ func FSHandler(fsys fs.FS, opts Options) web.Handler {
 
 		return file.Serve(req, src, file.ServeOptions{
 			ETag: opts.ETag, CacheControl: opts.CacheControl,
-			ContentType: mimeFor(path.Ext(rel), opts.MimeTypes),
+			ContentType: MimeType(path.Ext(rel), opts.MimeTypes),
 		})
 	}
 }
