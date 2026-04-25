@@ -23,11 +23,11 @@ import (
 // showcase (for hx-get attribute values) and from the starter (for route
 // registration) so the URLs never diverge.
 const (
-	PathSearch   = "/componentry/demo/search"
-	PathValidate = "/componentry/demo/validate"
-	PathPaginate = "/componentry/demo/paginate"
-	PathRegion   = "/componentry/demo/region"
-	PathOOBToast = "/componentry/demo/oob-toast"
+	PathSearch   = "/showcase/componentry/demo/search"
+	PathValidate = "/showcase/componentry/demo/validate"
+	PathPaginate = "/showcase/componentry/demo/paginate"
+	PathRegion   = "/showcase/componentry/demo/region"
+	PathOOBToast = "/showcase/componentry/demo/oob-toast"
 )
 
 // OOBToast returns a success toast fragment with an hx-swap-oob attribute that

@@ -1,8 +1,8 @@
-// Package showcase renders a living reference of every visual component in
+// Package componentry renders a living reference of every visual component in
 // pkg/componentry/. It produces a pure g.Node with no HTTP or internal/ imports
 // and follows the componentry module's documented tiered import DAG.
 // The example() card self-embeds its own source in a "View source" <details> toggle
-package showcase
+package componentry
 
 import (
 	_ "embed"
@@ -22,7 +22,7 @@ import (
 	"github.com/go-sum/componentry/interactive/tooltip"
 	htmx "github.com/go-sum/componentry/patterns/htmx"
 	"github.com/go-sum/componentry/patterns/pager"
-	"github.com/go-sum/componentry/showcase/demo"
+	"github.com/go-sum/showcase/componentry/demo"
 	"github.com/go-sum/componentry/ui/core"
 	"github.com/go-sum/componentry/ui/data"
 	"github.com/go-sum/componentry/ui/feedback"

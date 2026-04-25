@@ -6,13 +6,16 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/go-sum/componentry/showcase"
 	"github.com/go-sum/db"
 	"github.com/go-sum/docs"
 	"github.com/go-sum/foundry/config"
 	"github.com/go-sum/foundry/internal/features/hello"
 	"github.com/go-sum/foundry/internal/features/home"
 	"github.com/go-sum/foundry/internal/view"
+	"github.com/go-sum/showcase/componentry"
+	showcasedb "github.com/go-sum/showcase/db"
+	showcasekv "github.com/go-sum/showcase/kv"
+	showcasequeue "github.com/go-sum/showcase/queue"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/compress"
 	"github.com/go-sum/web/etag"
@@ -115,12 +118,6 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 		router.GET("/healthz", "health.check", healthHandler(checkers...)),
 	)
 
-	showcaseCfg := showcase.DefaultConfig()
-	showcaseCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
-		vr := view.NewRequest(c, navOpt)
-		return view.Render(vr, vr.Page(title, content), nil)
-	}
-
 	layoutNodes := []router.Node{
 		router.Use(
 			web.WithMaxBody(8<<20),
@@ -140,7 +137,43 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 			router.Use(session.Guard(session.DefaultGuardConfig())),
 		),
 	}
-	layoutNodes = append(layoutNodes, showcase.Routes(showcaseCfg)...)
+
+	showcaseCfg := componentry.DefaultConfig()
+	showcaseCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
+		vr := view.NewRequest(c, navOpt)
+		return view.Render(vr, vr.Page(title, content), nil)
+	}
+	layoutNodes = append(layoutNodes, componentry.Routes(showcaseCfg)...)
+
+	if svc.DBPool != nil {
+		dbCfg := showcasedb.DefaultConfig()
+		dbCfg.Pool = svc.DBPool
+		dbCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
+			vr := view.NewRequest(c, navOpt)
+			return view.Render(vr, vr.Page(title, content), nil)
+		}
+		layoutNodes = append(layoutNodes, showcasedb.Routes(dbCfg)...)
+	}
+
+	if svc.KVStore != nil {
+		kvCfg := showcasekv.DefaultConfig()
+		kvCfg.Store = svc.KVStore
+		kvCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
+			vr := view.NewRequest(c, navOpt)
+			return view.Render(vr, vr.Page(title, content), nil)
+		}
+		layoutNodes = append(layoutNodes, showcasekv.Routes(kvCfg)...)
+	}
+
+	if svc.DBPool != nil {
+		queueCfg := showcasequeue.DefaultConfig()
+		queueCfg.Pool = svc.DBPool
+		queueCfg.Page = func(c *web.Context, title string, content g.Node) (web.Response, error) {
+			vr := view.NewRequest(c, navOpt)
+			return view.Render(vr, vr.Page(title, content), nil)
+		}
+		layoutNodes = append(layoutNodes, showcasequeue.Routes(queueCfg)...)
+	}
 
 	router.Register(rt, router.Layout(layoutNodes...))
 	return nil

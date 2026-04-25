@@ -182,7 +182,7 @@ func runPGSchemaDiff(planDB PlanDBConfig, desiredFile string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("compose: pgschema desired state: %w", err)
 	}
-	defer provider.Stop()
+	defer provider.Stop() //nolint:errcheck
 
 	migrationPlan, err := pgplan.GeneratePlan(cfg, provider)
 	if err != nil {

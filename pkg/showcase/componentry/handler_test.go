@@ -1,4 +1,4 @@
-package showcase
+package componentry
 
 import (
 	"context"
@@ -59,7 +59,7 @@ func readBody(t *testing.T, resp web.Response) string {
 
 func TestHandler_Show_ReturnsOK(t *testing.T) {
 	h := newTestHandler()
-	c := newCtx(t, http.MethodGet, "/_components")
+	c := newCtx(t, http.MethodGet, "/components")
 
 	resp, err := h.Show(c)
 	if err != nil {
@@ -89,7 +89,7 @@ func TestHandler_Show_DelegatesPageFunc(t *testing.T) {
 		},
 	}
 	h := newHandler(cfg)
-	c := newCtx(t, http.MethodGet, "/_components")
+	c := newCtx(t, http.MethodGet, "/components")
 
 	_, err := h.Show(c)
 	if err != nil {
@@ -113,7 +113,7 @@ func TestHandler_Show_PageFuncErrorPropagates(t *testing.T) {
 		},
 	}
 	h := newHandler(cfg)
-	c := newCtx(t, http.MethodGet, "/_components")
+	c := newCtx(t, http.MethodGet, "/components")
 
 	_, err := h.Show(c)
 	if err != wantErr {
@@ -339,10 +339,10 @@ func TestHandler_OOBToast_ContainsSavedText(t *testing.T) {
 
 func TestHandler_Region(t *testing.T) {
 	tests := []struct {
-		name      string
-		query     string
-		pathParam string // set as c.Param("id") when non-empty
-		want      string
+		name       string
+		query      string
+		pathParam  string // set as c.Param("id") when non-empty
+		want       string
 		wantAbsent string
 	}{
 		{
@@ -377,10 +377,10 @@ func TestHandler_Region(t *testing.T) {
 			want:  "Berlin",
 		},
 		{
-			name:  "path param takes precedence over query param",
-			query: "/demo/region/de?country=us",
-			pathParam: "de",
-			want:  "Berlin",
+			name:       "path param takes precedence over query param",
+			query:      "/demo/region/de?country=us",
+			pathParam:  "de",
+			want:       "Berlin",
 			wantAbsent: "California",
 		},
 	}
@@ -417,13 +417,13 @@ func TestHandler_Region(t *testing.T) {
 
 func TestDefaultConfig_BasePath(t *testing.T) {
 	cfg := DefaultConfig()
-	if cfg.BasePath != "/componentry" {
-		t.Errorf("DefaultConfig().BasePath = %q, want %q", cfg.BasePath, "/componentry")
+	if cfg.BasePath != "/showcase/componentry" {
+		t.Errorf("DefaultConfig().BasePath = %q, want %q", cfg.BasePath, "/showcase/componentry")
 	}
 }
 
 func TestRoutes_ReturnsNonEmpty(t *testing.T) {
-	cfg := Config{BasePath: "/componentry", Page: stubPage}
+	cfg := Config{BasePath: "/showcase/componentry", Page: stubPage}
 	nodes := Routes(cfg)
 	if len(nodes) == 0 {
 		t.Error("Routes: returned empty node slice")

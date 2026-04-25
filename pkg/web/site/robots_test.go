@@ -22,7 +22,7 @@ func TestBuildRobots(t *testing.T) {
 				"Disallow: /",
 			},
 			noWantLines: []string{
-				"Disallow: /_components",
+				"Disallow: /components",
 				"Disallow: /admin",
 				"Disallow: /profile",
 				"Disallow: /signin",
@@ -35,7 +35,7 @@ func TestBuildRobots(t *testing.T) {
 			cfg:  site.RobotsConfig{DefaultAllow: true, DisallowPaths: nil},
 			wantLines: []string{
 				"User-agent: *",
-				"Disallow: /_components",
+				"Disallow: /components",
 				"Disallow: /admin",
 				"Disallow: /profile",
 				"Disallow: /signin",
@@ -43,7 +43,7 @@ func TestBuildRobots(t *testing.T) {
 				"Disallow: /health",
 			},
 			// "Disallow: /\n" is the exact whole-path block-all directive.
-			// Must not be confused with "Disallow: /_components" etc.
+			// Must not be confused with "Disallow: /components" etc.
 			noWantLines: []string{
 				"Disallow: /\n",
 			},
@@ -60,7 +60,7 @@ func TestBuildRobots(t *testing.T) {
 				"Disallow: /api",
 			},
 			noWantLines: []string{
-				"Disallow: /_components",
+				"Disallow: /components",
 				"Disallow: /admin",
 				"Disallow: /profile",
 				"Disallow: /signin",
@@ -144,7 +144,7 @@ func TestBuildRobots(t *testing.T) {
 
 func TestDefaultDisallowPaths(t *testing.T) {
 	want := []string{
-		"/_components",
+		"/components",
 		"/admin",
 		"/profile",
 		"/signin",

@@ -1,9 +1,9 @@
-package showcase
+package componentry
 
 import (
 	"strconv"
 
-	"github.com/go-sum/componentry/showcase/demo"
+	"github.com/go-sum/showcase/componentry/demo"
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/render"
 )

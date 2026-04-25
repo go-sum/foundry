@@ -9,7 +9,7 @@ import (
 // true and DisallowPaths is empty. These are internal surfaces or auth
 // mutation endpoints that have no SEO value.
 var DefaultDisallowPaths = []string{
-	"/_components",
+	"/components",
 	"/admin",
 	"/profile",
 	"/signin",

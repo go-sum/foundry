@@ -23,9 +23,12 @@ func DefaultNav() compound.NavConfig {
 						Label: "Packages",
 						Items: []compound.NavItem{
 							{
-								Label: "Componentry",
+								Label: "Showcase",
 								Items: []compound.NavItem{
-									{Label: "Components", Href: "/componentry/_components"},
+									{Label: "Components", Href: "/showcase/componentry/components"},
+									{Label: "Database", Href: "/showcase/db"},
+									{Label: "Key-Value", Href: "/showcase/kv"},
+									{Label: "Queues", Href: "/showcase/queues"},
 								},
 							},
 							{

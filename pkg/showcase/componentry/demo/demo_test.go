@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/componentry/showcase/demo"
+	"github.com/go-sum/showcase/componentry/demo"
 	g "maragu.dev/gomponents"
 )
 
@@ -110,8 +110,8 @@ func TestRegionOptions_Unknown(t *testing.T) {
 func TestPathConstants(t *testing.T) {
 	paths := []string{demo.PathSearch, demo.PathValidate, demo.PathPaginate, demo.PathRegion}
 	for _, p := range paths {
-		if !strings.HasPrefix(p, "/componentry/") {
-			t.Errorf("path constant %q missing /componentry/ prefix", p)
+		if !strings.HasPrefix(p, "/showcase/componentry/") {
+			t.Errorf("path constant %q missing /showcase/componentry/ prefix", p)
 		}
 	}
 }

@@ -10,6 +10,7 @@ use (
 	./pkg/notification
 	./pkg/queue
 	./pkg/queue/pgstore
+	./pkg/showcase
 	./pkg/web
 	./pkg/web/render
 	./starter

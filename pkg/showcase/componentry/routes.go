@@ -1,4 +1,4 @@
-package showcase
+package componentry
 
 import (
 	"github.com/go-sum/web"
@@ -19,7 +19,7 @@ type Config struct {
 
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() Config {
-	return Config{BasePath: "/componentry"}
+	return Config{BasePath: "/showcase/componentry"}
 }
 
 // Routes returns the router nodes for the showcase handler.
@@ -27,7 +27,7 @@ func Routes(cfg Config) []router.Node {
 	h := newHandler(cfg)
 	return []router.Node{
 		router.GroupNode(cfg.BasePath,
-			router.GET("/_components", "demos.showcase", h.Show),
+			router.GET("/components", "demos.showcase", h.Show),
 			router.GET("/demo/search", "demos.search", h.Search),
 			router.GET("/demo/validate", "demos.validate", h.Validate),
 			router.GET("/demo/paginate", "demos.paginate", h.Paginate),

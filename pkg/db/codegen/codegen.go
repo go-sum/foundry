@@ -65,7 +65,7 @@ func Generate(baseDir string, schemaFiles []string, cfg Config) error {
 	defer os.Remove(tmpPath) //nolint:errcheck
 
 	if _, err := f.Write(data); err != nil {
-		f.Close()
+		f.Close() //nolint:errcheck
 		return fmt.Errorf("codegen: write temp config: %w", err)
 	}
 	if err := f.Close(); err != nil {

@@ -28,10 +28,10 @@ func run(composeFiles []string, envFile, outDir string) error {
 		}
 		var cf composeFile
 		if err := yaml.NewDecoder(f).Decode(&cf); err != nil {
-			f.Close()
+			f.Close() //nolint:errcheck
 			return fmt.Errorf("parse %s: %w", path, err)
 		}
-		f.Close()
+		f.Close() //nolint:errcheck
 		for name := range cf.Secrets {
 			seen[name] = struct{}{}
 		}
@@ -49,7 +49,7 @@ func run(composeFiles []string, envFile, outDir string) error {
 	if err != nil {
 		return fmt.Errorf("open %s: %w", envFile, err)
 	}
-	defer ef.Close()
+	defer ef.Close() //nolint:errcheck
 
 	scanner := bufio.NewScanner(ef)
 	for scanner.Scan() {
