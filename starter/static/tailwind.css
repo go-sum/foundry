@@ -10,6 +10,8 @@
 @source "../../pkg/componentry/**/*.go";
 /* scans for showcase panels in monorepo */
 @source "../../pkg/showcase/**/*.go";
+/* scans for auth UI views in monorepo */
+@source "../../pkg/auth/authui/**/*.go";
 
 /* Class-based dark mode: utilities prefixed with dark: activate when .dark
    is present on <html> or any ancestor.  The ThemeScript in <head> sets

@@ -11,12 +11,16 @@ import (
 	"github.com/go-sum/web/serve"
 )
 
-const testCSRFHexKey = "0000000000000000000000000000000000000000000000000000000000000001" // for-tests-only
+const (
+	testCSRFHexKey      = "0000000000000000000000000000000000000000000000000000000000000001" // for-tests-only
+	testAuthTokenHexKey = "0000000000000000000000000000000000000000000000000000000000000002" // for-tests-only
+)
 
 func setupTestEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv("APP_ENV", "testing")
 	t.Setenv("SECURITY_CSRF_KEY", testCSRFHexKey)
+	t.Setenv("SECURITY_AUTH_TOKEN_KEY", testAuthTokenHexKey)
 	t.Setenv("SITE_BASE_URL", "http://test.local")
 
 	dir, err := os.MkdirTemp("", "static-*")

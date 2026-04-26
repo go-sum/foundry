@@ -3,6 +3,9 @@ go 1.26.0
 use (
 	./pkg/assets
 	./pkg/auth
+	./pkg/auth/authui
+	./pkg/auth/pgstore
+	./pkg/auth/provider/pgstore
 	./pkg/componentry
 	./pkg/config
 	./pkg/db

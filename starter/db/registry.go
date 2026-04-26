@@ -3,6 +3,8 @@ package db
 import (
 	"embed"
 
+	authpgstore "github.com/go-sum/auth/pgstore"
+	providerpgstore "github.com/go-sum/auth/provider/pgstore"
 	coredb "github.com/go-sum/db"
 	"github.com/go-sum/queue/pgstore"
 )
@@ -18,7 +20,9 @@ var SchemaFiles embed.FS
 // external package SQL.
 func ExternalSchemas() coredb.ExternalResolver {
 	return coredb.ExternalResolver{
-		"base":  coredb.BaseSchema.SQL(),
-		"queue": pgstore.SchemaSQL,
+		"base":             coredb.BaseSchema.SQL(),
+		"queue":            pgstore.SchemaSQL,
+		"auth":             authpgstore.SchemaSQL,
+		"auth_provider":    providerpgstore.SchemaSQL,
 	}
 }

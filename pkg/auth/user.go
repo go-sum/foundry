@@ -31,11 +31,13 @@ type User struct {
 type BeginSignupInput struct {
 	Email       string `form:"email"        validate:"required,email,max=255"`
 	DisplayName string `form:"display_name" validate:"required,min=1,max=255"`
+	ReturnTo    string `form:"return_to"`
 }
 
 // BeginSigninInput carries the email address for starting a signin verification flow.
 type BeginSigninInput struct {
-	Email string `form:"email" validate:"required,email,max=255"`
+	Email    string `form:"email"     validate:"required,email,max=255"`
+	ReturnTo string `form:"return_to"`
 }
 
 // BeginEmailChangeInput carries the target email address for a signed-in user.

@@ -1,6 +1,9 @@
 package auth
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestNewTransaction_Fields(t *testing.T) {
 	tx, err := NewTransaction("/dashboard")
@@ -28,5 +31,20 @@ func TestNewTransaction_InvalidReturnTo(t *testing.T) {
 	}
 	if tx.ReturnTo != "/" {
 		t.Errorf("ReturnTo = %q, want %q", tx.ReturnTo, "/")
+	}
+}
+
+func TestNewTransaction_SetsCreatedAt(t *testing.T) {
+	before := time.Now().UTC()
+	tx, err := NewTransaction("/")
+	after := time.Now().UTC()
+	if err != nil {
+		t.Fatalf("NewTransaction error: %v", err)
+	}
+	if tx.CreatedAt.IsZero() {
+		t.Fatal("CreatedAt is zero, want non-zero")
+	}
+	if tx.CreatedAt.Before(before) || tx.CreatedAt.After(after) {
+		t.Errorf("CreatedAt = %v, want between %v and %v", tx.CreatedAt, before, after)
 	}
 }

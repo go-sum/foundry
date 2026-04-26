@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/go-sum/auth"
 	"github.com/go-sum/componentry/compound"
 	"github.com/go-sum/componentry/icons"
 	"github.com/go-sum/componentry/icons/render"
@@ -12,10 +13,11 @@ import (
 
 // DefaultNav returns a view.RequestOption that builds the nav on each request.
 // Route URL reversal is deferred until request time so this option is safe to
-// construct before routes are registered.
+// construct before routes are registered. The CSRF token for the signout form
+// is injected from the per-request view.Request.
 func DefaultNav(rt *router.Router) view.RequestOption {
-	return view.WithNavFunc(func() compound.NavConfig {
-		return compound.NavConfig{
+	return func(r *view.Request) {
+		r.NavConfig = compound.NavConfig{
 			Brand: compound.NavBrand{
 				Label: "Starter",
 				Href:  rt.MustReverse("home.show", nil),
@@ -52,6 +54,17 @@ func DefaultNav(rt *router.Router) view.RequestOption {
 					Items: []compound.NavItem{
 						{Label: "Documentation", Href: rt.MustReverse("docs.index", nil)},
 						{Label: "Contact", Href: rt.MustReverse("contact.form", nil)},
+						{Label: "Sign in", Href: rt.MustReverse(auth.RouteSigninShow, nil), Visibility: compound.NavVisibilityGuest},
+						{Label: "Sign up", Href: rt.MustReverse(auth.RouteSignupShow, nil), Visibility: compound.NavVisibilityGuest},
+						{
+							Label:  "Sign out",
+							Action: rt.MustReverse(auth.RouteSignout, nil),
+							Method: "POST",
+							HiddenFields: []compound.NavHiddenField{
+								{Name: r.CSRFFieldName, Value: r.CSRFToken},
+							},
+							Visibility: compound.NavVisibilityUser,
+						},
 						{Slot: compound.SlotThemeToggle},
 					},
 				},
@@ -64,5 +77,5 @@ func DefaultNav(rt *router.Router) view.RequestOption {
 				})),
 			},
 		}
-	})
+	}
 }

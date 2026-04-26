@@ -86,3 +86,30 @@ func TestChallenge_DifferentVerifiers(t *testing.T) {
 		t.Fatal("Challenge produced identical output for two different verifiers")
 	}
 }
+
+func TestVerifyChallenge_Success(t *testing.T) {
+	// RFC 7636 test vector: known verifier → known challenge.
+	const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+	const challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+
+	if err := VerifyChallenge(verifier, challenge); err != nil {
+		t.Fatalf("VerifyChallenge error: %v", err)
+	}
+}
+
+func TestVerifyChallenge_Mismatch(t *testing.T) {
+	const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+	const wrongChallenge = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	err := VerifyChallenge(verifier, wrongChallenge)
+	if !errors.Is(err, ErrPKCEMismatch) {
+		t.Fatalf("VerifyChallenge mismatch: got %v, want ErrPKCEMismatch", err)
+	}
+}
+
+func TestVerifyChallenge_InvalidVerifier(t *testing.T) {
+	err := VerifyChallenge("short", "doesnotmatter")
+	if !errors.Is(err, ErrInvalidVerifier) {
+		t.Fatalf("VerifyChallenge invalid verifier: got %v, want ErrInvalidVerifier", err)
+	}
+}

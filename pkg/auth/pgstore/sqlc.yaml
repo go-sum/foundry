@@ -5,8 +5,8 @@ sql:
     schema: "sql/schema.sql"
     gen:
       go:
-        package: "sqlcgen"
-        out: "sqlcgen"
+        package: "db"
+        out: "db"
         sql_package: "pgx/v5"
         emit_json_tags: true
         emit_empty_slices: true

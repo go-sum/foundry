@@ -2,6 +2,7 @@
 package view
 
 import (
+	"github.com/go-sum/auth"
 	"github.com/go-sum/componentry/compound"
 	"github.com/go-sum/componentry/icons"
 	"github.com/go-sum/foundry/internal/view/layout"
@@ -114,9 +115,10 @@ func NewRequest(c *web.Context, opts ...RequestOption) Request {
 		r.CSRFHeaderName = secure.CSRFHeaderName(c)
 		r.Nonce = secure.Nonce(c)
 		if sess, ok := session.FromContext(c); ok {
-			if msgs, popped, _ := session.FlashPop[[]string](sess, "flash"); popped {
+			if msgs, ok := session.PopFlashMessages(sess); ok {
 				r.Flash = msgs
 			}
+			r.IsAuthenticated = auth.IsAuthenticated(sess)
 		}
 	}
 

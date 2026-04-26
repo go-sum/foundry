@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 )
@@ -14,6 +15,8 @@ const verifierRandomBytes = 48
 var (
 	// ErrInvalidVerifier is returned by Challenge when the verifier does not satisfy RFC 7636 4.1.
 	ErrInvalidVerifier = errors.New("pkce: verifier does not satisfy RFC 7636 4.1")
+	// ErrPKCEMismatch is returned by VerifyChallenge when the derived challenge does not match.
+	ErrPKCEMismatch = errors.New("pkce: challenge mismatch")
 )
 
 // NewVerifier generates a cryptographically random PKCE code verifier.
@@ -58,4 +61,18 @@ func Challenge(verifier string) (string, error) {
 	// so converting the string to bytes is an exact ASCII octet mapping.
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:]), nil
+}
+
+// VerifyChallenge confirms that verifier produces expectedChallenge under S256.
+// Returns ErrInvalidVerifier if the verifier format is invalid, and
+// ErrPKCEMismatch if the derived challenge does not match expectedChallenge.
+func VerifyChallenge(verifier, expectedChallenge string) error {
+	derived, err := Challenge(verifier)
+	if err != nil {
+		return err
+	}
+	if subtle.ConstantTimeCompare([]byte(derived), []byte(expectedChallenge)) != 1 {
+		return ErrPKCEMismatch
+	}
+	return nil
 }

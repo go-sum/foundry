@@ -32,6 +32,7 @@ type ContactConfig struct {
 type Config struct {
 	PublicDir    string
 	Assets       static.AssetsConfig
+	Auth         AuthConfig
 	Contact      ContactConfig
 	CSP          secure.CSPNonceConfig
 	CSRF         secure.CSRFConfig
@@ -58,9 +59,14 @@ func Load() (*Config, error) {
 }
 
 func defaultProduction() (Config, error) {
+	siteBaseURL := cfgpkg.ExpandEnv("SITE_BASE_URL", "")
 	csrf, err := defaultCSRF()
 	if err != nil {
 		return Config{}, fmt.Errorf("config: security: %w", err)
+	}
+	authCfg, err := DefaultAuth(siteBaseURL)
+	if err != nil {
+		return Config{}, fmt.Errorf("config: auth: %w", err)
 	}
 	const publicDir = "public"
 	assets := static.DefaultAssetsConfig()
@@ -69,16 +75,17 @@ func defaultProduction() (Config, error) {
 	return Config{
 		PublicDir: publicDir,
 		Assets:    assets,
+		Auth:      authCfg,
 		Contact: ContactConfig{
 			SendTo:     cfgpkg.ExpandEnv("CONTACT_SEND_TO", "admin@example.com"),
 			SendFrom:   cfgpkg.ExpandEnv("CONTACT_SEND_FROM", "noreply@example.com"),
 			RateLimit:  3,
 			RateWindow: time.Hour,
 		},
-		CSP:          secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash),
-		CSRF:         csrf,
-		Env:          Production,
-		Headers:      secure.DefaultHeadersConfig(),
+		CSP:     secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash),
+		CSRF:    csrf,
+		Env:     Production,
+		Headers: secure.DefaultHeadersConfig(),
 		KV: KVConfig{
 			Addr:     cfgpkg.ExpandEnv("KV_HOST", "localhost") + ":" + cfgpkg.ExpandEnv("KV_PORT", "6379"),
 			Password: cfgpkg.ExpandSecret("KV_PASSWORD"),
@@ -87,6 +94,6 @@ func defaultProduction() (Config, error) {
 		Server:       serve.DefaultServerConfig(),
 		Session:      session.DefaultSettings(),
 		SessionStore: cfgpkg.ExpandEnv("SESSION_STORE", "memory"),
-		Site:         site.Config{BaseURL: cfgpkg.ExpandEnv("SITE_BASE_URL", "")},
+		Site:         site.Config{BaseURL: siteBaseURL},
 	}, nil
 }

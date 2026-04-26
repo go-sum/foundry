@@ -2,12 +2,30 @@ package auth
 
 import (
 	"errors"
+	"net/url"
+	"strings"
 
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/htmx"
 	"github.com/go-sum/web/session"
 	"github.com/google/uuid"
 )
+
+// sanitizeReturnTo validates a return-to URL and returns it if safe, or "/".
+// A safe URL must be relative (starts with "/"), not protocol-relative ("//"),
+// and must not contain newlines (header injection guard).
+func sanitizeReturnTo(returnTo string) string {
+	if !strings.HasPrefix(returnTo, "/") {
+		return "/"
+	}
+	if strings.HasPrefix(returnTo, "//") {
+		return "/"
+	}
+	if strings.ContainsAny(returnTo, "\r\n") {
+		return "/"
+	}
+	return returnTo
+}
 
 // LoadSession reads user identity from the session and sets context values.
 // It is non-destructive: if no session or no user ID is present, the request
@@ -32,12 +50,19 @@ func LoadSession() web.Middleware {
 
 // RequireAuth rejects unauthenticated requests. For HTMX requests it returns
 // a 401 with an HX-Redirect header; for full-page requests it returns a 303
-// redirect to the signin path.
+// redirect to the signin path with a return_to query parameter so the user
+// is sent back to the original URL after signin.
 func RequireAuth(signinPath func() string) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
 			if UserID(c) == "" {
 				path := signinPath()
+				returnTo := c.URL().RequestURI()
+				sep := "?"
+				if strings.Contains(path, "?") {
+					sep = "&"
+				}
+				path = path + sep + "return_to=" + url.QueryEscape(returnTo)
 				if htmx.IsHTMX(c) && !htmx.IsBoosted(c) {
 					resp := web.Respond(401)
 					htmx.SetRedirect(&resp, path)

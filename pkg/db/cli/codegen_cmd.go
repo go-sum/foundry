@@ -19,16 +19,14 @@ func newCodegenCmd(configPath *string) *cobra.Command {
 				return err
 			}
 
-			if cfg.Codegen.Queries == "" {
-				return fmt.Errorf("codegen: no queries directory configured in schema.yaml")
-			}
-
-			if !hasQueryFiles(cfg.queriesDir()) {
+			extra := cfg.extraQueryPaths()
+			hasLocal := cfg.Codegen.Queries != "" && hasQueryFiles(cfg.queriesDir())
+			if !hasLocal && len(extra) == 0 {
 				fmt.Println("codegen: no query files found, skipping.")
 				return nil
 			}
 
-			if err := codegen.Generate(cfg.baseDir, cfg.schemaFiles(), cfg.Codegen); err != nil {
+			if err := codegen.Generate(cfg.baseDir, cfg.schemaFiles(), cfg.Codegen, extra); err != nil {
 				return err
 			}
 

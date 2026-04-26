@@ -27,6 +27,7 @@ type schemaEntry struct {
 	Priority     int      `yaml:"priority"`
 	HealthTables []string `yaml:"health_tables"`
 	External     bool     `yaml:"external"`
+	Queries      string   `yaml:"queries,omitempty"`
 }
 
 type fileSchema struct {
@@ -62,6 +63,9 @@ func loadConfig(path string) (*dbConfig, error) {
 	for i := range cfg.Schema {
 		if !filepath.IsAbs(cfg.Schema[i].Path) {
 			cfg.Schema[i].Path = filepath.Join(baseDir, cfg.Schema[i].Path)
+		}
+		if cfg.Schema[i].Queries != "" && !filepath.IsAbs(cfg.Schema[i].Queries) {
+			cfg.Schema[i].Queries = filepath.Join(baseDir, cfg.Schema[i].Queries)
 		}
 	}
 	cfg.baseDir = baseDir
@@ -115,6 +119,16 @@ func (c *dbConfig) schemaFiles() []string {
 	return paths
 }
 
+
+func (c *dbConfig) extraQueryPaths() []string {
+	var paths []string
+	for _, e := range c.Schema {
+		if e.Queries != "" {
+			paths = append(paths, e.Queries)
+		}
+	}
+	return paths
+}
 
 func (c *dbConfig) dsnFunc() func() (string, error) {
 	return db.DSN

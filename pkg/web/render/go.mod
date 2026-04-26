@@ -9,7 +9,4 @@ require (
 	maragu.dev/gomponents v1.3.0
 )
 
-require (
-	github.com/go-playground/validator/v10 v10.30.2 // indirect
-	golang.org/x/net v0.53.0 // indirect
-)
+require golang.org/x/net v0.53.0 // indirect

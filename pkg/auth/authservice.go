@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -31,6 +32,10 @@ type UserWriter interface {
 type Notifier interface {
 	SendVerification(ctx context.Context, input DeliveryInput) error
 }
+
+// maxVerifyAttempts is the number of failed TOTP attempts allowed before the
+// pending flow is locked. Requires requesting a new code after this limit.
+const maxVerifyAttempts = 5
 
 // AuthService implements email-TOTP authentication flows.
 type AuthService struct {
@@ -70,16 +75,30 @@ func NewAuthService(cfg AuthServiceConfig) *AuthService {
 }
 
 // BeginSignup starts a signup verification flow for a new user.
+// Anti-enumeration: when the email is already registered and verified, a
+// FlowAlreadyRegistered notification is sent (no code or link) and a dummy
+// flow is returned so the response is indistinguishable from a real signup.
 func (s *AuthService) BeginSignup(ctx context.Context, input BeginSignupInput, verifyPath string) (PendingFlow, error) {
 	if !s.config.Enabled {
 		return PendingFlow{}, ErrUnsupportedMethod
 	}
 
-	if _, err := s.users.GetUserByEmail(ctx, input.Email); err == nil {
-		return PendingFlow{}, ErrEmailTaken
-	} else if !errors.Is(err, ErrUserNotFound) {
-		return PendingFlow{}, fmt.Errorf("lookup signup email: %w", err)
+	existing, lookupErr := s.users.GetUserByEmail(ctx, input.Email)
+	switch {
+	case lookupErr == nil && existing.Verified:
+		_ = s.notifier.SendVerification(ctx, DeliveryInput{
+			Purpose: FlowAlreadyRegistered,
+			Email:   input.Email,
+		})
+		flow, _, err := s.newPendingFlow(FlowSignup, input.Email, input.DisplayName, RoleUser, uuid.Nil)
+		if err != nil {
+			return PendingFlow{}, err
+		}
+		return flow, nil
+	case lookupErr != nil && !errors.Is(lookupErr, ErrUserNotFound):
+		return PendingFlow{}, fmt.Errorf("lookup signup email: %w", lookupErr)
 	}
+	// ErrUserNotFound (new user) or exists-but-unverified: proceed normally.
 
 	flow, code, err := s.newPendingFlow(FlowSignup, input.Email, input.DisplayName, RoleUser, uuid.Nil)
 	if err != nil {
@@ -110,9 +129,9 @@ func (s *AuthService) BeginSignin(ctx context.Context, input BeginSigninInput, v
 			return PendingFlow{}, err
 		}
 	case err == nil:
-		// Anti-enumeration: suppress delivery for unverified accounts.
+		slog.DebugContext(ctx, "auth: signin suppressed for unverified account", "email", input.Email)
 	case errors.Is(err, ErrUserNotFound):
-		// Anti-enumeration: pretend the flow exists.
+		slog.DebugContext(ctx, "auth: signin for unknown email (anti-enumeration)", "email", input.Email)
 	case err != nil:
 		return PendingFlow{}, fmt.Errorf("lookup signin email: %w", err)
 	}
@@ -174,11 +193,18 @@ func (s *AuthService) ResendPendingFlow(ctx context.Context, flow PendingFlow, v
 }
 
 // VerifyPendingFlow verifies the code against the session-held pending flow.
-func (s *AuthService) VerifyPendingFlow(ctx context.Context, flow PendingFlow, input VerifyInput) (VerifyResult, error) {
-	if err := validateTOTPCode(flow.Secret, flow.IssuedAt, flow.ExpiresAt, input.Code, s.config.PeriodSeconds, s.clock()); err != nil {
-		return VerifyResult{}, err
+// It returns the updated flow (with incremented Attempts) so the caller can
+// persist it back to the session on failure.
+func (s *AuthService) VerifyPendingFlow(ctx context.Context, flow PendingFlow, input VerifyInput) (VerifyResult, PendingFlow, error) {
+	if flow.Attempts >= maxVerifyAttempts {
+		return VerifyResult{}, flow, ErrTooManyAttempts
 	}
-	return s.finishVerification(ctx, flow)
+	flow.Attempts++
+	if err := validateTOTPCode(flow.Secret, flow.IssuedAt, flow.ExpiresAt, input.Code, s.config.PeriodSeconds, s.clock()); err != nil {
+		return VerifyResult{}, flow, err
+	}
+	result, err := s.finishVerification(ctx, flow)
+	return result, flow, err
 }
 
 // VerifyToken verifies the code against a self-contained token from a verify link.
@@ -190,23 +216,18 @@ func (s *AuthService) VerifyToken(ctx context.Context, token string, input Verif
 	if err := validateTOTPCode(payload.Secret, payload.IssuedAt, payload.ExpiresAt, input.Code, s.config.PeriodSeconds, s.clock()); err != nil {
 		return VerifyResult{}, err
 	}
-	return s.finishVerification(ctx, PendingFlow(payload))
+	return s.finishVerification(ctx, pendingFlowFromToken(payload))
 }
 
-// VerifyPageState decodes a verify token and returns the data needed to render
-// the verification page, including the pre-generated code (for dev/preview).
+// VerifyPageState decodes a verify token and returns the display context
+// needed to render the verification page.
 func (s *AuthService) VerifyPageState(token string) (VerifyPageState, error) {
 	payload, err := s.tokenCodec.Decode(token)
 	if err != nil {
 		return VerifyPageState{}, err
 	}
-	code, err := generateTOTPCode(payload.Secret, payload.IssuedAt, s.config.PeriodSeconds)
-	if err != nil {
-		return VerifyPageState{}, err
-	}
 	return VerifyPageState{
 		Purpose: payload.Purpose,
-		Code:    code,
 		Token:   token,
 		Email:   payload.Email,
 	}, nil
@@ -244,7 +265,7 @@ func (s *AuthService) newPendingFlow(purpose FlowPurpose, email, displayName str
 }
 
 func (s *AuthService) deliver(ctx context.Context, flow PendingFlow, code, verifyPath string) error {
-	token, err := s.tokenCodec.Encode(VerificationToken(flow))
+	token, err := s.tokenCodec.Encode(verificationTokenFromFlow(flow))
 	if err != nil {
 		return fmt.Errorf("encode verification token: %w", err)
 	}

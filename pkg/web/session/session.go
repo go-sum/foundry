@@ -207,6 +207,19 @@ func FlashPop[T any](s *Session, key string) (T, bool, error) {
 	return zero, true, nil
 }
 
+const flashKey = "flash"
+
+// FlashMessages stores a slice of user-facing messages for the next request.
+func FlashMessages(s *Session, msgs []string) error {
+	return s.Flash(flashKey, msgs)
+}
+
+// PopFlashMessages retrieves and removes the flash messages set by the previous request.
+func PopFlashMessages(s *Session) ([]string, bool) {
+	msgs, ok, _ := FlashPop[[]string](s, flashKey)
+	return msgs, ok
+}
+
 // FromContext returns the session injected by Middleware.
 func FromContext(c *web.Context) (*Session, bool) {
 	return web.Get[*Session](c, contextKey)

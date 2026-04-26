@@ -17,4 +17,10 @@ var (
 
 	// ErrSessionKeyInvalid is returned when SECURITY_SESSION_KEY is not valid hex-encoded key material.
 	ErrSessionKeyInvalid = errors.New("config: SECURITY_SESSION_KEY must be valid hex-encoded key material")
+
+	// ErrAuthTokenKeyMissing is returned when SECURITY_AUTH_TOKEN_KEY is not set.
+	ErrAuthTokenKeyMissing = errors.New("config: SECURITY_AUTH_TOKEN_KEY is required")
+
+	// ErrAuthTokenKeyInvalid is returned when SECURITY_AUTH_TOKEN_KEY is not valid hex-encoded key material.
+	ErrAuthTokenKeyInvalid = errors.New("config: SECURITY_AUTH_TOKEN_KEY must be valid hex-encoded key material (minimum 32 bytes)")
 )

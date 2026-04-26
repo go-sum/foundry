@@ -151,8 +151,8 @@ func TestNewRequest_PopsFlashFromSession(t *testing.T) {
 		if !ok {
 			t.Fatal("session missing from context")
 		}
-		if err := sess.Flash("flash", []string{"Saved", "Sent"}); err != nil {
-			t.Fatalf("Flash() error = %v", err)
+		if err := session.FlashMessages(sess, []string{"Saved", "Sent"}); err != nil {
+			t.Fatalf("FlashMessages() error = %v", err)
 		}
 		return web.Text(http.StatusOK, "ok"), nil
 	})

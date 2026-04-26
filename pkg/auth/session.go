@@ -12,7 +12,10 @@ const (
 	sessionKeyPasskeyCeremony = "auth.passkey_ceremony"
 )
 
-func setAuth(sess *session.Session, userID, displayName string) error {
+// SetAuth records the authenticated user in the session. It is exported so
+// OAuth callback handlers can establish the same session state after resolving
+// identity from the userinfo endpoint.
+func SetAuth(sess *session.Session, userID, displayName string) error {
 	if err := sess.Set(sessionKeyUserID, userID); err != nil {
 		return err
 	}
@@ -26,6 +29,12 @@ func setAuth(sess *session.Session, userID, displayName string) error {
 func getUserID(sess *session.Session) (string, bool) {
 	id, ok, _ := session.Get[string](sess, sessionKeyUserID)
 	return id, ok && id != ""
+}
+
+// IsAuthenticated reports whether the session holds a valid authenticated user.
+func IsAuthenticated(sess *session.Session) bool {
+	_, ok := getUserID(sess)
+	return ok
 }
 
 func getDisplayName(sess *session.Session) (string, bool) {

@@ -9,6 +9,8 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/go-sum/auth"
+	"github.com/go-sum/auth/provider"
 	"github.com/go-sum/componentry/icons"
 	"github.com/go-sum/db"
 	"github.com/go-sum/kv"
@@ -26,6 +28,7 @@ import (
 
 	config "github.com/go-sum/foundry/config"
 	"github.com/go-sum/foundry/internal/features/contact"
+	"github.com/go-sum/foundry/internal/features/oauthclient"
 	"github.com/go-sum/foundry/internal/view"
 )
 
@@ -62,6 +65,11 @@ type Services struct {
 	Processor      *queue.Processor
 	Notifier       *notification.Dispatcher
 	Contact        *contact.Module
+	Auth           *auth.Module
+	// OAuthProvider is the built-in OAuth 2.0 Authorization Server.
+	OAuthProvider  *provider.ProviderModule
+	// OAuthClient is the first-party OAuth 2.1 client handler.
+	OAuthClient    *oauthclient.Handler
 	SchemaRegistry *db.Registry
 }
 
@@ -127,6 +135,7 @@ func New(ctx context.Context) (*App, error) {
 		session.Middleware(security.Session),
 		secure.CSRF(security.CSRF),
 		htmx.VaryMiddleware(),
+		auth.LoadSession(),
 	)
 
 	services, err := provideServices(ctx, runtime, security, routing, pres)

@@ -24,6 +24,7 @@ type SigninPageData struct {
 	Errors     map[string]string
 	FormErrors []string
 	Config     Config
+	ReturnTo   string // URL to return to after successful signin; empty means "/"
 }
 
 // SignupPageData carries state for rendering the signup view.
@@ -32,6 +33,7 @@ type SignupPageData struct {
 	Errors     map[string]string
 	FormErrors []string
 	Config     Config
+	ReturnTo   string // URL to return to after successful signup; empty means "/"
 }
 
 // VerifyPageData carries state for rendering the verification view.
@@ -60,7 +62,8 @@ type AuthHandler struct {
 
 // ShowSignin renders the signin form.
 func (h *AuthHandler) ShowSignin(c *web.Context) (web.Response, error) {
-	return h.renderer.SigninPage(c, SigninPageData{Config: h.config})
+	returnTo := sanitizeReturnTo(c.URL().Query().Get("return_to"))
+	return h.renderer.SigninPage(c, SigninPageData{Config: h.config, ReturnTo: returnTo})
 }
 
 // BeginSignin starts a passwordless signin verification flow.
@@ -73,15 +76,18 @@ func (h *AuthHandler) BeginSignin(c *web.Context) (web.Response, error) {
 			Input:      input,
 			FormErrors: []string{"Please enter a valid email address."},
 			Config:     h.config,
+			ReturnTo:   sanitizeReturnTo(input.ReturnTo),
 		})
 	}
 
+	returnTo := sanitizeReturnTo(input.ReturnTo)
 	verifyPath := h.router.MustReverse(RouteVerifyShow, nil)
 	flow, err := h.svc.BeginSignin(c.Context(), input, verifyPath)
 	if err != nil {
 		return web.Response{}, mapServiceError(err)
 	}
 
+	flow.ReturnTo = returnTo
 	if err := setPendingFlow(sess, flow); err != nil {
 		return web.Response{}, web.ErrInternal(err)
 	}
@@ -92,7 +98,8 @@ func (h *AuthHandler) BeginSignin(c *web.Context) (web.Response, error) {
 
 // ShowSignup renders the signup form.
 func (h *AuthHandler) ShowSignup(c *web.Context) (web.Response, error) {
-	return h.renderer.SignupPage(c, SignupPageData{Config: h.config})
+	returnTo := sanitizeReturnTo(c.URL().Query().Get("return_to"))
+	return h.renderer.SignupPage(c, SignupPageData{Config: h.config, ReturnTo: returnTo})
 }
 
 // BeginSignup starts a signup verification flow.
@@ -105,15 +112,18 @@ func (h *AuthHandler) BeginSignup(c *web.Context) (web.Response, error) {
 			Input:      input,
 			FormErrors: []string{"Please correct the errors below."},
 			Config:     h.config,
+			ReturnTo:   sanitizeReturnTo(input.ReturnTo),
 		})
 	}
 
+	returnTo := sanitizeReturnTo(input.ReturnTo)
 	verifyPath := h.router.MustReverse(RouteVerifyShow, nil)
 	flow, err := h.svc.BeginSignup(c.Context(), input, verifyPath)
 	if err != nil {
 		return web.Response{}, mapServiceError(err)
 	}
 
+	flow.ReturnTo = returnTo
 	if err := setPendingFlow(sess, flow); err != nil {
 		return web.Response{}, web.ErrInternal(err)
 	}
@@ -137,7 +147,7 @@ func (h *AuthHandler) ShowVerify(c *web.Context) (web.Response, error) {
 		}
 		return h.renderer.VerifyPage(c, VerifyPageData{
 			State: state,
-			Input: VerifyInput{Token: token, Code: state.Code},
+			Input: VerifyInput{Token: token},
 		})
 	}
 
@@ -171,6 +181,7 @@ func (h *AuthHandler) Verify(c *web.Context) (web.Response, error) {
 
 	var result VerifyResult
 	var err error
+	var returnTo string
 
 	if input.Token != "" {
 		result, err = h.svc.VerifyToken(c.Context(), input.Token, input)
@@ -179,18 +190,29 @@ func (h *AuthHandler) Verify(c *web.Context) (web.Response, error) {
 		if !ok {
 			return web.Response{}, web.ErrBadRequest("No pending verification flow")
 		}
-		result, err = h.svc.VerifyPendingFlow(c.Context(), flow, input)
+		returnTo = flow.ReturnTo
+		var updatedFlow PendingFlow
+		result, updatedFlow, err = h.svc.VerifyPendingFlow(c.Context(), flow, input)
+		if err != nil {
+			// Persist the attempt count back to the session so brute-force
+			// attempts are counted across requests.
+			_ = setPendingFlow(sess, updatedFlow)
+			return web.Response{}, mapServiceError(err)
+		}
 	}
 	if err != nil {
 		return web.Response{}, mapServiceError(err)
 	}
 
 	sess.Regenerate()
-	if err := setAuth(sess, result.User.ID.String(), result.User.DisplayName); err != nil {
+	if err := SetAuth(sess, result.User.ID.String(), result.User.DisplayName); err != nil {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	return web.SeeOther("/"), nil
+	if returnTo == "" {
+		returnTo = "/"
+	}
+	return web.SeeOther(returnTo), nil
 }
 
 // Resend re-sends the verification code for the current pending flow.

@@ -21,7 +21,9 @@ type Config struct {
 // Generate produces Go code from SQL schema files and query annotations.
 // baseDir is the directory containing schema.yaml; relative paths in cfg
 // are resolved against it. schemaFiles must be absolute paths.
-func Generate(baseDir string, schemaFiles []string, cfg Config) error {
+// extraQueryPaths are additional absolute paths to query files or directories
+// to include alongside cfg.Queries in the single sqlc run.
+func Generate(baseDir string, schemaFiles []string, cfg Config, extraQueryPaths []string) error {
 	// sqlc resolves schema paths relative to the config file's location.
 	// Convert absolute schema paths to relative-to-baseDir so they resolve
 	// correctly when the temp config file is placed in baseDir.
@@ -34,11 +36,23 @@ func Generate(baseDir string, schemaFiles []string, cfg Config) error {
 		relSchema[i] = rel
 	}
 
+	var queryPaths []string
+	if cfg.Queries != "" {
+		queryPaths = append(queryPaths, cfg.Queries)
+	}
+	for _, p := range extraQueryPaths {
+		rel, err := filepath.Rel(baseDir, p)
+		if err != nil {
+			return fmt.Errorf("codegen: extra queries rel path: %w", err)
+		}
+		queryPaths = append(queryPaths, rel)
+	}
+
 	sqlcCfg := sqlcConfig{
 		Version: "2",
 		SQL: []sqlcSQL{{
 			Engine:  "postgresql",
-			Queries: cfg.Queries,
+			Queries: queryPaths,
 			Schema:  relSchema,
 			Gen: sqlcGen{Go: sqlcGenGo{
 				Package:         cfg.Package,
@@ -85,7 +99,7 @@ type sqlcConfig struct {
 
 type sqlcSQL struct {
 	Engine  string   `yaml:"engine"`
-	Queries string   `yaml:"queries"`
+	Queries []string `yaml:"queries"`
 	Schema  []string `yaml:"schema"`
 	Gen     sqlcGen  `yaml:"gen"`
 }

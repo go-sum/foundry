@@ -10,6 +10,18 @@ schema:
     health_tables: [queue_jobs]
     external: true
 
+  - name: auth
+    path: ../../pkg/auth/pgstore/sql/schema.sql
+    priority: 60
+    health_tables: [users, webauthn_credentials]
+    external: true
+    queries: ../../pkg/auth/pgstore/sql/queries.sql
+
+  - name: auth_provider
+    path: ../../pkg/auth/provider/pgstore/sql/schema.sql
+    priority: 70
+    external: true
+
   - path: sql/schema/contact.sql
     priority: 100
     health_tables: [contact_submissions]

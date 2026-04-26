@@ -41,6 +41,7 @@ const airProxyCSPHash = "'sha256-y933zYNvpVe5f9j5A+OKECUXiWo8bKB5Yp5sLDD3d0I='"
 
 func overlayDevelopment(cfg *Config) {
 	cfg.Site.BaseURL = "http://forge.test"
+	cfg.Auth.Provider.Issuer = cfg.Site.BaseURL
 	cfg.CSRF.CookieSecure = false
 	cfg.Session.CookieSecure = false
 	cfg.Headers.StrictTransportSecurity = ""
@@ -56,6 +57,7 @@ func overlayDevelopment(cfg *Config) {
 
 func overlayTesting(cfg *Config) {
 	cfg.Site.BaseURL = "http://test.local"
+	cfg.Auth.Provider.Issuer = cfg.Site.BaseURL
 	cfg.CSRF.CookieSecure = false
 	cfg.Session.CookieSecure = false
 	if dir := os.Getenv("TEST_STATIC_DIR"); dir != "" {

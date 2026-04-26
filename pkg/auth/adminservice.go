@@ -15,6 +15,13 @@ type AdminStore interface {
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	CountUsers(ctx context.Context) (int64, error)
 	HasAdmin(ctx context.Context) (bool, error)
+	// IsLastAdmin reports whether id is an admin AND is the only admin in the
+	// system. Returns false when id is not an admin or more than one admin exists.
+	IsLastAdmin(ctx context.Context, id uuid.UUID) (bool, error)
+	// ElevateToAdmin atomically promotes id to admin, returning ErrAdminExists
+	// if any admin already exists. The check-and-update is a single SQL statement
+	// to prevent a TOCTOU race during initial bootstrap.
+	ElevateToAdmin(ctx context.Context, id uuid.UUID) (User, error)
 }
 
 // AdminService provides admin-level user management operations.
@@ -49,13 +56,27 @@ func (s *AdminService) GetUser(ctx context.Context, id uuid.UUID) (User, error) 
 	return s.users.GetUserByID(ctx, id)
 }
 
-// UpdateUser updates user fields by ID.
+// UpdateUser updates user fields by ID. Returns ErrLastAdmin when the update
+// would demote the only remaining admin account.
 func (s *AdminService) UpdateUser(ctx context.Context, id uuid.UUID, input UpdateUserInput) (User, error) {
+	if input.Role == string(RoleUser) {
+		if last, err := s.users.IsLastAdmin(ctx, id); err != nil {
+			return User{}, fmt.Errorf("AdminService.UpdateUser: check last admin: %w", err)
+		} else if last {
+			return User{}, ErrLastAdmin
+		}
+	}
 	return s.users.UpdateUser(ctx, id, input.Email, input.DisplayName, input.Role)
 }
 
-// DeleteUser removes a user by ID.
+// DeleteUser removes a user by ID. Returns ErrLastAdmin when the target is
+// the only remaining admin account.
 func (s *AdminService) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	if last, err := s.users.IsLastAdmin(ctx, id); err != nil {
+		return fmt.Errorf("AdminService.DeleteUser: check last admin: %w", err)
+	} else if last {
+		return ErrLastAdmin
+	}
 	return s.users.DeleteUser(ctx, id)
 }
 
@@ -64,16 +85,9 @@ func (s *AdminService) HasAdmin(ctx context.Context) (bool, error) {
 	return s.users.HasAdmin(ctx)
 }
 
-// ElevateToAdmin promotes a user to admin, provided no admin exists yet.
+// ElevateToAdmin atomically promotes a user to admin, provided no admin exists yet.
 func (s *AdminService) ElevateToAdmin(ctx context.Context, userID uuid.UUID) (User, error) {
-	hasAdmin, err := s.users.HasAdmin(ctx)
-	if err != nil {
-		return User{}, fmt.Errorf("AdminService.ElevateToAdmin: %w", err)
-	}
-	if hasAdmin {
-		return User{}, ErrAdminExists
-	}
-	user, err := s.users.UpdateUser(ctx, userID, "", "", string(RoleAdmin))
+	user, err := s.users.ElevateToAdmin(ctx, userID)
 	if err != nil {
 		return User{}, fmt.Errorf("AdminService.ElevateToAdmin: %w", err)
 	}

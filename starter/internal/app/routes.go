@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-sum/auth"
+	"github.com/go-sum/auth/provider"
 	"github.com/go-sum/db"
 	"github.com/go-sum/docs"
 	"github.com/go-sum/foundry/internal/features/hello"
@@ -20,7 +22,6 @@ import (
 	"github.com/go-sum/web/etag"
 	"github.com/go-sum/web/router"
 	"github.com/go-sum/web/secure"
-	"github.com/go-sum/web/session"
 	"github.com/go-sum/web/site"
 	"github.com/go-sum/web/static"
 	g "maragu.dev/gomponents"
@@ -82,6 +83,12 @@ func unavailableHandler(feature string) web.Handler {
 	}
 }
 
+// Route name constants for the first-party OAuth client.
+const (
+	RouteOAuthConnect  = "auth.connect"
+	RouteOAuthCallback = "auth.callback"
+)
+
 func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site.Site, pres Presentation) error {
 	homeH := home.NewHandler(rt, pres.ViewOpts...)
 	helloH := hello.NewHandler(rt, pres.ViewOpts...)
@@ -131,12 +138,31 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 				router.GET("/contact", "contact.form", contactForm),
 				router.POST("/contact", "contact.submit", contactSubmit),
 				router.Group("/account",
-					router.Use(session.Guard(session.DefaultGuardConfig())),
+					router.Use(auth.RequireAuth(router.NewResolver(rt).Path(RouteOAuthConnect))),
 				),
 			},
 			showcaseNodes(svc, pres),
 		)...),
 	)
+
+	// Auth routes (identity provider — signin/signup/verify/signout).
+	if svc.Auth != nil {
+		router.Register(rt, auth.Routes(svc.Auth)...)
+	}
+
+	// OAuth Provider routes (Authorization Server — authorize/token/userinfo/discovery).
+	if svc.OAuthProvider != nil {
+		router.Register(rt, provider.Routes(svc.OAuthProvider)...)
+	}
+
+	// First-party OAuth client routes (connect + callback).
+	if svc.OAuthClient != nil {
+		router.Register(rt,
+			router.GET("/auth/connect", RouteOAuthConnect, svc.OAuthClient.Connect),
+			router.GET("/auth/callback", RouteOAuthCallback, svc.OAuthClient.Callback),
+		)
+	}
+
 	return nil
 }
 

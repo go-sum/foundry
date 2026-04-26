@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"strings"
+
 	"github.com/go-sum/web"
 	"github.com/go-sum/web/router"
 	"github.com/go-sum/web/session"
@@ -51,7 +53,7 @@ func (h *PasskeyHandler) FinishAuthentication(c *web.Context) (web.Response, err
 	}
 
 	sess.Regenerate()
-	if err := setAuth(sess, result.User.ID.String(), result.User.DisplayName); err != nil {
+	if err := SetAuth(sess, result.User.ID.String(), result.User.DisplayName); err != nil {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
@@ -97,8 +99,8 @@ func (h *PasskeyHandler) FinishRegistration(c *web.Context) (web.Response, error
 	}
 	clearPasskeyCeremony(sess)
 
-	// Parse optional name from query param.
-	name := c.URL().Query().Get("name")
+	// Parse and validate optional name from query param.
+	name := sanitizePasskeyName(c.URL().Query().Get("name"))
 
 	httpReq := toHTTPRequest(c)
 	cred, err := h.svc.FinishRegistration(c.Context(), state.UserID, name, state.Ceremony, httpReq)
@@ -196,6 +198,19 @@ func (h *PasskeyHandler) Delete(c *web.Context) (web.Response, error) {
 	}
 
 	return web.Respond(200), nil
+}
+
+// sanitizePasskeyName trims whitespace from the provided name and enforces a
+// 255-character maximum. Returns "Passkey" when the result is empty.
+func sanitizePasskeyName(name string) string {
+	name = strings.TrimSpace(name)
+	if len(name) > 255 {
+		name = name[:255]
+	}
+	if name == "" {
+		return "Passkey"
+	}
+	return name
 }
 
 // parseUserAndPasskeyID extracts and validates the user ID from the context and

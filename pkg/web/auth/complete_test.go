@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"testing"
@@ -82,5 +83,70 @@ func TestCompleteAuth_RegeneratesSession(t *testing.T) {
 	// ID() returns the current token, which is now empty.
 	if sess.ID() != "" {
 		t.Errorf("sess.ID() = %q after CompleteAuth, want empty (Regenerate clears token)", sess.ID())
+	}
+}
+
+func TestCompleteAuth_UnsetsTransaction(t *testing.T) {
+	sess := sessionFromMiddleware(t)
+	if err := sess.Set(SessionKey, "test-value"); err != nil {
+		t.Fatalf("sess.Set error: %v", err)
+	}
+	if !sess.Has(SessionKey) {
+		t.Fatal("expected session to have SessionKey before CompleteAuth")
+	}
+
+	tx := OAuthTransaction{
+		State:    "some-state",
+		Nonce:    "some-nonce",
+		Verifier: "some-verifier",
+		ReturnTo: "/dashboard",
+	}
+	if _, err := CompleteAuth(context.Background(), sess, tx); err != nil {
+		t.Fatalf("CompleteAuth error: %v", err)
+	}
+
+	if sess.Has(SessionKey) {
+		t.Error("expected SessionKey to be unset after CompleteAuth")
+	}
+}
+
+func TestCompleteAuth_ExpiredTransaction(t *testing.T) {
+	sess := sessionFromMiddleware(t)
+	originalID := sess.ID()
+
+	tx := OAuthTransaction{
+		State:     "some-state",
+		Nonce:     "some-nonce",
+		Verifier:  "some-verifier",
+		ReturnTo:  "/dashboard",
+		CreatedAt: time.Now().UTC().Add(-11 * time.Minute),
+	}
+
+	_, err := CompleteAuth(context.Background(), sess, tx)
+	if !errors.Is(err, ErrTransactionExpired) {
+		t.Fatalf("CompleteAuth expired: got %v, want ErrTransactionExpired", err)
+	}
+	// Session must NOT have been regenerated.
+	if sess.ID() != originalID {
+		t.Errorf("session ID changed on expired transaction; Regenerate must not be called")
+	}
+}
+
+func TestCompleteAuth_ZeroCreatedAt(t *testing.T) {
+	sess := sessionFromMiddleware(t)
+	tx := OAuthTransaction{
+		State:    "some-state",
+		Nonce:    "some-nonce",
+		Verifier: "some-verifier",
+		ReturnTo: "/home",
+		// CreatedAt is zero — TTL check must be skipped.
+	}
+
+	returnTo, err := CompleteAuth(context.Background(), sess, tx)
+	if err != nil {
+		t.Fatalf("CompleteAuth zero CreatedAt error: %v", err)
+	}
+	if returnTo != "/home" {
+		t.Errorf("returnTo = %q, want %q", returnTo, "/home")
 	}
 }

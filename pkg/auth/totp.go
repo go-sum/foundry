@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1" //nolint:gosec // RFC 6238 TOTP uses HMAC-SHA1.
+	"crypto/subtle"
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
@@ -44,7 +45,7 @@ func validateTOTPCode(secret string, issuedAt, expiresAt time.Time, code string,
 	if err != nil {
 		return err
 	}
-	if constantTimeEqual(expected, code) {
+	if subtle.ConstantTimeCompare([]byte(expected), []byte(code)) == 1 {
 		return nil
 	}
 	return ErrInvalidVerificationCode
@@ -56,15 +57,4 @@ func randomSecret() (string, error) {
 		return "", err
 	}
 	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(raw), nil
-}
-
-func constantTimeEqual(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	var diff byte
-	for i := range a {
-		diff |= a[i] ^ b[i]
-	}
-	return diff == 0
 }

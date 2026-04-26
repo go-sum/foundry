@@ -15,6 +15,11 @@ import (
 
 	cfgpkg "github.com/go-sum/config"
 	"github.com/go-sum/assets/publish"
+	"github.com/go-sum/auth"
+	"github.com/go-sum/auth/authui"
+	authpgstore "github.com/go-sum/auth/pgstore"
+	"github.com/go-sum/auth/provider"
+	providerpgstore "github.com/go-sum/auth/provider/pgstore"
 	"github.com/go-sum/componentry/assets/iconset"
 	"github.com/go-sum/componentry/icons"
 	"github.com/go-sum/db"
@@ -30,9 +35,13 @@ import (
 	"github.com/go-sum/web/session"
 	"github.com/go-sum/web/validate"
 
+	g "maragu.dev/gomponents"
+	h "maragu.dev/gomponents/html"
+
 	config "github.com/go-sum/foundry/config"
 	appdb "github.com/go-sum/foundry/db"
 	"github.com/go-sum/foundry/internal/features/contact"
+	"github.com/go-sum/foundry/internal/features/oauthclient"
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/internal/view/errorpage"
 )
@@ -149,7 +158,7 @@ func connectWithRetry(ctx context.Context, name string, logger *slog.Logger, max
 	return err
 }
 
-func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router, pres Presentation) (Services, error) {
+func provideServices(ctx context.Context, runtime Runtime, security Security, rt *router.Router, pres Presentation) (Services, error) {
 	// In testing environments, skip external service wiring.
 	if runtime.Config.Env == config.Testing {
 		return Services{}, nil
@@ -223,6 +232,21 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 		Logger:   runtime.Logger,
 	})
 
+	// Auth modules (identity provider + OAuth Authorization Server).
+	authMod, oauthProvider, err := provideAuth(runtime.Config, runtime.Logger, pool, rt, pres.ViewOpts)
+	if err != nil {
+		pool.Close()
+		return Services{}, fmt.Errorf("services: %w", err)
+	}
+
+	// Seed the first-party OAuth client — redirect_uri depends on runtime Issuer.
+	if err := seedFirstPartyClient(ctx, pool, *runtime.Config); err != nil {
+		pool.Close()
+		return Services{}, fmt.Errorf("services: seed first-party client: %w", err)
+	}
+
+	oauthClientH := oauthclient.New(runtime.Config.Auth.FirstPartyClientConfig())
+
 	// Queue processor
 	processor := queue.NewProcessor(qStore, queue.WithLogger(runtime.Logger))
 	processor.Register(contact.QueueName, contactMod.QueueHandler,
@@ -239,6 +263,9 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 		Processor:      processor,
 		Notifier:       notifier,
 		Contact:        contactMod,
+		Auth:           authMod,
+		OAuthProvider:  oauthProvider,
+		OAuthClient:    oauthClientH,
 		SchemaRegistry: schemaReg,
 	}, nil
 }
@@ -263,6 +290,97 @@ func provideErrorBoundary(runtime Runtime, routing *router.Router) web.Middlewar
 			return c.Method() + "|" + c.URL().Path
 		},
 	})
+}
+
+// provideAuth wires the auth identity module and the OAuth 2.0 Authorization Server.
+func provideAuth(
+	cfg *config.Config,
+	logger *slog.Logger,
+	pool *pgxpool.Pool,
+	rt *router.Router,
+	viewOpts []view.RequestOption,
+) (*auth.Module, *provider.ProviderModule, error) {
+	tokenCodec, err := auth.NewTokenCodec(cfg.Auth.TokenKeys)
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth: token codec: %w", err)
+	}
+
+	notifier, err := mustNotProductionLogNotifier(cfg.Env, logger)
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth: notifier: %w", err)
+	}
+
+	authStore := authpgstore.New(pool)
+
+	uiCfg := authui.Config{
+		Page: func(c *web.Context, title string, content g.Node) (web.Response, error) {
+			vr := view.NewRequest(c, viewOpts...)
+			centered := h.Div(
+				h.Class("flex min-h-[calc(100vh-4rem)] items-center justify-center px-4"),
+				h.Div(h.Class("w-full max-w-sm"), content),
+			)
+			return view.Render(vr, vr.Page(title, centered), content)
+		},
+	}
+
+	authMod, err := auth.NewModule(auth.ModuleConfig{
+		Router:        rt,
+		Validator:     validate.New(),
+		Logger:        logger,
+		Config:        cfg.Auth.Identity,
+		Users:         authStore,
+		Credentials:   authStore,
+		AdminUsers:    authStore,
+		Notifier:      notifier,
+		TokenCodec:    tokenCodec,
+		Renderer:      authui.NewRenderer(uiCfg),
+		AdminRenderer: authui.NewAdminRenderer(uiCfg),
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth: identity module: %w", err)
+	}
+
+	providerStore := providerpgstore.New(pool)
+	providerMod, err := provider.NewProviderModule(provider.ProviderModuleConfig{
+		Router:    rt,
+		Validator: validate.New(),
+		Logger:    logger,
+		Config: provider.Config{
+			Issuer: cfg.Auth.Provider.Issuer,
+		},
+		Clients:         providerStore,
+		Codes:           providerStore,
+		Tokens:          providerStore,
+		Consents:        providerStore,
+		// Users feeds the /oauth/userinfo endpoint with identity claims.
+		Users:           authStore,
+		ConsentRenderer: stubConsentRenderer{},
+		// The provider's RequireAuth redirects to direct signin (not /auth/connect)
+		// so users can prove their identity before the OAuth flow resumes.
+		SigninPath: router.NewResolver(rt).Path(auth.RouteSigninShow),
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth: provider module: %w", err)
+	}
+
+	return authMod, providerMod, nil
+}
+
+// seedFirstPartyClient upserts the built-in first-party OAuth client into the
+// database at startup. The redirect_uri is derived at runtime from the Issuer
+// URL, so a static migration cannot encode it.
+func seedFirstPartyClient(ctx context.Context, pool *pgxpool.Pool, cfg config.Config) error {
+	redirectURI := cfg.Auth.Provider.Issuer + cfg.Auth.FirstParty.RedirectPath
+	const q = `
+		INSERT INTO oauth_clients (client_id, client_secret, name, redirect_uris, scopes, public, first_party)
+		VALUES ($1, '', 'Starter App (first-party)', ARRAY[$2]::text[], ARRAY['openid','email','profile']::text[], true, true)
+		ON CONFLICT (client_id) DO UPDATE
+			SET redirect_uris = ARRAY[$2]::text[],
+			    first_party   = true,
+			    public        = true,
+			    updated_at    = NOW()`
+	_, err := pool.Exec(ctx, q, cfg.Auth.FirstParty.ClientID, redirectURI)
+	return err
 }
 
 // appErrorRenderer implements web.ErrorRenderer for the starter application.
