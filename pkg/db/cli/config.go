@@ -9,38 +9,38 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/go-sum/db"
-	"github.com/go-sum/db/codegen"
-	"github.com/go-sum/db/compose"
+	"github.com/go-sum/db/migrate"
+	"github.com/go-sum/db/seed"
 )
 
 type dbConfig struct {
-	Schema     []schemaEntry        `yaml:"schema"`
-	Migrations string               `yaml:"migrations"`
-	Codegen    codegen.Config       `yaml:"codegen"`
-	PlanDB     compose.PlanDBConfig `yaml:"plan_db"`
+	Schema     []schemaEntry    `yaml:"schema"`
+	Migrations migrationsConfig `yaml:"migrations"`
 	baseDir    string
 }
 
+type migrationsConfig struct {
+	Destination string `yaml:"destination"`
+}
+
 type schemaEntry struct {
-	Name         string   `yaml:"name"`
-	Path         string   `yaml:"path"`
-	Priority     int      `yaml:"priority"`
-	HealthTables []string `yaml:"health_tables"`
-	External     bool     `yaml:"external"`
-	Queries      string   `yaml:"queries,omitempty"`
+	Name     string `yaml:"name"`
+	Source   string `yaml:"source"`
+	Priority int    `yaml:"priority"`
+	External bool   `yaml:"external"`
+	Discrete bool   `yaml:"discrete"`
+	Seed     string `yaml:"seed"`
 }
 
 type fileSchema struct {
 	name     string
 	sql      string
 	priority int
-	tables   []string
 }
 
-func (f fileSchema) Name() string           { return f.name }
-func (f fileSchema) SQL() string            { return f.sql }
-func (f fileSchema) Priority() int          { return f.priority }
-func (f fileSchema) HealthTables() []string { return f.tables }
+func (f fileSchema) Name() string  { return f.name }
+func (f fileSchema) SQL() string   { return f.sql }
+func (f fileSchema) Priority() int { return f.priority }
 
 func loadConfig(path string) (*dbConfig, error) {
 	absPath, err := filepath.Abs(path)
@@ -57,15 +57,15 @@ func loadConfig(path string) (*dbConfig, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	baseDir := filepath.Dir(absPath)
-	if cfg.Migrations != "" && !filepath.IsAbs(cfg.Migrations) {
-		cfg.Migrations = filepath.Join(baseDir, cfg.Migrations)
+	if cfg.Migrations.Destination != "" && !filepath.IsAbs(cfg.Migrations.Destination) {
+		cfg.Migrations.Destination = filepath.Join(baseDir, cfg.Migrations.Destination)
 	}
 	for i := range cfg.Schema {
-		if !filepath.IsAbs(cfg.Schema[i].Path) {
-			cfg.Schema[i].Path = filepath.Join(baseDir, cfg.Schema[i].Path)
+		if !filepath.IsAbs(cfg.Schema[i].Source) {
+			cfg.Schema[i].Source = filepath.Join(baseDir, cfg.Schema[i].Source)
 		}
-		if cfg.Schema[i].Queries != "" && !filepath.IsAbs(cfg.Schema[i].Queries) {
-			cfg.Schema[i].Queries = filepath.Join(baseDir, cfg.Schema[i].Queries)
+		if cfg.Schema[i].Seed != "" && !filepath.IsAbs(cfg.Schema[i].Seed) {
+			cfg.Schema[i].Seed = filepath.Join(baseDir, cfg.Schema[i].Seed)
 		}
 	}
 	cfg.baseDir = baseDir
@@ -75,59 +75,64 @@ func loadConfig(path string) (*dbConfig, error) {
 func (c *dbConfig) buildRegistry() (*db.Registry, error) {
 	reg := db.NewRegistry()
 	for _, entry := range c.Schema {
-		sql, err := os.ReadFile(entry.Path)
+		sql, err := os.ReadFile(entry.Source)
 		if err != nil {
-			return nil, fmt.Errorf("schema %s: %w", entry.Path, err)
+			return nil, fmt.Errorf("schema %s: %w", entry.Source, err)
 		}
-		name := strings.TrimSuffix(filepath.Base(entry.Path), ".sql")
-		tables := entry.HealthTables
-		if len(tables) == 0 {
-			tables = nil
+		name := entry.Name
+		if name == "" {
+			name = strings.TrimSuffix(filepath.Base(entry.Source), ".sql")
 		}
-		reg.Register(fileSchema{
-			name:     name,
-			sql:      string(sql),
-			priority: entry.Priority,
-			tables:   tables,
-		})
+		reg.Register(fileSchema{name: name, sql: string(sql), priority: entry.Priority})
 	}
 	return reg, nil
 }
 
+func (c *dbConfig) buildSchemaInputs() ([]migrate.SchemaInput, error) {
+	inputs := make([]migrate.SchemaInput, 0, len(c.Schema))
+	for _, entry := range c.Schema {
+		sql, err := os.ReadFile(entry.Source)
+		if err != nil {
+			return nil, fmt.Errorf("schema %s: %w", entry.Source, err)
+		}
+		name := entry.Name
+		if name == "" {
+			name = strings.TrimSuffix(filepath.Base(entry.Source), ".sql")
+		}
+		inputs = append(inputs, migrate.SchemaInput{
+			Name:     name,
+			SQL:      string(sql),
+			Priority: entry.Priority,
+			Discrete: entry.Discrete,
+		})
+	}
+	return inputs, nil
+}
+
+func (c *dbConfig) buildSeedEntries() ([]seed.Entry, error) {
+	var entries []seed.Entry
+	for _, e := range c.Schema {
+		if e.Seed == "" {
+			continue
+		}
+		sql, err := os.ReadFile(e.Seed)
+		if err != nil {
+			return nil, fmt.Errorf("seed %s: %w", e.Seed, err)
+		}
+		name := e.Name
+		if name == "" {
+			name = strings.TrimSuffix(filepath.Base(e.Source), ".sql")
+		}
+		entries = append(entries, seed.Entry{Name: name, Priority: e.Priority, SQL: string(sql)})
+	}
+	return entries, nil
+}
+
 func (c *dbConfig) migrationsDir() string {
-	if c.Migrations != "" {
-		return c.Migrations
+	if c.Migrations.Destination != "" {
+		return c.Migrations.Destination
 	}
 	return "db/migrations"
-}
-
-func (c *dbConfig) queriesDir() string {
-	if c.Codegen.Queries == "" {
-		return filepath.Join(c.baseDir, "sql/queries")
-	}
-	if filepath.IsAbs(c.Codegen.Queries) {
-		return c.Codegen.Queries
-	}
-	return filepath.Join(c.baseDir, c.Codegen.Queries)
-}
-
-func (c *dbConfig) schemaFiles() []string {
-	paths := make([]string, len(c.Schema))
-	for i, s := range c.Schema {
-		paths[i] = s.Path
-	}
-	return paths
-}
-
-
-func (c *dbConfig) extraQueryPaths() []string {
-	var paths []string
-	for _, e := range c.Schema {
-		if e.Queries != "" {
-			paths = append(paths, e.Queries)
-		}
-	}
-	return paths
 }
 
 func (c *dbConfig) dsnFunc() func() (string, error) {

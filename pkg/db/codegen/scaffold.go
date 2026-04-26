@@ -27,6 +27,8 @@ type TableDef struct {
 // ColumnDef holds information about a single column within a table.
 type ColumnDef struct {
 	Name       string
+	Type       string // raw SQL type string (e.g. "TEXT", "UUID", "TIMESTAMPTZ")
+	Nullable   bool   // true when NOT NULL is absent
 	HasDefault bool
 	IsPK       bool
 	IsUnique   bool   // inline UNIQUE constraint
@@ -35,7 +37,7 @@ type ColumnDef struct {
 
 var (
 	reScaffoldCreateTable  = regexp.MustCompile(`(?i)^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)\s*\(`)
-	reScaffoldColumnDef    = regexp.MustCompile(`(?i)^\s*([a-z_][a-z0-9_]*)\s+\S+`)
+	reScaffoldColumnDef    = regexp.MustCompile(`(?i)^\s*([a-z_][a-z0-9_]*)\s+(\S+)`)
 	reScaffoldCreateIndex  = regexp.MustCompile(`(?i)^\s*CREATE\s+INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)\s+ON\s+(\S+)\s*\(([^)]+)\)`)
 	reScaffoldCreateUIndex = regexp.MustCompile(`(?i)^\s*CREATE\s+UNIQUE\s+INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)\s+ON\s+(\S+)\s*\(([^)]+)\)`)
 	reScaffoldWhereClause  = regexp.MustCompile(`(?i)\)\s*WHERE\s+(.+)$`)
@@ -97,9 +99,15 @@ func ParseTables(schemaSQL string) []TableDef {
 		upperLine := strings.ToUpper(line)
 		col := ColumnDef{
 			Name:       m[1],
+			Type:       m[2],
+			Nullable:   !strings.Contains(upperLine, "NOT NULL"),
 			HasDefault: strings.Contains(upperLine, "DEFAULT"),
 			IsPK:       strings.Contains(upperLine, "PRIMARY KEY"),
 			IsUnique:   strings.Contains(upperLine, "UNIQUE"),
+		}
+		// PK columns are implicitly NOT NULL
+		if col.IsPK {
+			col.Nullable = false
 		}
 		if rm := reScaffoldReferences.FindStringSubmatch(line); rm != nil {
 			col.FKRef = strings.Trim(rm[1], `"`)
@@ -248,8 +256,44 @@ func colsPascal(cols []string) string {
 	return strings.Join(parts, "And")
 }
 
-// GenerateQueries produces CRUD SQL query annotations for the given TableDef.
-func GenerateQueries(t TableDef) string {
+// goType maps a SQL type string to its Go equivalent.
+// nullable=true returns a pointer type for scalar types.
+func goType(sqlType string, nullable bool) string {
+	base := map[string]string{
+		"uuid":        "uuid.UUID",
+		"text":        "string",
+		"citext":      "string",
+		"varchar":     "string",
+		"boolean":     "bool",
+		"bool":        "bool",
+		"integer":     "int32",
+		"int":         "int32",
+		"bigint":      "int64",
+		"timestamptz": "time.Time",
+		"jsonb":       "json.RawMessage",
+		"bytea":       "[]byte",
+	}
+	// normalize: take first word, lowercase, strip trailing comma and parenthesized args (e.g. varchar(20))
+	t := strings.ToLower(strings.Fields(sqlType)[0])
+	t = strings.TrimSuffix(t, ",")
+	if idx := strings.Index(t, "("); idx != -1 {
+		t = t[:idx]
+	}
+	if b, ok := base[t]; ok {
+		if nullable && b != "[]byte" && b != "json.RawMessage" {
+			return "*" + b
+		}
+		return b
+	}
+	return "string" // safe fallback
+}
+
+// GenerateGoStore produces a complete Go file with inline SQL constants,
+// a scan helper, a Store struct, and CRUD methods for the given TableDef.
+func GenerateGoStore(t TableDef, pkgName string) string {
+	sp := singularPascal(t.Name)
+	pp := pluralPascal(t.Name)
+
 	// Determine insert columns: exclude PK+DEFAULT columns and DEFAULT timestamp columns.
 	var insertCols []string
 	for _, col := range t.Columns {
@@ -274,6 +318,15 @@ func GenerateQueries(t TableDef) string {
 		pkCol = t.Columns[0].Name
 	}
 
+	// Determine PK Go type.
+	pkGoType := "string"
+	for _, col := range t.Columns {
+		if col.IsPK {
+			pkGoType = goType(col.Type, false)
+			break
+		}
+	}
+
 	// Determine order-by column.
 	orderCol := pkCol
 	for _, col := range t.Columns {
@@ -292,125 +345,138 @@ func GenerateQueries(t TableDef) string {
 		}
 	}
 
-	sp := singularPascal(t.Name)
-	pp := pluralPascal(t.Name)
+	// Collect all column names for SELECT.
+	var allCols []string
+	for _, col := range t.Columns {
+		allCols = append(allCols, col.Name)
+	}
+	allColsStr := strings.Join(allCols, ", ")
+
+	// Determine required imports.
+	needsUUID := false
+	needsTime := false
+	needsJSON := false
+	for _, col := range t.Columns {
+		gt := goType(col.Type, col.Nullable)
+		gt = strings.TrimPrefix(gt, "*")
+		if gt == "uuid.UUID" {
+			needsUUID = true
+		}
+		if gt == "time.Time" {
+			needsTime = true
+		}
+		if gt == "json.RawMessage" {
+			needsJSON = true
+		}
+	}
 
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "-- Auto-generated CRUD queries for %s\n", t.Name)
-	fmt.Fprintf(&b, "-- Edit as needed, then run: db codegen\n")
+	// Package and imports
+	fmt.Fprintf(&b, "package %s\n\n", pkgName)
+	fmt.Fprintf(&b, "import (\n")
+	fmt.Fprintf(&b, "\t\"context\"\n")
+	if needsJSON {
+		fmt.Fprintf(&b, "\t\"encoding/json\"\n")
+	}
+	if needsTime {
+		fmt.Fprintf(&b, "\t\"time\"\n")
+	}
+	fmt.Fprintf(&b, "\n")
+	if needsUUID {
+		fmt.Fprintf(&b, "\t\"github.com/google/uuid\"\n")
+	}
+	fmt.Fprintf(&b, "\t\"github.com/jackc/pgx/v5\"\n")
+	fmt.Fprintf(&b, "\t\"github.com/jackc/pgx/v5/pgxpool\"\n")
+	fmt.Fprintf(&b, ")\n\n")
 
-	// INSERT block
-	fmt.Fprintln(&b)
-	if len(insertCols) == 0 {
-		fmt.Fprintf(&b, "-- No insertable columns (all have defaults)\n")
-	} else {
+	// Model struct
+	fmt.Fprintf(&b, "// %s is the domain model for the %s table.\n", sp, t.Name)
+	fmt.Fprintf(&b, "type %s struct {\n", sp)
+	for _, col := range t.Columns {
+		gt := goType(col.Type, col.Nullable)
+		fmt.Fprintf(&b, "\t%s %s\n", toPascalCase(col.Name), gt)
+	}
+	fmt.Fprintf(&b, "}\n\n")
+
+	// scan helper
+	fmt.Fprintf(&b, "func scan%s(row pgx.Row) (%s, error) {\n", sp, sp)
+	fmt.Fprintf(&b, "\tvar m %s\n", sp)
+	fmt.Fprintf(&b, "\terr := row.Scan(\n")
+	for _, col := range t.Columns {
+		fmt.Fprintf(&b, "\t\t&m.%s,\n", toPascalCase(col.Name))
+	}
+	fmt.Fprintf(&b, "\t)\n")
+	fmt.Fprintf(&b, "\treturn m, err\n")
+	fmt.Fprintf(&b, "}\n\n")
+
+	// Store struct
+	fmt.Fprintf(&b, "// Store provides CRUD operations for %s.\n", t.Name)
+	fmt.Fprintf(&b, "type Store struct {\n")
+	fmt.Fprintf(&b, "\tpool *pgxpool.Pool\n")
+	fmt.Fprintf(&b, "}\n\n")
+
+	fmt.Fprintf(&b, "// NewStore creates a Store backed by pool.\n")
+	fmt.Fprintf(&b, "func NewStore(pool *pgxpool.Pool) *Store {\n")
+	fmt.Fprintf(&b, "\treturn &Store{pool: pool}\n")
+	fmt.Fprintf(&b, "}\n\n")
+
+	// INSERT
+	if len(insertCols) > 0 {
 		placeholders := make([]string, len(insertCols))
 		for i := range insertCols {
 			placeholders[i] = fmt.Sprintf("$%d", i+1)
 		}
-		fmt.Fprintf(&b, "-- name: Insert%s :one\n", sp)
+		fmt.Fprintf(&b, "const insert%s = `\n", sp)
 		fmt.Fprintf(&b, "INSERT INTO %s (%s)\n", t.Name, strings.Join(insertCols, ", "))
 		fmt.Fprintf(&b, "VALUES (%s)\n", strings.Join(placeholders, ", "))
-		fmt.Fprintf(&b, "RETURNING *;\n")
+		fmt.Fprintf(&b, "RETURNING %s`\n\n", allColsStr)
+
+		fmt.Fprintf(&b, "// Insert%s inserts a new record and returns the created row.\n", sp)
+		fmt.Fprintf(&b, "func (s *Store) Insert%s(ctx context.Context, m %s) (%s, error) {\n", sp, sp, sp)
+		fmt.Fprintf(&b, "\treturn scan%s(s.pool.QueryRow(ctx, insert%s,\n", sp, sp)
+		for _, col := range insertCols {
+			fmt.Fprintf(&b, "\t\tm.%s,\n", toPascalCase(col))
+		}
+		fmt.Fprintf(&b, "\t))\n")
+		fmt.Fprintf(&b, "}\n\n")
 	}
 
-	// GET by PK block
-	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "-- name: Get%s :one\n", sp)
-	fmt.Fprintf(&b, "SELECT * FROM %s\n", t.Name)
-	fmt.Fprintf(&b, "WHERE %s = $1;\n", pkCol)
+	// GET by PK
+	fmt.Fprintf(&b, "const get%s = `\n", sp)
+	fmt.Fprintf(&b, "SELECT %s FROM %s\n", allColsStr, t.Name)
+	fmt.Fprintf(&b, "WHERE %s = $1`\n\n", pkCol)
 
-	// GetBy* queries — from inline UNIQUE columns and unique indexes (non-partial).
-	generated := make(map[string]bool)
+	fmt.Fprintf(&b, "// Get%s returns a record by %s.\n", sp, pkCol)
+	fmt.Fprintf(&b, "func (s *Store) Get%s(ctx context.Context, %s %s) (%s, error) {\n", sp, pkCol, pkGoType, sp)
+	fmt.Fprintf(&b, "\treturn scan%s(s.pool.QueryRow(ctx, get%s, %s))\n", sp, sp, pkCol)
+	fmt.Fprintf(&b, "}\n\n")
 
-	// Inline UNIQUE columns (single-column).
-	for _, col := range t.Columns {
-		if !col.IsUnique {
-			continue
-		}
-		key := colsKey([]string{col.Name})
-		if generated[key] {
-			continue
-		}
-		generated[key] = true
-		fmt.Fprintln(&b)
-		fmt.Fprintf(&b, "-- name: Get%sBy%s :one\n", sp, colsPascal([]string{col.Name}))
-		fmt.Fprintf(&b, "SELECT * FROM %s\n", t.Name)
-		fmt.Fprintf(&b, "WHERE %s = $1;\n", col.Name)
-	}
-
-	// Unique indexes (non-partial).
-	for _, idx := range t.Indexes {
-		if !idx.IsUnique || idx.Where != "" {
-			continue
-		}
-		key := colsKey(idx.Columns)
-		if generated[key] {
-			continue
-		}
-		generated[key] = true
-		whereParts := make([]string, len(idx.Columns))
-		for i, c := range idx.Columns {
-			whereParts[i] = fmt.Sprintf("%s = $%d", c, i+1)
-		}
-		fmt.Fprintln(&b)
-		fmt.Fprintf(&b, "-- name: Get%sBy%s :one\n", sp, colsPascal(idx.Columns))
-		fmt.Fprintf(&b, "SELECT * FROM %s\n", t.Name)
-		fmt.Fprintf(&b, "WHERE %s;\n", strings.Join(whereParts, " AND "))
-	}
-
-	// LIST default block
-	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "-- name: List%s :many\n", pp)
-	fmt.Fprintf(&b, "SELECT * FROM %s\n", t.Name)
+	// LIST
+	fmt.Fprintf(&b, "const list%s = `\n", pp)
+	fmt.Fprintf(&b, "SELECT %s FROM %s\n", allColsStr, t.Name)
 	fmt.Fprintf(&b, "ORDER BY %s DESC\n", orderCol)
-	fmt.Fprintf(&b, "LIMIT $1 OFFSET $2;\n")
+	fmt.Fprintf(&b, "LIMIT $1 OFFSET $2`\n\n")
 
-	// ListBy* queries — from non-unique non-partial indexes.
-	listGenerated := make(map[string]bool)
+	fmt.Fprintf(&b, "// List%s returns a paginated list ordered by %s descending.\n", pp, orderCol)
+	fmt.Fprintf(&b, "func (s *Store) List%s(ctx context.Context, limit, offset int32) ([]%s, error) {\n", pp, sp)
+	fmt.Fprintf(&b, "\trows, err := s.pool.Query(ctx, list%s, limit, offset)\n", pp)
+	fmt.Fprintf(&b, "\tif err != nil {\n")
+	fmt.Fprintf(&b, "\t\treturn nil, err\n")
+	fmt.Fprintf(&b, "\t}\n")
+	fmt.Fprintf(&b, "\tdefer rows.Close()\n")
+	fmt.Fprintf(&b, "\tvar items []%s\n", sp)
+	fmt.Fprintf(&b, "\tfor rows.Next() {\n")
+	fmt.Fprintf(&b, "\t\tm, err := scan%s(rows)\n", sp)
+	fmt.Fprintf(&b, "\t\tif err != nil {\n")
+	fmt.Fprintf(&b, "\t\t\treturn nil, err\n")
+	fmt.Fprintf(&b, "\t\t}\n")
+	fmt.Fprintf(&b, "\t\titems = append(items, m)\n")
+	fmt.Fprintf(&b, "\t}\n")
+	fmt.Fprintf(&b, "\treturn items, rows.Err()\n")
+	fmt.Fprintf(&b, "}\n\n")
 
-	for _, idx := range t.Indexes {
-		if idx.IsUnique || idx.Where != "" {
-			continue
-		}
-		key := colsKey(idx.Columns)
-		if listGenerated[key] {
-			continue
-		}
-		listGenerated[key] = true
-		whereParts := make([]string, len(idx.Columns))
-		for i, c := range idx.Columns {
-			whereParts[i] = fmt.Sprintf("%s = $%d", c, i+1)
-		}
-		nextParam := len(idx.Columns) + 1
-		fmt.Fprintln(&b)
-		fmt.Fprintf(&b, "-- name: List%sBy%s :many\n", pp, colsPascal(idx.Columns))
-		fmt.Fprintf(&b, "SELECT * FROM %s\n", t.Name)
-		fmt.Fprintf(&b, "WHERE %s\n", strings.Join(whereParts, " AND "))
-		fmt.Fprintf(&b, "ORDER BY %s DESC\n", orderCol)
-		fmt.Fprintf(&b, "LIMIT $%d OFFSET $%d;\n", nextParam, nextParam+1)
-	}
-
-	// FK-derived ListBy queries (if not already covered by an index).
-	for _, col := range t.Columns {
-		if col.FKRef == "" {
-			continue
-		}
-		key := colsKey([]string{col.Name})
-		if listGenerated[key] {
-			continue
-		}
-		listGenerated[key] = true
-		fmt.Fprintln(&b)
-		fmt.Fprintf(&b, "-- name: List%sBy%s :many\n", pp, colsPascal([]string{col.Name}))
-		fmt.Fprintf(&b, "SELECT * FROM %s\n", t.Name)
-		fmt.Fprintf(&b, "WHERE %s = $1\n", col.Name)
-		fmt.Fprintf(&b, "ORDER BY %s DESC\n", orderCol)
-		fmt.Fprintf(&b, "LIMIT $2 OFFSET $3;\n")
-	}
-
-	// UPDATE block — only if table has updated_at column.
+	// UPDATE — only if table has updated_at column.
 	if hasUpdatedAt {
 		var mutableCols []string
 		for _, col := range t.Columns {
@@ -424,25 +490,39 @@ func GenerateQueries(t TableDef) string {
 			for i, c := range mutableCols {
 				setParts[i] = fmt.Sprintf("%s = $%d", c, i+2) // $1 is PK
 			}
-			fmt.Fprintln(&b)
-			fmt.Fprintf(&b, "-- name: Update%s :one\n", sp)
+			fmt.Fprintf(&b, "const update%s = `\n", sp)
 			fmt.Fprintf(&b, "UPDATE %s\n", t.Name)
 			fmt.Fprintf(&b, "SET %s\n", strings.Join(setParts, ", "))
 			fmt.Fprintf(&b, "WHERE %s = $1\n", pkCol)
-			fmt.Fprintf(&b, "RETURNING *;\n")
+			fmt.Fprintf(&b, "RETURNING %s`\n\n", allColsStr)
+
+			fmt.Fprintf(&b, "// Update%s updates mutable fields of a record by %s.\n", sp, pkCol)
+			fmt.Fprintf(&b, "func (s *Store) Update%s(ctx context.Context, m %s) (%s, error) {\n", sp, sp, sp)
+			fmt.Fprintf(&b, "\treturn scan%s(s.pool.QueryRow(ctx, update%s,\n", sp, sp)
+			fmt.Fprintf(&b, "\t\tm.%s,\n", toPascalCase(pkCol))
+			for _, col := range mutableCols {
+				fmt.Fprintf(&b, "\t\tm.%s,\n", toPascalCase(col))
+			}
+			fmt.Fprintf(&b, "\t))\n")
+			fmt.Fprintf(&b, "}\n\n")
 		}
 	}
 
-	// DELETE block
-	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "-- name: Delete%s :exec\n", sp)
+	// DELETE
+	fmt.Fprintf(&b, "const delete%s = `\n", sp)
 	fmt.Fprintf(&b, "DELETE FROM %s\n", t.Name)
-	fmt.Fprintf(&b, "WHERE %s = $1;\n", pkCol)
+	fmt.Fprintf(&b, "WHERE %s = $1`\n\n", pkCol)
+
+	fmt.Fprintf(&b, "// Delete%s removes a record by %s.\n", sp, pkCol)
+	fmt.Fprintf(&b, "func (s *Store) Delete%s(ctx context.Context, %s %s) error {\n", sp, pkCol, pkGoType)
+	fmt.Fprintf(&b, "\t_, err := s.pool.Exec(ctx, delete%s, %s)\n", sp, pkCol)
+	fmt.Fprintf(&b, "\treturn err\n")
+	fmt.Fprintf(&b, "}\n")
 
 	return b.String()
 }
 
-// ScaffoldTable parses schemaSQL and writes CRUD query files to outDir.
+// ScaffoldTable parses schemaSQL and writes CRUD Go store files to outDir.
 // If tableName is non-empty, only that table is scaffolded.
 // Behaviour when the output file already exists:
 //   - force=false, skipExisting=false → error (default: protect manual edits)
@@ -450,7 +530,7 @@ func GenerateQueries(t TableDef) string {
 //   - skipExisting=true               → silently skip (used by db:compose)
 //
 // Returns the list of file paths created.
-func ScaffoldTable(schemaSQL, tableName, outDir string, force, skipExisting bool) ([]string, error) {
+func ScaffoldTable(schemaSQL, tableName, pkgName, outDir string, force, skipExisting bool) ([]string, error) {
 	tables := ParseTables(schemaSQL)
 
 	if tableName != "" {
@@ -473,7 +553,7 @@ func ScaffoldTable(schemaSQL, tableName, outDir string, force, skipExisting bool
 
 	var created []string
 	for _, t := range tables {
-		outPath := filepath.Join(outDir, t.Name+".sql")
+		outPath := filepath.Join(outDir, t.Name+"_store.go")
 		if _, err := os.Stat(outPath); err == nil {
 			switch {
 			case force:
@@ -484,7 +564,7 @@ func ScaffoldTable(schemaSQL, tableName, outDir string, force, skipExisting bool
 				return nil, fmt.Errorf("scaffold: %s already exists (use --force to overwrite)", outPath)
 			}
 		}
-		content := GenerateQueries(t)
+		content := GenerateGoStore(t, pkgName)
 		if err := os.WriteFile(outPath, []byte(content), 0o644); err != nil {
 			return nil, fmt.Errorf("scaffold: write %s: %w", outPath, err)
 		}

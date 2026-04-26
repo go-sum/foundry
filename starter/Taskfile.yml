@@ -5,14 +5,20 @@ vars:
   PROJECT_NAME:
     sh: basename "$(pwd)"
   APP_NAME: "{{.PROJECT_NAME}}-dev"
-  DCOMP_ALL: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.caddy.yml --project-name {{.PROJECT_NAME}}"
+  DCOMP_ALL: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f
+    docker-compose.dev.yml -f docker-compose.caddy.yml --project-name
+    {{.PROJECT_NAME}}"
   DCOMP_CADDY: "docker compose -f docker-compose.caddy.yml --project-name {{.PROJECT_NAME}}"
   DCOMP_DATA: "docker compose -f docker-compose.data.yml --project-name {{.PROJECT_NAME}}"
-  DCOMP_DEV: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f docker-compose.dev.yml --project-name {{.PROJECT_NAME}}"
+  DCOMP_DEV: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f
+    docker-compose.dev.yml --project-name {{.PROJECT_NAME}}"
   DCOMP_TOOLS: "docker compose -f docker-compose.tools.yml --project-name {{.PROJECT_NAME}}"
   DEV_DOMAIN: "{{.PROJECT_NAME}}.test"
-  RUN_IN_TOOLS: "docker compose -f docker-compose.data.yml -f docker-compose.tools.yml --project-name {{.PROJECT_NAME}} run --rm"
-  RUN_WITH_TOOLS: "docker compose -f docker-compose.data.yml -f docker-compose.tools.yml --project-name {{.PROJECT_NAME}} run --rm -w /app/{{.PROJECT_NAME}} tools"
+  RUN_IN_TOOLS: "docker compose -f docker-compose.data.yml -f
+    docker-compose.tools.yml --project-name {{.PROJECT_NAME}} run --rm"
+  RUN_WITH_TOOLS: "docker compose -f docker-compose.data.yml -f
+    docker-compose.tools.yml --project-name {{.PROJECT_NAME}} run --rm -w
+    /app/{{.PROJECT_NAME}} tools"
   TOOLS_IMAGE: "{{.PROJECT_NAME}}-tools"
   TOOLS_DEV: "{{.TOOLS_IMAGE}}:dev"
   TOOLS_PROD: "{{.TOOLS_IMAGE}}:prod"
@@ -96,35 +102,33 @@ tasks:
 
   # ── Database ──────────────────────────────────────────────────────────────────
 
+  db:compose:
+    desc: "Detect schema changes and generate migration file(s) (task db:compose [NAME=<migration_name>])"
+    cmds:
+      - task: _db:run
+        vars: {DB_CMD: "migrate compose{{if .NAME}} {{.NAME}}{{end}}"}
+      - task: _db:run
+        vars: {DB_CMD: "scaffold --skip-existing"}
+
   db:migrate:
-    desc: "Run pending database migrations"
-    cmd: {task: _db:run, vars: {DB_CMD: migrate}}
+    desc: "Apply pending database migrations"
+    cmd: {task: _db:run, vars: {DB_CMD: "migrate apply"}}
 
   db:rollback:
-    desc: "Roll back the last database migration"
-    cmd: {task: _db:run, vars: {DB_CMD: rollback}}
+    desc: "Roll back the last applied migration"
+    cmd: {task: _db:run, vars: {DB_CMD: "migrate rollback"}}
 
   db:status:
     desc: "Show database migration status"
-    cmd: {task: _db:run, vars: {DB_CMD: status}}
+    cmd: {task: _db:run, vars: {DB_CMD: "migrate status"}}
 
   db:health:
-    desc: "Check database schema health"
+    desc: "Check database connectivity and schema fingerprint"
     cmd: {task: _db:run, vars: {DB_CMD: health}}
 
-  db:clean:
-    desc: "Remove generated sqlcgen files (run from inside container to fix ownership issues)"
-    cmd: "{{.DCOMP_DEV}} run --rm --entrypoint '' app sh -c 'rm -f db/sqlcgen/*.go'"
-
-  db:compose:
-    desc: "Diff schema and generate migration + sqlc (task db:compose [NAME=<migration_name>])"
-    cmds:
-      - task: _db:run
-        vars: {DB_CMD: "compose{{if .NAME}} {{.NAME}}{{end}}"}
-      - task: _db:run
-        vars: {DB_CMD: "scaffold --skip-existing"}
-      - task: _db:run
-        vars: {DB_CMD: codegen}
+  db:seed:
+    desc: "Apply pending seed files"
+    cmd: {task: _db:run, vars: {DB_CMD: "seed apply"}}
 
   # ── Test ──────────────────────────────────────────────────────────────────────
 
@@ -143,7 +147,8 @@ tasks:
   # ── Secrets & Certs ───────────────────────────────────────────────────────────
 
   secrets:init:
-    desc: "Write secret files from .env into .secrets/ (required before first docker compose up)"
+    desc: "Write secret files from .env into .secrets/ (required before first docker
+      compose up)"
     cmd: "{{.GO}} run ./cmd/secrets"
 
   certs:init:

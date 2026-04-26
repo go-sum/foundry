@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestStoreFingerprint_CreatesTableAndStoresValue(t *testing.T) {
+func TestStoreFingerprint_SetsValueOnLatestRow(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("TEST_DATABASE_URL not set")
@@ -20,26 +20,40 @@ func TestStoreFingerprint_CreatesTableAndStoresValue(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	ctx := context.Background()
-	pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+	pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	t.Cleanup(func() {
-		pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+		pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	})
+
+	// Create _migrations table and insert a row.
+	_, err = pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS _migrations (
+		version     INTEGER     PRIMARY KEY,
+		name        TEXT        NOT NULL,
+		applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		fingerprint TEXT
+	)`)
+	if err != nil {
+		t.Fatalf("create _migrations: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO _migrations (version, name) VALUES (1, 'initial')`); err != nil {
+		t.Fatalf("insert migration row: %v", err)
+	}
 
 	const fp = "abc123"
 	if err := StoreFingerprint(ctx, pool, fp); err != nil {
 		t.Fatalf("StoreFingerprint: %v", err)
 	}
 
-	var got string
-	if err := pool.QueryRow(ctx, "SELECT fingerprint FROM _schema_fingerprint WHERE id = 1").Scan(&got); err != nil {
+	var got *string
+	if err := pool.QueryRow(ctx, `SELECT fingerprint FROM _migrations WHERE version = 1`).Scan(&got); err != nil {
 		t.Fatalf("SELECT after StoreFingerprint: %v", err)
 	}
-	if got != fp {
-		t.Fatalf("stored fingerprint = %q, want %q", got, fp)
+	if got == nil || *got != fp {
+		t.Fatalf("stored fingerprint = %v, want %q", got, fp)
 	}
 }
 
-func TestStoreFingerprint_UpdatesExistingValue(t *testing.T) {
+func TestStoreFingerprint_NoTable_ReturnsMissing(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("TEST_DATABASE_URL not set")
@@ -52,24 +66,17 @@ func TestStoreFingerprint_UpdatesExistingValue(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	ctx := context.Background()
-	pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+	pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	t.Cleanup(func() {
-		pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+		pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	})
 
-	if err := StoreFingerprint(ctx, pool, "first"); err != nil {
-		t.Fatalf("StoreFingerprint (first): %v", err)
+	err = StoreFingerprint(ctx, pool, "fp1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
-	if err := StoreFingerprint(ctx, pool, "second"); err != nil {
-		t.Fatalf("StoreFingerprint (second): %v", err)
-	}
-
-	var got string
-	if err := pool.QueryRow(ctx, "SELECT fingerprint FROM _schema_fingerprint WHERE id = 1").Scan(&got); err != nil {
-		t.Fatalf("SELECT after second store: %v", err)
-	}
-	if got != "second" {
-		t.Fatalf("fingerprint = %q, want %q", got, "second")
+	if !errors.Is(err, ErrFingerprintMissing) {
+		t.Fatalf("errors.Is(err, ErrFingerprintMissing) = false; err = %v", err)
 	}
 }
 
@@ -86,10 +93,23 @@ func TestVerifyFingerprint_Match_ReturnsNil(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	ctx := context.Background()
-	pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+	pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	t.Cleanup(func() {
-		pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+		pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	})
+
+	_, err = pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS _migrations (
+		version     INTEGER     PRIMARY KEY,
+		name        TEXT        NOT NULL,
+		applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		fingerprint TEXT
+	)`)
+	if err != nil {
+		t.Fatalf("create _migrations: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO _migrations (version, name) VALUES (1, 'initial')`); err != nil {
+		t.Fatalf("insert migration row: %v", err)
+	}
 
 	const fp = "fp1"
 	if err := StoreFingerprint(ctx, pool, fp); err != nil {
@@ -114,10 +134,23 @@ func TestVerifyFingerprint_Mismatch_ReturnsMismatchError(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	ctx := context.Background()
-	pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+	pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	t.Cleanup(func() {
-		pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+		pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	})
+
+	_, err = pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS _migrations (
+		version     INTEGER     PRIMARY KEY,
+		name        TEXT        NOT NULL,
+		applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		fingerprint TEXT
+	)`)
+	if err != nil {
+		t.Fatalf("create _migrations: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO _migrations (version, name) VALUES (1, 'initial')`); err != nil {
+		t.Fatalf("insert migration row: %v", err)
+	}
 
 	if err := StoreFingerprint(ctx, pool, "fp1"); err != nil {
 		t.Fatalf("StoreFingerprint: %v", err)
@@ -145,14 +178,55 @@ func TestVerifyFingerprint_NoTable_ReturnsMissingError(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	ctx := context.Background()
-	pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+	pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	t.Cleanup(func() {
-		pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+		pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	})
 
 	err = VerifyFingerprint(ctx, pool, "anyvalue")
 	if err == nil {
 		t.Fatal("expected ErrFingerprintMissing, got nil")
+	}
+	if !errors.Is(err, ErrFingerprintMissing) {
+		t.Fatalf("errors.Is(err, ErrFingerprintMissing) = false; err = %v", err)
+	}
+}
+
+func TestVerifyFingerprint_NullFingerprint_ReturnsMissingError(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL not set")
+	}
+
+	pool, err := ConnectDSN(context.Background(), dsn)
+	if err != nil {
+		t.Fatalf("ConnectDSN: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	ctx := context.Background()
+	pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
+	t.Cleanup(func() {
+		pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
+	})
+
+	_, err = pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS _migrations (
+		version     INTEGER     PRIMARY KEY,
+		name        TEXT        NOT NULL,
+		applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		fingerprint TEXT
+	)`)
+	if err != nil {
+		t.Fatalf("create _migrations: %v", err)
+	}
+	// Insert row without fingerprint (NULL).
+	if _, err := pool.Exec(ctx, `INSERT INTO _migrations (version, name) VALUES (1, 'initial')`); err != nil {
+		t.Fatalf("insert migration row: %v", err)
+	}
+
+	err = VerifyFingerprint(ctx, pool, "anyvalue")
+	if err == nil {
+		t.Fatal("expected ErrFingerprintMissing for null fingerprint, got nil")
 	}
 	if !errors.Is(err, ErrFingerprintMissing) {
 		t.Fatalf("errors.Is(err, ErrFingerprintMissing) = false; err = %v", err)
@@ -172,17 +246,19 @@ func TestVerifyFingerprint_EmptyTable_ReturnsMissingError(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	ctx := context.Background()
-	pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+	pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	t.Cleanup(func() {
-		pool.Exec(ctx, "DROP TABLE IF EXISTS _schema_fingerprint") //nolint:errcheck
+		pool.Exec(ctx, "DROP TABLE IF EXISTS _migrations") //nolint:errcheck
 	})
 
-	// Create the table via StoreFingerprint, then delete the single row.
-	if err := StoreFingerprint(ctx, pool, "seed"); err != nil {
-		t.Fatalf("StoreFingerprint (seed): %v", err)
-	}
-	if _, err := pool.Exec(ctx, "DELETE FROM _schema_fingerprint"); err != nil {
-		t.Fatalf("DELETE FROM _schema_fingerprint: %v", err)
+	_, err = pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS _migrations (
+		version     INTEGER     PRIMARY KEY,
+		name        TEXT        NOT NULL,
+		applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		fingerprint TEXT
+	)`)
+	if err != nil {
+		t.Fatalf("create _migrations: %v", err)
 	}
 
 	err = VerifyFingerprint(ctx, pool, "anyvalue")

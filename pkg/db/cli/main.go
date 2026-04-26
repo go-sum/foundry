@@ -14,15 +14,11 @@ func main() {
 		Use:   "db",
 		Short: "Database management commands",
 	}
-	root.PersistentFlags().StringVar(&configPath, "config", "db/schema.yaml", "path to db/schema.yaml config file")
+	root.PersistentFlags().StringVar(&configPath, "config", "db/schema.yaml", "path to schema.yaml config file")
 
 	root.AddCommand(
 		newMigrateCmd(&configPath),
-		newRollbackCmd(&configPath),
-		newStatusCmd(&configPath),
-		newCreateCmd(&configPath),
-		newComposeCmd(&configPath),
-		newCodegenCmd(&configPath),
+		newSeedCmd(&configPath),
 		newScaffoldCmd(&configPath),
 		newLintCmd(&configPath),
 		newHealthCmd(&configPath),

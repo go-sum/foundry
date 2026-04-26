@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-sum/db/codegen"
@@ -11,10 +12,11 @@ import (
 
 func newScaffoldCmd(configPath *string) *cobra.Command {
 	var force, skipExisting bool
+	var pkgName, outDir string
 
 	cmd := &cobra.Command{
 		Use:   "scaffold [table]",
-		Short: "Generate CRUD query files from schema definitions",
+		Short: "Generate Go store files from schema definitions",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadConfig(*configPath)
@@ -28,9 +30,9 @@ func newScaffoldCmd(configPath *string) *cobra.Command {
 				if entry.External {
 					continue
 				}
-				data, err := os.ReadFile(entry.Path)
+				data, err := os.ReadFile(entry.Source)
 				if err != nil {
-					return fmt.Errorf("scaffold: read schema %s: %w", entry.Path, err)
+					return fmt.Errorf("scaffold: read schema %s: %w", entry.Source, err)
 				}
 				schemaSQLParts = append(schemaSQLParts, string(data))
 			}
@@ -41,7 +43,29 @@ func newScaffoldCmd(configPath *string) *cobra.Command {
 				tableName = args[0]
 			}
 
-			paths, err := codegen.ScaffoldTable(schemaSQL, tableName, cfg.queriesDir(), force, skipExisting)
+			// Determine output directory: default to same directory as schema file.
+			target := outDir
+			if target == "" {
+				for _, entry := range cfg.Schema {
+					if !entry.External {
+						target = filepath.Dir(entry.Source)
+						break
+					}
+				}
+			}
+			if target == "" {
+				target = cfg.baseDir
+			}
+
+			// Determine package name: default to directory base name.
+			pkg := pkgName
+			if pkg == "" {
+				pkg = filepath.Base(target)
+				// sanitize: replace hyphens with underscores
+				pkg = strings.ReplaceAll(pkg, "-", "_")
+			}
+
+			paths, err := codegen.ScaffoldTable(schemaSQL, tableName, pkg, target, force, skipExisting)
 			if err != nil {
 				return err
 			}
@@ -53,7 +77,9 @@ func newScaffoldCmd(configPath *string) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing query files")
-	cmd.Flags().BoolVar(&skipExisting, "skip-existing", false, "skip tables that already have a query file")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing store files")
+	cmd.Flags().BoolVar(&skipExisting, "skip-existing", false, "skip tables that already have a store file")
+	cmd.Flags().StringVar(&pkgName, "package", "", "Go package name (default: inferred from output directory name)")
+	cmd.Flags().StringVar(&outDir, "out", "", "output directory (default: same directory as the schema file)")
 	return cmd
 }

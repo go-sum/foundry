@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-sum/auth"
 	"github.com/go-sum/auth/provider"
-	"github.com/go-sum/db"
 	"github.com/go-sum/docs"
 	"github.com/go-sum/foundry/internal/features/hello"
 	"github.com/go-sum/foundry/internal/features/home"
@@ -24,6 +23,7 @@ import (
 	"github.com/go-sum/web/secure"
 	"github.com/go-sum/web/site"
 	"github.com/go-sum/web/static"
+	"github.com/jackc/pgx/v5/pgxpool"
 	g "maragu.dev/gomponents"
 )
 
@@ -64,6 +64,14 @@ func registerStaticRoutes(rt *router.Router, assets static.AssetsConfig) error {
 
 type healthChecker interface {
 	Check(ctx context.Context) error
+}
+
+type dbHealthChecker struct {
+	pool *pgxpool.Pool
+}
+
+func (d *dbHealthChecker) Check(ctx context.Context) error {
+	return d.pool.Ping(ctx)
 }
 
 func healthHandler(checkers ...healthChecker) web.Handler {
@@ -116,7 +124,7 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 
 	var checkers []healthChecker
 	if svc.DBPool != nil {
-		checkers = append(checkers, db.NewChecker(svc.DBPool, svc.SchemaRegistry.HealthTables()...))
+		checkers = append(checkers, &dbHealthChecker{pool: svc.DBPool})
 	}
 
 	router.Register(rt,

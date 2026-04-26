@@ -8,7 +8,6 @@ tmp_dir = "tmp"
   delay = 500
   exclude_dir = [".claude", ".git", ".secrets", "docker", "public", "tmp"]
   exclude_file = ["docker*.yml"]
-  include_dir = ["../pkg/componentry"]
   include_ext = ["go", "html", "tmpl", "yaml", "toml", "css", "js", "ts"]
   kill_delay = "1s"
   rerun = false

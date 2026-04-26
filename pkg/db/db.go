@@ -145,40 +145,11 @@ func ConnectDSN(ctx context.Context, dsn string, opts ...Option) (*pgxpool.Pool,
 	return pool, nil
 }
 
-// Health pings the pool and verifies that each named table is queryable.
-// A 5-second timeout is applied to the entire check.
-func Health(ctx context.Context, pool *pgxpool.Pool, tables ...string) error {
+// Health pings the pool. A 5-second timeout is applied.
+func Health(ctx context.Context, pool *pgxpool.Pool) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-
-	if err := pool.Ping(ctx); err != nil {
-		return fmt.Errorf("db health: ping: %w", err)
-	}
-
-	for _, table := range tables {
-		q := fmt.Sprintf("SELECT 1 FROM %s LIMIT 0", pgx.Identifier{table}.Sanitize())
-		if _, err := pool.Exec(ctx, q); err != nil {
-			return fmt.Errorf("db health: table %q: %w", table, err)
-		}
-	}
-
-	return nil
-}
-
-// Checker holds the pool and table list needed to assess database health.
-type Checker struct {
-	pool   *pgxpool.Pool
-	tables []string
-}
-
-// NewChecker returns a Checker that pings pool and verifies each table is queryable.
-func NewChecker(pool *pgxpool.Pool, tables ...string) *Checker {
-	return &Checker{pool: pool, tables: tables}
-}
-
-// Check runs the health assessment and returns a non-nil error if unhealthy.
-func (c *Checker) Check(ctx context.Context) error {
-	return Health(ctx, c.pool, c.tables...)
+	return pool.Ping(ctx)
 }
 
 // LogPoolStats starts a goroutine that logs pool statistics at every interval

@@ -1,43 +1,30 @@
 schema:
   - name: base
-    path: ../../pkg/db/sql/base.sql
+    source: ../../pkg/db/sql/base.sql
     priority: 0
     external: true
+    discrete: true
 
   - name: queue
-    path: ../../pkg/queue/pgstore/sql/schema.sql
+    source: ../../pkg/queue/pgstore/sql/schema.sql
     priority: 50
-    health_tables: [queue_jobs]
     external: true
+    discrete: true
 
   - name: auth
-    path: ../../pkg/auth/pgstore/sql/schema.sql
+    source: ../../pkg/auth/pgstore/sql/schema.sql
     priority: 60
-    health_tables: [users, webauthn_credentials]
     external: true
-    queries: ../../pkg/auth/pgstore/sql/queries.sql
+    discrete: true
 
   - name: auth_provider
-    path: ../../pkg/auth/provider/pgstore/sql/schema.sql
+    source: ../../pkg/auth/provider/pgstore/sql/schema.sql
     priority: 70
     external: true
+    discrete: true
 
-  - path: sql/schema/contact.sql
+  - source: sql/schema/contact.sql
     priority: 100
-    health_tables: [contact_submissions]
 
-migrations: migrations
-
-codegen:
-  queries: sql/queries/
-  out: sqlcgen
-  package: sqlcgen
-  emit_json_tags: true
-  emit_empty_slices: true
-
-plan_db:
-  host: ${PGHOST:-db}
-  port: ${PGPORT:-5432}
-  user: ${PGUSER:-postgres}
-  password: ${PGPASSWORD:-postgres}
-  database: ${PGDATABASE:-foundry}
+migrations:
+  destination: migrations

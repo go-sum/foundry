@@ -20,7 +20,7 @@ type SchemaProvider interface {
 }
 
 // Registry collects SchemaProviders and composes them into a single SQL string.
-// Register must complete before any concurrent call to Providers, Compose, or HealthTables.
+// Register must complete before any concurrent call to Providers or Compose.
 type Registry struct {
 	providers []SchemaProvider
 }
@@ -60,21 +60,6 @@ func (r *Registry) Compose() string {
 	return result.String()
 }
 
-// HealthTables returns the combined table names from all registered providers
-// that implement HealthTables() []string.
-func (r *Registry) HealthTables() []string {
-	type healthTabler interface {
-		HealthTables() []string
-	}
-	var tables []string
-	for _, p := range r.Providers() {
-		if ht, ok := p.(healthTabler); ok {
-			tables = append(tables, ht.HealthTables()...)
-		}
-	}
-	return tables
-}
-
 // Fingerprint returns the hex-encoded SHA-256 hash of the composed schema SQL.
 func (r *Registry) Fingerprint() string {
 	hash := sha256.Sum256([]byte(r.Compose()))
@@ -104,13 +89,11 @@ type simpleSchema struct {
 	priority int
 }
 
-func (s simpleSchema) Name() string           { return s.name }
-func (s simpleSchema) SQL() string            { return s.sql }
-func (s simpleSchema) Priority() int          { return s.priority }
-func (s simpleSchema) HealthTables() []string { return []string{s.name} }
+func (s simpleSchema) Name() string  { return s.name }
+func (s simpleSchema) SQL() string   { return s.sql }
+func (s simpleSchema) Priority() int { return s.priority }
 
 // NewSchema returns a SchemaProvider for the given name, SQL, and priority.
-// The provider's Name is also used as its health-check table name.
 func NewSchema(name, sql string, priority int) SchemaProvider {
 	return simpleSchema{name: name, sql: sql, priority: priority}
 }
@@ -121,11 +104,10 @@ type yamlSchemaCfg struct {
 }
 
 type yamlSchemaEntry struct {
-	Name         string   `yaml:"name"`
-	Path         string   `yaml:"path"`
-	Priority     int      `yaml:"priority"`
-	HealthTables []string `yaml:"health_tables"`
-	External     bool     `yaml:"external"`
+	Name     string `yaml:"name"`
+	Source   string `yaml:"source"`
+	Priority int    `yaml:"priority"`
+	External bool   `yaml:"external"`
 }
 
 // yamlSchema is a SchemaProvider whose SQL was loaded from an embedded filesystem.
@@ -133,13 +115,11 @@ type yamlSchema struct {
 	name     string
 	sql      string
 	priority int
-	tables   []string
 }
 
-func (y yamlSchema) Name() string           { return y.name }
-func (y yamlSchema) SQL() string            { return y.sql }
-func (y yamlSchema) Priority() int          { return y.priority }
-func (y yamlSchema) HealthTables() []string { return y.tables }
+func (y yamlSchema) Name() string  { return y.name }
+func (y yamlSchema) SQL() string   { return y.sql }
+func (y yamlSchema) Priority() int { return y.priority }
 
 // LoadRegistryFromYAML parses a schema.yaml config, loads non-external schema
 // files from schemaFiles, and resolves external: true entries via the provided
@@ -160,7 +140,7 @@ func LoadRegistryFromYAML(configYAML []byte, schemaFiles fs.FS, opts ...LoadOpti
 	for _, entry := range cfg.Schema {
 		name := entry.Name
 		if name == "" {
-			name = strings.TrimSuffix(path.Base(entry.Path), ".sql")
+			name = strings.TrimSuffix(path.Base(entry.Source), ".sql")
 		}
 
 		if entry.External {
@@ -172,20 +152,18 @@ func LoadRegistryFromYAML(configYAML []byte, schemaFiles fs.FS, opts ...LoadOpti
 				name:     name,
 				sql:      sql,
 				priority: entry.Priority,
-				tables:   entry.HealthTables,
 			})
 			continue
 		}
 
-		sql, err := fs.ReadFile(schemaFiles, entry.Path)
+		sql, err := fs.ReadFile(schemaFiles, entry.Source)
 		if err != nil {
-			return nil, fmt.Errorf("db: read schema %s: %w", entry.Path, err)
+			return nil, fmt.Errorf("db: read schema %s: %w", entry.Source, err)
 		}
 		reg.Register(yamlSchema{
 			name:     name,
 			sql:      string(sql),
 			priority: entry.Priority,
-			tables:   entry.HealthTables,
 		})
 	}
 

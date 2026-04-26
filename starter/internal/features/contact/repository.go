@@ -3,8 +3,7 @@ package contact
 import (
 	"context"
 
-	"github.com/go-sum/db"
-	"github.com/go-sum/foundry/db/sqlcgen"
+	coredb "github.com/go-sum/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -14,25 +13,22 @@ type Repository interface {
 }
 
 type pgRepository struct {
-	q *sqlcgen.Queries
+	pool *pgxpool.Pool
 }
 
 // NewRepository creates a Repository backed by pool.
 func NewRepository(pool *pgxpool.Pool) *pgRepository {
-	return &pgRepository{q: sqlcgen.New(pool)}
+	return &pgRepository{pool: pool}
 }
 
 func (r *pgRepository) Create(ctx context.Context, s *Submission) error {
-	row, err := r.q.InsertContactSubmission(ctx, sqlcgen.InsertContactSubmissionParams{
-		Name:      s.Name,
-		Email:     s.Email,
-		Message:   s.Message,
-		IpAddress: s.IPAddress,
-	})
+	const q = `
+		INSERT INTO contact_submissions (name, email, message, ip_address)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at`
+	err := r.pool.QueryRow(ctx, q, s.Name, s.Email, s.Message, s.IPAddress).Scan(&s.ID, &s.CreatedAt)
 	if err != nil {
-		return db.MapError(err, "contact: insert submission")
+		return coredb.MapError(err, "contact: insert submission")
 	}
-	s.ID = row.ID
-	s.CreatedAt = row.CreatedAt.Time
 	return nil
 }

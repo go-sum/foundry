@@ -17,41 +17,43 @@ var ErrFingerprintMismatch = errors.New("db: schema fingerprint mismatch")
 // (first deploy or upgrade from a pre-fingerprint version).
 var ErrFingerprintMissing = errors.New("db: schema fingerprint not stored")
 
-const fingerprintDDL = `CREATE TABLE IF NOT EXISTS _schema_fingerprint (
-    id          INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-    fingerprint TEXT    NOT NULL,
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`
-
-// StoreFingerprint creates the fingerprint table if needed and upserts the
-// fingerprint value.
+// StoreFingerprint sets the fingerprint on the latest _migrations row.
+// Clears fingerprint from all other rows first.
 func StoreFingerprint(ctx context.Context, pool *pgxpool.Pool, fingerprint string) error {
-	if _, err := pool.Exec(ctx, fingerprintDDL); err != nil {
-		return fmt.Errorf("db: store fingerprint: create table: %w", err)
+	_, err := pool.Exec(ctx, `UPDATE _migrations SET fingerprint = NULL WHERE fingerprint IS NOT NULL`)
+	if err != nil {
+		if isPgCode(err, "42P01") {
+			return ErrFingerprintMissing
+		}
+		return fmt.Errorf("db: store fingerprint: %w", err)
 	}
-	const upsert = `INSERT INTO _schema_fingerprint (id, fingerprint, updated_at)
-        VALUES (1, $1, NOW())
-        ON CONFLICT (id) DO UPDATE SET fingerprint = $1, updated_at = NOW()`
-	if _, err := pool.Exec(ctx, upsert, fingerprint); err != nil {
+	_, err = pool.Exec(ctx,
+		`UPDATE _migrations SET fingerprint = $1 WHERE version = (SELECT MAX(version) FROM _migrations)`,
+		fingerprint,
+	)
+	if err != nil {
 		return fmt.Errorf("db: store fingerprint: %w", err)
 	}
 	return nil
 }
 
-// VerifyFingerprint checks that the stored fingerprint matches the provided
-// value. Returns ErrFingerprintMissing if the table or row does not exist.
-// Returns ErrFingerprintMismatch if the stored value differs.
+// VerifyFingerprint checks the fingerprint on the latest _migrations row.
 func VerifyFingerprint(ctx context.Context, pool *pgxpool.Pool, fingerprint string) error {
-	var stored string
-	err := pool.QueryRow(ctx, `SELECT fingerprint FROM _schema_fingerprint WHERE id = 1`).Scan(&stored)
+	var stored *string
+	err := pool.QueryRow(ctx,
+		`SELECT fingerprint FROM _migrations ORDER BY version DESC LIMIT 1`,
+	).Scan(&stored)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) || isPgCode(err, "42P01") {
 			return ErrFingerprintMissing
 		}
 		return fmt.Errorf("db: verify fingerprint: %w", err)
 	}
-	if stored != fingerprint {
-		return fmt.Errorf("%w: want %s, have %s", ErrFingerprintMismatch, fingerprint, stored)
+	if stored == nil || *stored == "" {
+		return ErrFingerprintMissing
+	}
+	if *stored != fingerprint {
+		return fmt.Errorf("%w: want %s, have %s", ErrFingerprintMismatch, fingerprint, *stored)
 	}
 	return nil
 }

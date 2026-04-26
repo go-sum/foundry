@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -195,44 +196,80 @@ func TestSingularize(t *testing.T) {
 	}
 }
 
-func TestGenerateQueries_ContactSubmissions(t *testing.T) {
+func TestGenerateGoStore_ContactSubmissions(t *testing.T) {
 	tables := ParseTables(contactSubmissionsSQL)
 	if len(tables) != 1 {
 		t.Fatalf("expected 1 table, got %d", len(tables))
 	}
 
-	got := GenerateQueries(tables[0])
+	got := GenerateGoStore(tables[0], "store")
 
-	want := `-- Auto-generated CRUD queries for contact_submissions
--- Edit as needed, then run: db codegen
+	// Verify package declaration.
+	if !strings.Contains(got, "package store") {
+		t.Error("missing package declaration")
+	}
 
--- name: InsertContactSubmission :one
-INSERT INTO contact_submissions (name, email, message, ip_address)
-VALUES ($1, $2, $3, $4)
-RETURNING *;
+	// Verify imports are present.
+	if !strings.Contains(got, `"context"`) {
+		t.Error("missing context import")
+	}
+	if !strings.Contains(got, `"time"`) {
+		t.Error("missing time import")
+	}
+	if !strings.Contains(got, `"github.com/jackc/pgx/v5"`) {
+		t.Error("missing pgx/v5 import")
+	}
+	if !strings.Contains(got, `"github.com/jackc/pgx/v5/pgxpool"`) {
+		t.Error("missing pgxpool import")
+	}
 
--- name: GetContactSubmission :one
-SELECT * FROM contact_submissions
-WHERE id = $1;
+	// Verify model struct.
+	if !strings.Contains(got, "type ContactSubmission struct") {
+		t.Error("missing ContactSubmission struct")
+	}
 
--- name: ListContactSubmissions :many
-SELECT * FROM contact_submissions
-ORDER BY created_at DESC
-LIMIT $1 OFFSET $2;
+	// Verify scan helper.
+	if !strings.Contains(got, "func scanContactSubmission(row pgx.Row)") {
+		t.Error("missing scanContactSubmission helper")
+	}
 
--- name: ListContactSubmissionsByEmailAndCreatedAt :many
-SELECT * FROM contact_submissions
-WHERE email = $1 AND created_at = $2
-ORDER BY created_at DESC
-LIMIT $3 OFFSET $4;
+	// Verify Store struct and constructor.
+	if !strings.Contains(got, "type Store struct") {
+		t.Error("missing Store struct")
+	}
+	if !strings.Contains(got, "func NewStore(pool *pgxpool.Pool) *Store") {
+		t.Error("missing NewStore constructor")
+	}
 
--- name: DeleteContactSubmission :exec
-DELETE FROM contact_submissions
-WHERE id = $1;
-`
+	// Verify INSERT method (insert cols: name, email, message, ip_address — id and created_at have defaults).
+	if !strings.Contains(got, "func (s *Store) InsertContactSubmission(ctx context.Context") {
+		t.Error("missing InsertContactSubmission method")
+	}
+	if !strings.Contains(got, "INSERT INTO contact_submissions (name, email, message, ip_address)") {
+		t.Error("INSERT SQL does not contain expected columns")
+	}
 
-	if got != want {
-		t.Errorf("GenerateQueries mismatch:\ngot:\n%s\nwant:\n%s", got, want)
+	// Verify GET method.
+	if !strings.Contains(got, "func (s *Store) GetContactSubmission(ctx context.Context") {
+		t.Error("missing GetContactSubmission method")
+	}
+
+	// Verify LIST method.
+	if !strings.Contains(got, "func (s *Store) ListContactSubmissions(ctx context.Context") {
+		t.Error("missing ListContactSubmissions method")
+	}
+	if !strings.Contains(got, "ORDER BY created_at DESC") {
+		t.Error("LIST SQL missing ORDER BY created_at")
+	}
+
+	// No UPDATE method since there is no updated_at column.
+	if strings.Contains(got, "func (s *Store) UpdateContactSubmission") {
+		t.Error("unexpected UpdateContactSubmission — table has no updated_at")
+	}
+
+	// Verify DELETE method.
+	if !strings.Contains(got, "func (s *Store) DeleteContactSubmission(ctx context.Context") {
+		t.Error("missing DeleteContactSubmission method")
 	}
 }
 
@@ -314,53 +351,96 @@ func TestParseTables_WithIndexes(t *testing.T) {
 	}
 }
 
-func TestGenerateQueries_FullFeature(t *testing.T) {
+func TestGenerateGoStore_FullFeature(t *testing.T) {
 	tables := ParseTables(fullFeatureSQL)
 	if len(tables) != 1 {
 		t.Fatalf("expected 1 table, got %d", len(tables))
 	}
 
-	got := GenerateQueries(tables[0])
+	got := GenerateGoStore(tables[0], "posts")
 
-	want := `-- Auto-generated CRUD queries for posts
--- Edit as needed, then run: db codegen
-
--- name: InsertPost :one
-INSERT INTO posts (title, slug, body, author_id, status)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING *;
-
--- name: GetPost :one
-SELECT * FROM posts
-WHERE id = $1;
-
--- name: GetPostBySlug :one
-SELECT * FROM posts
-WHERE slug = $1;
-
--- name: ListPosts :many
-SELECT * FROM posts
-ORDER BY created_at DESC
-LIMIT $1 OFFSET $2;
-
--- name: ListPostsByAuthorId :many
-SELECT * FROM posts
-WHERE author_id = $1
-ORDER BY created_at DESC
-LIMIT $2 OFFSET $3;
-
--- name: UpdatePost :one
-UPDATE posts
-SET title = $2, slug = $3, body = $4, author_id = $5, status = $6
-WHERE id = $1
-RETURNING *;
-
--- name: DeletePost :exec
-DELETE FROM posts
-WHERE id = $1;
-`
-
-	if got != want {
-		t.Errorf("GenerateQueries mismatch:\ngot:\n%s\nwant:\n%s", got, want)
+	// Verify package declaration.
+	if !strings.Contains(got, "package posts") {
+		t.Error("missing package declaration")
 	}
+
+	// Verify uuid import since table has UUID columns.
+	if !strings.Contains(got, `"github.com/google/uuid"`) {
+		t.Error("missing uuid import")
+	}
+
+	// Verify time import since table has timestamptz columns.
+	if !strings.Contains(got, `"time"`) {
+		t.Error("missing time import")
+	}
+
+	// Verify Post struct.
+	if !strings.Contains(got, "type Post struct") {
+		t.Error("missing Post struct")
+	}
+
+	// Verify scan helper.
+	if !strings.Contains(got, "func scanPost(row pgx.Row)") {
+		t.Error("missing scanPost helper")
+	}
+
+	// Verify INSERT includes mutable fields (excludes id, created_at, updated_at).
+	if !strings.Contains(got, "INSERT INTO posts (title, slug, body, author_id, status)") {
+		t.Error("INSERT SQL does not contain expected columns")
+	}
+
+	// Verify UPDATE method is present (table has updated_at).
+	if !strings.Contains(got, "func (s *Store) UpdatePost(ctx context.Context") {
+		t.Error("missing UpdatePost method")
+	}
+
+	// Verify DELETE method.
+	if !strings.Contains(got, "func (s *Store) DeletePost(ctx context.Context") {
+		t.Error("missing DeletePost method")
+	}
+}
+
+func TestGoType(t *testing.T) {
+	tests := []struct {
+		sqlType  string
+		nullable bool
+		want     string
+	}{
+		{"UUID", false, "uuid.UUID"},
+		{"uuid", false, "uuid.UUID"},
+		{"uuid", true, "*uuid.UUID"},
+		{"TEXT", false, "string"},
+		{"text", true, "*string"},
+		{"citext", false, "string"},
+		{"BOOLEAN", false, "bool"},
+		{"bool", true, "*bool"},
+		{"INTEGER", false, "int32"},
+		{"int", true, "*int32"},
+		{"BIGINT", false, "int64"},
+		{"TIMESTAMPTZ", false, "time.Time"},
+		{"timestamptz", true, "*time.Time"},
+		{"JSONB", false, "json.RawMessage"},
+		{"jsonb", true, "json.RawMessage"}, // slice types never get pointer
+		{"BYTEA", false, "[]byte"},
+		{"bytea", true, "[]byte"}, // slice types never get pointer
+		{"VARCHAR(20)", false, "string"},
+		{"varchar(20)", true, "*string"},
+		{"unknown_type", false, "string"}, // safe fallback
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.sqlType+"_nullable="+boolStr(tt.nullable), func(t *testing.T) {
+			got := goType(tt.sqlType, tt.nullable)
+			if got != tt.want {
+				t.Errorf("goType(%q, %v) = %q, want %q", tt.sqlType, tt.nullable, got, tt.want)
+			}
+		})
+	}
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

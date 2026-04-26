@@ -6,11 +6,10 @@ import (
 	"testing"
 )
 
-// writeMigration writes a goose-style .sql migration file with the given SQL in
-// the Up section.
+// writeMigration writes a .sql migration file with the given SQL in the Up section.
 func writeMigration(t *testing.T, dir, name, upSQL string) string {
 	t.Helper()
-	content := "-- +goose Up\n" + upSQL + "\n-- +goose Down\n-- nothing\n"
+	content := "-- +migrate Up\n" + upSQL + "\n-- +migrate Down\n-- nothing\n"
 	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("writeMigration %q: %v", name, err)
@@ -21,7 +20,7 @@ func writeMigration(t *testing.T, dir, name, upSQL string) string {
 // writeDownOnlyMigration writes a file where the dangerous SQL is ONLY in the Down section.
 func writeDownOnlyMigration(t *testing.T, dir, name, downSQL string) string {
 	t.Helper()
-	content := "-- +goose Up\n-- nothing here\n-- +goose Down\n" + downSQL + "\n"
+	content := "-- +migrate Up\n-- nothing here\n-- +migrate Down\n" + downSQL + "\n"
 	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("writeDownOnlyMigration %q: %v", name, err)
@@ -254,7 +253,7 @@ func TestLint_NonSQLFilesSkipped(t *testing.T) {
 	dir := t.TempDir()
 	// Write a .txt file with dangerous SQL content — must be skipped.
 	txtPath := filepath.Join(dir, "notes.txt")
-	if err := os.WriteFile(txtPath, []byte("-- +goose Up\nDROP TABLE foo;\n"), 0o644); err != nil {
+	if err := os.WriteFile(txtPath, []byte("-- +migrate Up\nDROP TABLE foo;\n"), 0o644); err != nil {
 		t.Fatalf("write txt: %v", err)
 	}
 
@@ -309,7 +308,7 @@ func TestLint_DollarQuotedBlock_NoFalsePositive(t *testing.T) {
 	// DDL patterns inside $$ bodies must not fire lint rules.
 	dir := t.TempDir()
 	writeMigration(t, dir, "00001_fn.sql",
-		"-- +goose StatementBegin\nCREATE OR REPLACE FUNCTION fn()\nAS $$\nBEGIN\n    UPDATE foo SET col = 1;\n    DELETE FROM bar;\nEND;\n$$;\n-- +goose StatementEnd")
+		"-- +migrate StatementBegin\nCREATE OR REPLACE FUNCTION fn()\nAS $$\nBEGIN\n    UPDATE foo SET col = 1;\n    DELETE FROM bar;\nEND;\n$$;\n-- +migrate StatementEnd")
 
 	results, err := Lint(dir)
 	if err != nil {
@@ -327,7 +326,7 @@ func TestLint_DollarQuotedBlock_DDLOutsideStillCaught(t *testing.T) {
 	// Dangerous DDL before or after a $$ block must still be caught.
 	dir := t.TempDir()
 	writeMigration(t, dir, "00001_mixed.sql",
-		"UPDATE foo SET col = 1;\n-- +goose StatementBegin\nCREATE OR REPLACE FUNCTION fn()\nAS $$\nBEGIN\n    RETURN NEW;\nEND;\n$$;\n-- +goose StatementEnd")
+		"UPDATE foo SET col = 1;\n-- +migrate StatementBegin\nCREATE OR REPLACE FUNCTION fn()\nAS $$\nBEGIN\n    RETURN NEW;\nEND;\n$$;\n-- +migrate StatementEnd")
 
 	results, err := Lint(dir)
 	if err != nil {

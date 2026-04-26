@@ -32,7 +32,7 @@ var (
 )
 
 // Lint reads all .sql files in dir and checks for dangerous DDL patterns.
-// Only the Up section (between -- +goose Up and -- +goose Down) is analyzed.
+// Only the Up section (between -- +migrate Up and -- +migrate Down) is analyzed.
 func Lint(dir string) ([]LintResult, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -76,11 +76,11 @@ func lintFile(path string) (_ []LintResult, err error) {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
 
-		if strings.HasPrefix(trimmed, "-- +goose Up") {
+		if strings.HasPrefix(trimmed, "-- +migrate Up") {
 			inUp = true
 			continue
 		}
-		if strings.HasPrefix(trimmed, "-- +goose Down") {
+		if strings.HasPrefix(trimmed, "-- +migrate Down") {
 			inUp = false
 			inCreateTable = false
 			inDollarQuote = false

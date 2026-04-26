@@ -3,62 +3,44 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-sum/db"
 	"github.com/spf13/cobra"
 )
 
 func newHealthCmd(configPath *string) *cobra.Command {
-	var tablesFlag string
-
 	cmd := &cobra.Command{
 		Use:   "health",
-		Short: "Verify database connectivity and required tables",
+		Short: "Verify database connectivity and schema fingerprint",
 		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadConfig(*configPath)
 			if err != nil {
 				return err
 			}
-
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err
 			}
-
 			ctx := context.Background()
 			pool, err := db.ConnectDSN(ctx, dsn)
 			if err != nil {
-				return err
+				return fmt.Errorf("health: connect: %w", err)
 			}
 			defer pool.Close()
-
-			var tables []string
-			if tablesFlag != "" {
-				for _, t := range strings.Split(tablesFlag, ",") {
-					if t = strings.TrimSpace(t); t != "" {
-						tables = append(tables, t)
-					}
-				}
-			} else {
-				reg, err := cfg.buildRegistry()
-				if err != nil {
-					return err
-				}
-				tables = reg.HealthTables()
+			if err := db.Health(ctx, pool); err != nil {
+				return fmt.Errorf("health: ping: %w", err)
 			}
-
-			if err := db.Health(ctx, pool, tables...); err != nil {
-				return err
+			reg, err := cfg.buildRegistry()
+			if err != nil {
+				return fmt.Errorf("health: build registry: %w", err)
 			}
-
-			fmt.Println("Database is healthy.")
+			if err := db.VerifyFingerprint(ctx, pool, reg.Fingerprint()); err != nil {
+				return fmt.Errorf("health: %w", err)
+			}
+			fmt.Println("OK")
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVar(&tablesFlag, "tables", "", "comma-separated list of tables to verify")
-
 	return cmd
 }

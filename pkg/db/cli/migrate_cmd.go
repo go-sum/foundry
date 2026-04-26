@@ -6,19 +6,114 @@ import (
 	"os"
 	"path/filepath"
 	"text/tabwriter"
+	"time"
 
-	"github.com/go-sum/db"
+	"github.com/go-sum/db/ddl"
 	"github.com/go-sum/db/migrate"
 	"github.com/spf13/cobra"
 )
 
 func newMigrateCmd(configPath *string) *cobra.Command {
-	var dryRun bool
-	var toVersion int64
-	var dir string
-
 	cmd := &cobra.Command{
 		Use:   "migrate",
+		Short: "Migration commands",
+	}
+	cmd.AddCommand(
+		newMigrateComposeCmd(configPath),
+		newMigrateApplyCmd(configPath),
+		newMigrateStatusCmd(configPath),
+		newMigrateRollbackCmd(configPath),
+	)
+	return cmd
+}
+
+func newMigrateComposeCmd(configPath *string) *cobra.Command {
+	var dir string
+	var fromDB bool
+	cmd := &cobra.Command{
+		Use:   "compose [name]",
+		Short: "Detect schema changes and generate a migration file",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig(*configPath)
+			if err != nil {
+				return err
+			}
+			schemas, err := cfg.buildSchemaInputs()
+			if err != nil {
+				return err
+			}
+			migrDir := dir
+			if migrDir == "" {
+				migrDir = cfg.migrationsDir()
+			}
+			name := "migrate_schema"
+			if len(args) > 0 {
+				name = args[0]
+			}
+
+			createCfg := migrate.CreateConfig{
+				Schemas:       schemas,
+				MigrationsDir: migrDir,
+			}
+
+			if fromDB {
+				dsn, err := cfg.dsnFunc()()
+				if err != nil {
+					return err
+				}
+				ctx := cmd.Context()
+				introspected, err := migrate.IntrospectDSN(ctx, dsn)
+				if err != nil {
+					return fmt.Errorf("migrate compose --from-db: %w", err)
+				}
+				baseSchemas := make(map[string]*ddl.Schema, len(schemas))
+				for _, s := range schemas {
+					baseSchemas[s.Name] = ddl.Filter(introspected, ddl.Parse(s.SQL))
+				}
+				tmpDir, err := os.MkdirTemp("", "db-schema-*")
+				if err != nil {
+					return fmt.Errorf("migrate compose --from-db: temp dir: %w", err)
+				}
+				createCfg.BaseSchemas = baseSchemas
+				createCfg.SnapshotDir = tmpDir
+			}
+
+			result, err := migrate.Create(createCfg, name)
+			if err != nil {
+				return err
+			}
+			if len(result.Files) == 0 {
+				fmt.Println("migrate compose: no schema changes detected")
+				return nil
+			}
+			for _, f := range result.Files {
+				fmt.Printf("Created: %s\n", f)
+			}
+			lintResults, lintErr := migrate.Lint(migrDir)
+			if lintErr != nil {
+				return fmt.Errorf("migrate compose: post-create lint: %w", lintErr)
+			}
+			if len(lintResults) > 0 {
+				printLintResults(os.Stderr, lintResults)
+				if migrate.HasErrors(lintResults) {
+					return fmt.Errorf("migrate compose: lint errors in generated migration")
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&dir, "dir", "", "migrations directory (default: from config)")
+	cmd.Flags().BoolVar(&fromDB, "from-db", false, "use live database state as diff baseline instead of .schema/ snapshots")
+	return cmd
+}
+
+func newMigrateApplyCmd(configPath *string) *cobra.Command {
+	var dir string
+	var dryRun bool
+	var toVersion int64
+	cmd := &cobra.Command{
+		Use:   "apply",
 		Short: "Apply pending migrations",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -26,31 +121,26 @@ func newMigrateCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err
 			}
-
 			migrDir := dir
 			if migrDir == "" {
 				migrDir = cfg.migrationsDir()
 			}
-
 			lintResults, lintErr := migrate.Lint(migrDir)
 			if lintErr != nil {
-				return fmt.Errorf("migrate: pre-flight lint: %w", lintErr)
+				return fmt.Errorf("migrate apply: pre-flight lint: %w", lintErr)
 			}
 			if len(lintResults) > 0 {
 				printLintResults(os.Stderr, lintResults)
 				if migrate.HasErrors(lintResults) {
-					return fmt.Errorf("migrate: lint found errors — fix migration files before applying")
+					return fmt.Errorf("migrate apply: lint errors — fix before applying")
 				}
-				fmt.Fprintln(os.Stderr, "migrate: lint warnings found — proceeding")
+				fmt.Fprintln(os.Stderr, "migrate apply: lint warnings — proceeding")
 			}
-
 			ctx := context.Background()
-
 			if dryRun {
 				fmt.Fprintln(os.Stderr, "Dry run — no changes will be applied")
 				statuses, err := migrate.Status(ctx, dsn, migrDir)
@@ -69,71 +159,27 @@ func newMigrateCmd(configPath *string) *cobra.Command {
 				}
 				return nil
 			}
-
 			if toVersion > 0 {
 				if err := migrate.UpTo(ctx, dsn, migrDir, toVersion); err != nil {
 					return err
 				}
-				storeFingerprintAfterMigrate(ctx, cfg, dsn)
-				return nil
+			} else {
+				if err := migrate.Up(ctx, dsn, migrDir); err != nil {
+					return err
+				}
 			}
-			if err := migrate.Up(ctx, dsn, migrDir); err != nil {
-				return err
-			}
-			storeFingerprintAfterMigrate(ctx, cfg, dsn)
+			storeFingerprintAfterApply(ctx, cfg, dsn, migrDir)
 			return nil
 		},
 	}
-
 	cmd.Flags().StringVar(&dir, "dir", "", "migrations directory (default: from config)")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print SQL without executing")
-	cmd.Flags().Int64Var(&toVersion, "to", 0, "migrate up to this version")
-
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print pending migrations without applying")
+	cmd.Flags().Int64Var(&toVersion, "to", 0, "apply up to this version")
 	return cmd
 }
 
-func newRollbackCmd(configPath *string) *cobra.Command {
-	var toVersion int64
+func newMigrateStatusCmd(configPath *string) *cobra.Command {
 	var dir string
-
-	cmd := &cobra.Command{
-		Use:   "rollback",
-		Short: "Rollback the last applied migration",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(*configPath)
-			if err != nil {
-				return err
-			}
-
-			dsn, err := cfg.dsnFunc()()
-			if err != nil {
-				return err
-			}
-
-			migrDir := dir
-			if migrDir == "" {
-				migrDir = cfg.migrationsDir()
-			}
-
-			ctx := context.Background()
-
-			if toVersion > 0 {
-				return migrate.DownTo(ctx, dsn, migrDir, toVersion)
-			}
-			return migrate.Down(ctx, dsn, migrDir)
-		},
-	}
-
-	cmd.Flags().StringVar(&dir, "dir", "", "migrations directory (default: from config)")
-	cmd.Flags().Int64Var(&toVersion, "to", 0, "roll back to this version")
-
-	return cmd
-}
-
-func newStatusCmd(configPath *string) *cobra.Command {
-	var dir string
-
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show migration status",
@@ -143,62 +189,80 @@ func newStatusCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err
 			}
-
 			migrDir := dir
 			if migrDir == "" {
 				migrDir = cfg.migrationsDir()
 			}
-
 			ctx := context.Background()
 			statuses, err := migrate.Status(ctx, dsn, migrDir)
 			if err != nil {
 				return err
 			}
-
 			if len(statuses) == 0 {
 				fmt.Println("No migrations found.")
 				return nil
 			}
-
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "VERSION\tAPPLIED\tSOURCE")
+			fmt.Fprintln(w, "VERSION\tAPPLIED\tAPPLIED AT\tSOURCE")
 			for _, s := range statuses {
 				applied := "no"
+				appliedAt := ""
 				if s.Applied {
 					applied = "yes"
+					appliedAt = s.AppliedAt.Format(time.RFC3339)
 				}
-				fmt.Fprintf(w, "%d\t%s\t%s\n", s.Version, applied, s.Source)
+				fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", s.Version, applied, appliedAt, filepath.Base(s.Source))
 			}
 			return w.Flush()
 		},
 	}
-
 	cmd.Flags().StringVar(&dir, "dir", "", "migrations directory (default: from config)")
-
 	return cmd
 }
 
-// storeFingerprintAfterMigrate computes the schema fingerprint and stores it in
-// the database after a successful migration. Errors are logged as warnings and
-// do not cause the migrate command to fail.
-func storeFingerprintAfterMigrate(ctx context.Context, cfg *dbConfig, dsn string) {
+func newMigrateRollbackCmd(configPath *string) *cobra.Command {
+	var dir string
+	var toVersion int64
+	cmd := &cobra.Command{
+		Use:   "rollback",
+		Short: "Roll back the most recently applied migration",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := loadConfig(*configPath)
+			if err != nil {
+				return err
+			}
+			dsn, err := cfg.dsnFunc()()
+			if err != nil {
+				return err
+			}
+			migrDir := dir
+			if migrDir == "" {
+				migrDir = cfg.migrationsDir()
+			}
+			ctx := context.Background()
+			if toVersion > 0 {
+				return migrate.DownTo(ctx, dsn, migrDir, toVersion)
+			}
+			return migrate.Down(ctx, dsn, migrDir)
+		},
+	}
+	cmd.Flags().StringVar(&dir, "dir", "", "migrations directory (default: from config)")
+	cmd.Flags().Int64Var(&toVersion, "to", 0, "roll back to this version")
+	return cmd
+}
+
+func storeFingerprintAfterApply(ctx context.Context, cfg *dbConfig, dsn, migrDir string) {
 	reg, err := cfg.buildRegistry()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "warning: fingerprint: build registry:", err)
 		return
 	}
-	pool, err := db.ConnectDSN(ctx, dsn)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "warning: fingerprint: connect:", err)
-		return
-	}
-	defer pool.Close()
-	if err := db.StoreFingerprint(ctx, pool, reg.Fingerprint()); err != nil {
-		fmt.Fprintln(os.Stderr, "warning: fingerprint: store:", err)
+	if err := migrate.StoreFingerprintDSN(ctx, dsn, migrDir, reg.Fingerprint()); err != nil {
+		fmt.Fprintln(os.Stderr, "warning: fingerprint:", err)
 	}
 }
