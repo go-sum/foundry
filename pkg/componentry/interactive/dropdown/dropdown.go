@@ -52,7 +52,7 @@ func Trigger(p TriggerProps, children ...g.Node) g.Node {
 // Content renders the dropdown panel, visible when <details> is open.
 func Content(children ...g.Node) g.Node {
 	return h.Div(
-		h.Class("absolute z-50 mt-1 min-w-[8rem] rounded-md border border-border bg-popover p-1 shadow-md"),
+		h.Class("absolute z-50 mt-1 min-w-32 rounded-md border border-border bg-popover p-1 shadow-md"),
 		g.Group(children),
 	)
 }
