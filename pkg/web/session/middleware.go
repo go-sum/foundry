@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	validate "github.com/go-playground/validator/v10"
@@ -18,7 +17,7 @@ const (
 
 // Settings is the env-facing shape for session configuration.
 type Settings struct {
-	CookieName   string        `validate:"required"`
+	CookieName   string `validate:"required"`
 	IdleTTL      time.Duration
 	AbsoluteTTL  time.Duration
 	CookieSecure bool
@@ -125,13 +124,17 @@ func loadSession(ctx context.Context, cookieHeader string, cfg Config) (*Session
 		return newSession(), nil
 	}
 	if err != nil {
-		cause := fmt.Errorf("web/session: load: %w", err)
-		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, errors.Join(web.ErrDependencyTimeout, cause)
-		}
-		return nil, errors.Join(web.ErrTransient, cause)
+		return nil, classifyStoreError("load", err)
 	}
 	return sessionFromData(data, token, version), nil
+}
+
+func classifyStoreError(op string, err error) error {
+	cause := fmt.Errorf("web/session: %s: %w", op, err)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return errors.Join(web.ErrDependencyTimeout, cause)
+	}
+	return errors.Join(web.ErrTransient, cause)
 }
 
 func commit(ctx context.Context, resp *web.Response, cfg Config, sess *Session) error {
@@ -153,11 +156,7 @@ func commit(ctx context.Context, resp *web.Response, cfg Config, sess *Session) 
 	if destroyed {
 		if token != "" {
 			if err := cfg.Store.Delete(ctx, token); err != nil {
-				cause := fmt.Errorf("web/session: delete: %w", err)
-				if errors.Is(err, context.DeadlineExceeded) {
-					return errors.Join(web.ErrDependencyTimeout, cause)
-				}
-				return errors.Join(web.ErrTransient, cause)
+				return classifyStoreError("delete", err)
 			}
 		}
 		web.SetCookie(resp, expiredCookie(cfg))
@@ -172,14 +171,12 @@ func commit(ctx context.Context, resp *web.Response, cfg Config, sess *Session) 
 	saveToken := token
 	saveVersion := version
 	if regenerated {
-		// Delete old token from store; new session starts at version 0.
+		// Save the replacement as a new record first so a failed save leaves the
+		// current session intact. Old-token deletion happens after save succeeds.
 		if oldToken != "" {
-			if err := cfg.Store.Delete(ctx, oldToken); err != nil {
-				slog.Debug("web/session: delete old token on regenerate", "err", err)
-			}
+			saveToken = ""
+			saveVersion = 0
 		}
-		saveToken = ""
-		saveVersion = 0
 	}
 
 	data, err := sess.marshalPayload()
@@ -190,16 +187,8 @@ func commit(ctx context.Context, resp *web.Response, cfg Config, sess *Session) 
 	absolute := time.Now().Add(cfg.TTL)
 	newToken, err := cfg.Store.Save(ctx, saveToken, data, absolute, cfg.IdleTTL, saveVersion)
 	if err != nil {
-		cause := fmt.Errorf("web/session: save: %w", err)
-		if errors.Is(err, context.DeadlineExceeded) {
-			return errors.Join(web.ErrDependencyTimeout, cause)
-		}
-		return cause
+		return classifyStoreError("save", err)
 	}
-
-	sess.mu.Lock()
-	sess.token = newToken
-	sess.mu.Unlock()
 
 	cookie := cfg.CookieTemplate
 	cookie.Value = newToken
@@ -210,6 +199,18 @@ func commit(ctx context.Context, resp *web.Response, cfg Config, sess *Session) 
 	if len(serialized) > cfg.MaxCookieBytes {
 		return fmt.Errorf("web/session: Set-Cookie size %d exceeds limit %d", len(serialized), cfg.MaxCookieBytes)
 	}
+
+	if regenerated && oldToken != "" {
+		if err := cfg.Store.Delete(ctx, oldToken); err != nil {
+			return classifyStoreError("delete", err)
+		}
+	}
+
+	sess.mu.Lock()
+	sess.token = newToken
+	sess.oldToken = ""
+	sess.mu.Unlock()
+
 	web.SetCookie(resp, cookie)
 	return nil
 }

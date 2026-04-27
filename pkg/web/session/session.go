@@ -28,7 +28,7 @@ type sessionPayload struct {
 type Session struct {
 	mu           sync.RWMutex
 	token        string                     // opaque store token (session ID or encoded blob)
-	oldToken     string                     // previous token; deleted from store on Regenerate
+	oldToken     string                     // previous token; deleted during commit after replacement save succeeds
 	values       map[string]json.RawMessage // persistent key/value data
 	currentFlash map[string]json.RawMessage // flash from previous request; available this request
 	nextFlash    map[string]json.RawMessage // flash set this request; available next request
@@ -151,7 +151,8 @@ func (s *Session) Destroy() {
 }
 
 // Regenerate assigns a new session token while preserving session data.
-// The old token is deleted from the store, preventing session fixation.
+// Commit saves the replacement first, then deletes the old token to prevent
+// session loss if the replacement save fails.
 func (s *Session) Regenerate() {
 	if s == nil {
 		return

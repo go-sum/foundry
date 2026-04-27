@@ -18,7 +18,8 @@ import (
 // newSession path). Save always returns an error to simulate a storage failure.
 // Delete always returns nil.
 type fakeErrorStore struct {
-	saveErr error
+	saveErr   error
+	deleteErr error
 }
 
 func (f *fakeErrorStore) Read(_ context.Context, _ string) ([]byte, int64, error) {
@@ -30,7 +31,51 @@ func (f *fakeErrorStore) Save(_ context.Context, _ string, _ []byte, _ time.Time
 }
 
 func (f *fakeErrorStore) Delete(_ context.Context, _ string) error {
-	return nil
+	return f.deleteErr
+}
+
+type failNthSaveStore struct {
+	base       *MemoryStore
+	failOnCall int
+	saveErr    error
+	saveCalls  int
+}
+
+func (s *failNthSaveStore) Read(ctx context.Context, token string) ([]byte, int64, error) {
+	return s.base.Read(ctx, token)
+}
+
+func (s *failNthSaveStore) Save(ctx context.Context, token string, data []byte, absolute time.Time, idleTTL time.Duration, version int64) (string, error) {
+	s.saveCalls++
+	if s.saveCalls == s.failOnCall {
+		return "", s.saveErr
+	}
+	return s.base.Save(ctx, token, data, absolute, idleTTL, version)
+}
+
+func (s *failNthSaveStore) Delete(ctx context.Context, token string) error {
+	return s.base.Delete(ctx, token)
+}
+
+type failDeleteTokenStore struct {
+	base            *MemoryStore
+	failDeleteToken string
+	deleteErr       error
+}
+
+func (s *failDeleteTokenStore) Read(ctx context.Context, token string) ([]byte, int64, error) {
+	return s.base.Read(ctx, token)
+}
+
+func (s *failDeleteTokenStore) Save(ctx context.Context, token string, data []byte, absolute time.Time, idleTTL time.Duration, version int64) (string, error) {
+	return s.base.Save(ctx, token, data, absolute, idleTTL, version)
+}
+
+func (s *failDeleteTokenStore) Delete(ctx context.Context, token string) error {
+	if token == s.failDeleteToken {
+		return s.deleteErr
+	}
+	return s.base.Delete(ctx, token)
 }
 
 func testMemoryConfig(t *testing.T) Config {
@@ -248,6 +293,128 @@ func TestP0_03_Session_Regenerate(t *testing.T) {
 	}
 }
 
+func TestMiddleware_Regenerate_SaveFailurePreservesExistingSession(t *testing.T) {
+	base := NewMemoryStore()
+	defer base.Stop()
+
+	store := &failNthSaveStore{
+		base:       base,
+		failOnCall: 2,
+		saveErr:    errors.New("store unavailable"),
+	}
+	cfg := Config{
+		Store: store,
+		CookieTemplate: web.Cookie{
+			Name:     "sess",
+			Path:     "/",
+			HTTPOnly: true,
+			SameSite: "Lax",
+		},
+		TTL: time.Hour,
+	}
+	mw := Middleware(cfg)
+
+	resp1, err := runRequest(t, mw, "", func(c *web.Context) (web.Response, error) {
+		sess, _ := FromContext(c)
+		_ = sess.Set("uid", "42")
+		return web.Respond(http.StatusOK), nil
+	})
+	if err != nil {
+		t.Fatalf("establish session: %v", err)
+	}
+	cookie := extractSetCookie(t, resp1)
+
+	resp2, err := runRequest(t, mw, cookie, func(c *web.Context) (web.Response, error) {
+		sess, _ := FromContext(c)
+		sess.Regenerate()
+		return web.Respond(http.StatusOK), nil
+	})
+	if err == nil {
+		t.Fatal("expected regenerate save failure, got nil")
+	}
+	if sc := resp2.Headers.Get("Set-Cookie"); sc != "" {
+		t.Fatalf("Set-Cookie = %q, want empty after failed regenerate save", sc)
+	}
+
+	var uid string
+	_, err = runRequest(t, mw, cookie, func(c *web.Context) (web.Response, error) {
+		sess, _ := FromContext(c)
+		v, ok, getErr := Get[string](sess, "uid")
+		if !ok || getErr != nil {
+			t.Fatalf("Get uid after failed regenerate: ok=%v err=%v", ok, getErr)
+		}
+		uid = v
+		return web.Respond(http.StatusOK), nil
+	})
+	if err != nil {
+		t.Fatalf("reuse original session after failed regenerate: %v", err)
+	}
+	if uid != "42" {
+		t.Fatalf("uid after failed regenerate = %q, want 42", uid)
+	}
+}
+
+func TestMiddleware_Regenerate_DeleteFailurePreservesExistingSession(t *testing.T) {
+	base := NewMemoryStore()
+	defer base.Stop()
+
+	store := &failDeleteTokenStore{
+		base:      base,
+		deleteErr: errors.New("delete unavailable"),
+	}
+	cfg := Config{
+		Store: store,
+		CookieTemplate: web.Cookie{
+			Name:     "sess",
+			Path:     "/",
+			HTTPOnly: true,
+			SameSite: "Lax",
+		},
+		TTL: time.Hour,
+	}
+	mw := Middleware(cfg)
+
+	resp1, err := runRequest(t, mw, "", func(c *web.Context) (web.Response, error) {
+		sess, _ := FromContext(c)
+		_ = sess.Set("uid", "42")
+		return web.Respond(http.StatusOK), nil
+	})
+	if err != nil {
+		t.Fatalf("establish session: %v", err)
+	}
+	cookie := extractSetCookie(t, resp1)
+	store.failDeleteToken = cookieValue(cookie, "sess")
+
+	resp2, err := runRequest(t, mw, cookie, func(c *web.Context) (web.Response, error) {
+		sess, _ := FromContext(c)
+		sess.Regenerate()
+		return web.Respond(http.StatusOK), nil
+	})
+	if err == nil {
+		t.Fatal("expected regenerate delete failure, got nil")
+	}
+	if sc := resp2.Headers.Get("Set-Cookie"); sc != "" {
+		t.Fatalf("Set-Cookie = %q, want empty after failed old-token delete", sc)
+	}
+
+	var uid string
+	_, err = runRequest(t, mw, cookie, func(c *web.Context) (web.Response, error) {
+		sess, _ := FromContext(c)
+		v, ok, getErr := Get[string](sess, "uid")
+		if !ok || getErr != nil {
+			t.Fatalf("Get uid after failed old-token delete: ok=%v err=%v", ok, getErr)
+		}
+		uid = v
+		return web.Respond(http.StatusOK), nil
+	})
+	if err != nil {
+		t.Fatalf("reuse original session after failed old-token delete: %v", err)
+	}
+	if uid != "42" {
+		t.Fatalf("uid after failed old-token delete = %q, want 42", uid)
+	}
+}
+
 func TestP0_04_Session_CookieAEADNoPlaintext(t *testing.T) {
 	cfg := testCookieConfig(t)
 	mw := Middleware(cfg)
@@ -352,6 +519,9 @@ func TestMiddleware_CommitError_Returns500(t *testing.T) {
 	}
 	if webErr.Status != http.StatusInternalServerError {
 		t.Fatalf("error status = %d, want 500 when Store.Save fails", webErr.Status)
+	}
+	if !errors.Is(err, web.ErrTransient) {
+		t.Fatalf("errors.Is(err, web.ErrTransient) = false; err = %v", err)
 	}
 }
 
@@ -494,5 +664,73 @@ func TestMiddleware_G1_WrappedErrSessionNotFound(t *testing.T) {
 	}
 	if !wasNew {
 		t.Fatal("expected a fresh session when store returns wrapped ErrSessionNotFound")
+	}
+}
+
+func TestCommit_SaveVersionConflictMarkedTransient(t *testing.T) {
+	cfg := Config{
+		Store: &fakeErrorStore{saveErr: ErrVersionConflict},
+		CookieTemplate: web.Cookie{
+			Name:     "sess",
+			Path:     "/",
+			HTTPOnly: true,
+			SameSite: "Lax",
+		},
+		TTL:            time.Hour,
+		MaxCookieBytes: defaultMaxSize,
+	}
+
+	sess := newSession()
+	sess.token = "existing-token"
+	sess.version = 7
+	sess.fresh = false
+	if err := sess.Set("k", "v"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	resp := web.Respond(http.StatusOK)
+	err := commit(context.Background(), &resp, cfg, sess)
+	if err == nil {
+		t.Fatal("commit returned nil, want ErrVersionConflict")
+	}
+	if !errors.Is(err, web.ErrTransient) {
+		t.Fatalf("errors.Is(err, web.ErrTransient) = false; err = %v", err)
+	}
+	if !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("errors.Is(err, ErrVersionConflict) = false; err = %v", err)
+	}
+	if errors.Is(err, web.ErrDependencyTimeout) {
+		t.Fatalf("errors.Is(err, web.ErrDependencyTimeout) = true, want false; err = %v", err)
+	}
+}
+
+func TestCommit_SaveDeadlineMarkedDependencyTimeout(t *testing.T) {
+	cfg := Config{
+		Store: &fakeErrorStore{saveErr: context.DeadlineExceeded},
+		CookieTemplate: web.Cookie{
+			Name:     "sess",
+			Path:     "/",
+			HTTPOnly: true,
+			SameSite: "Lax",
+		},
+		TTL:            time.Hour,
+		MaxCookieBytes: defaultMaxSize,
+	}
+
+	sess := newSession()
+	if err := sess.Set("k", "v"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	resp := web.Respond(http.StatusOK)
+	err := commit(context.Background(), &resp, cfg, sess)
+	if err == nil {
+		t.Fatal("commit returned nil, want dependency timeout")
+	}
+	if !errors.Is(err, web.ErrDependencyTimeout) {
+		t.Fatalf("errors.Is(err, web.ErrDependencyTimeout) = false; err = %v", err)
+	}
+	if errors.Is(err, web.ErrTransient) {
+		t.Fatalf("errors.Is(err, web.ErrTransient) = true, want false; err = %v", err)
 	}
 }
