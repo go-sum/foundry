@@ -139,8 +139,8 @@ func minimalFS(filePath, sql string) fstest.MapFS {
 }
 
 // TestLoadRegistryFromYAML_WithResolver_ResolvesExternal verifies that an
-// external: true entry is resolved via the provided ExternalResolver and that
-// a non-external entry is loaded from the embedded FS.
+// entry whose name matches a resolver key is resolved via the SchemaResolver,
+// and that an entry without a resolver match is loaded from the embedded FS.
 func TestLoadRegistryFromYAML_WithResolver_ResolvesExternal(t *testing.T) {
 	const externalSQL = "CREATE TABLE test_external (id int)"
 	const localSQL = "CREATE TABLE local_thing (id int)"
@@ -148,14 +148,13 @@ func TestLoadRegistryFromYAML_WithResolver_ResolvesExternal(t *testing.T) {
 	yamlData := []byte(`schema:
   - name: test
     priority: 5
-    external: true
   - source: sql/local.sql
     priority: 10
 `)
 
 	fsys := minimalFS("sql/local.sql", localSQL)
 
-	resolver := ExternalResolver{"test": externalSQL}
+	resolver := SchemaResolver{"test": externalSQL}
 
 	reg, err := LoadRegistryFromYAML(yamlData, fsys, WithResolver(resolver))
 	if err != nil {
@@ -187,20 +186,18 @@ func TestLoadRegistryFromYAML_WithResolver_ResolvesExternal(t *testing.T) {
 }
 
 // TestLoadRegistryFromYAML_WithResolver_MissingEntry_Error verifies that a
-// YAML entry marked external: true whose name has no key in the resolver
-// causes an error.
+// YAML entry with no source and no matching resolver key causes an error.
 func TestLoadRegistryFromYAML_WithResolver_MissingEntry_Error(t *testing.T) {
 	yamlData := []byte(`schema:
   - name: missing
     priority: 1
-    external: true
 `)
 
-	resolver := ExternalResolver{} // "missing" key absent
+	resolver := SchemaResolver{} // "missing" key absent
 
 	_, err := LoadRegistryFromYAML(yamlData, fstest.MapFS{}, WithResolver(resolver))
 	if err == nil {
-		t.Fatal("expected error for missing external resolver entry, got nil")
+		t.Fatal("expected error for missing resolver entry with no source, got nil")
 	}
 	if !strings.Contains(err.Error(), "missing") {
 		t.Fatalf("error message %q does not mention the missing name %q", err.Error(), "missing")
@@ -208,7 +205,7 @@ func TestLoadRegistryFromYAML_WithResolver_MissingEntry_Error(t *testing.T) {
 }
 
 // TestLoadRegistryFromYAML_NoExternals_WorksWithoutResolver verifies that a
-// YAML with only non-external entries succeeds without a resolver option.
+// YAML with only source-based entries succeeds without a resolver option.
 func TestLoadRegistryFromYAML_NoExternals_WorksWithoutResolver(t *testing.T) {
 	const sql = "CREATE TABLE things (id int)"
 
@@ -233,22 +230,99 @@ func TestLoadRegistryFromYAML_NoExternals_WorksWithoutResolver(t *testing.T) {
 	}
 }
 
-// TestLoadRegistryFromYAML_ExternalWithoutName_Error verifies that an external
-// entry with an empty name cannot be resolved and returns an error.
-func TestLoadRegistryFromYAML_ExternalWithoutName_Error(t *testing.T) {
-	// An external entry has no name field — name will be derived from path.Base(source) minus ".sql".
-	// With no resolver entry for that derived name, an error must be returned.
+// TestLoadRegistryFromYAML_NoSourceNoResolver_Error verifies that an entry
+// with no source path and no resolver match returns an error.
+func TestLoadRegistryFromYAML_NoSourceNoResolver_Error(t *testing.T) {
 	yamlData := []byte(`schema:
-  - source: sql/unnamed.sql
+  - name: unnamed
     priority: 1
-    external: true
 `)
 
 	// Empty resolver: no key will match "unnamed".
-	resolver := ExternalResolver{}
+	resolver := SchemaResolver{}
 
 	_, err := LoadRegistryFromYAML(yamlData, fstest.MapFS{}, WithResolver(resolver))
 	if err == nil {
-		t.Fatal("expected error for external entry not in resolver, got nil")
+		t.Fatal("expected error for entry with no source and no resolver match, got nil")
+	}
+	if !strings.Contains(err.Error(), "unnamed") {
+		t.Fatalf("error message %q does not mention the entry name %q", err.Error(), "unnamed")
+	}
+}
+
+// TestLoadRegistryFromYAML_ResolverTakesPrecedence verifies that when an entry
+// has both a name and a source, the resolver SQL is returned rather than the
+// file content when the resolver contains the entry name.
+func TestLoadRegistryFromYAML_ResolverTakesPrecedence(t *testing.T) {
+	const fileSQL = "CREATE TABLE from_file (id int)"
+	const resolverSQL = "CREATE TABLE from_resolver (id int)"
+
+	yamlData := []byte(`schema:
+  - name: myschema
+    source: sql/myschema.sql
+    priority: 10
+`)
+
+	fsys := minimalFS("sql/myschema.sql", fileSQL)
+	resolver := SchemaResolver{"myschema": resolverSQL}
+
+	reg, err := LoadRegistryFromYAML(yamlData, fsys, WithResolver(resolver))
+	if err != nil {
+		t.Fatalf("LoadRegistryFromYAML returned unexpected error: %v", err)
+	}
+
+	providers := reg.Providers()
+	if len(providers) != 1 {
+		t.Fatalf("len(Providers()) = %d, want 1", len(providers))
+	}
+	if providers[0].SQL() != resolverSQL {
+		t.Fatalf("resolver should take precedence: got %q, want %q", providers[0].SQL(), resolverSQL)
+	}
+}
+
+// TestLoadRegistryFromYAML_FallbackToFS verifies that when an entry has a
+// source path but the resolver does not contain the entry name, the embed.FS
+// content is used.
+func TestLoadRegistryFromYAML_FallbackToFS(t *testing.T) {
+	const fileSQL = "CREATE TABLE from_file (id int)"
+
+	yamlData := []byte(`schema:
+  - name: myschema
+    source: sql/myschema.sql
+    priority: 10
+`)
+
+	fsys := minimalFS("sql/myschema.sql", fileSQL)
+	// Resolver present but does not contain "myschema" — should fall through to FS.
+	resolver := SchemaResolver{"other": "SELECT 1"}
+
+	reg, err := LoadRegistryFromYAML(yamlData, fsys, WithResolver(resolver))
+	if err != nil {
+		t.Fatalf("LoadRegistryFromYAML returned unexpected error: %v", err)
+	}
+
+	providers := reg.Providers()
+	if len(providers) != 1 {
+		t.Fatalf("len(Providers()) = %d, want 1", len(providers))
+	}
+	if providers[0].SQL() != fileSQL {
+		t.Fatalf("FS fallback should return file content: got %q, want %q", providers[0].SQL(), fileSQL)
+	}
+}
+
+// TestLoadRegistryFromYAML_NoResolverNoSource_Error verifies that an entry
+// with a name but no source and no resolver at all returns an error.
+func TestLoadRegistryFromYAML_NoResolverNoSource_Error(t *testing.T) {
+	yamlData := []byte(`schema:
+  - name: orphan
+    priority: 1
+`)
+
+	_, err := LoadRegistryFromYAML(yamlData, fstest.MapFS{})
+	if err == nil {
+		t.Fatal("expected error for entry with no resolver and no source, got nil")
+	}
+	if !strings.Contains(err.Error(), "orphan") {
+		t.Fatalf("error message %q does not mention entry name %q", err.Error(), "orphan")
 	}
 }

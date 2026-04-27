@@ -22,7 +22,7 @@ RUN cd pkg/assets && go mod download && CGO_ENABLED=0 go build -ldflags='-s -w' 
 # ── db CLI ──
 COPY --from=workspace pkg/db/ ./pkg/db/
 COPY --from=workspace pkg/config/ ./pkg/config/
-RUN cd pkg/db && go mod download && CGO_ENABLED=0 go build -ldflags='-s -w' -o /usr/local/bin/db ./cli
+RUN cd pkg/db && go mod download && CGO_ENABLED=0 go build -ldflags='-s -w' -o /usr/local/bin/db ./cmd/db
 
 # ── docs CLI ──
 COPY --from=workspace pkg/docs/ ./pkg/docs/

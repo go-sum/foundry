@@ -18,8 +18,8 @@ var SchemaFiles embed.FS
 // ExternalSchemas returns the resolver mapping external schema names (declared
 // in schema.yaml) to their embedded SQL. This is the single wiring point for
 // external package SQL.
-func ExternalSchemas() coredb.ExternalResolver {
-	return coredb.ExternalResolver{
+func ExternalSchemas() coredb.SchemaResolver {
+	return coredb.SchemaResolver{
 		"base":             coredb.BaseSchema.SQL(),
 		"queue":            pgstore.SchemaSQL,
 		"auth":             authpgstore.SchemaSQL,

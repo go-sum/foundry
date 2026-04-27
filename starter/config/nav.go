@@ -71,9 +71,9 @@ func DefaultNav(rt *router.Router) view.RequestOption {
 			},
 			Slots: compound.NavSlots{
 				compound.SlotThemeToggle: compound.ControlSlot("Theme", theme.ThemeSelector(theme.ThemeSelectorProps{
-					LightIcon:  core.Icon(render.PropsForRegistry(nil, icons.ThemeLight, core.IconProps{})),
-					DarkIcon:   core.Icon(render.PropsForRegistry(nil, icons.ThemeDark, core.IconProps{})),
-					SystemIcon: core.Icon(render.PropsForRegistry(nil, icons.ThemeSystem, core.IconProps{})),
+					LightIcon:  core.Icon(render.PropsForRegistry(r.Icons, icons.ThemeLight, core.IconProps{})),
+					DarkIcon:   core.Icon(render.PropsForRegistry(r.Icons, icons.ThemeDark, core.IconProps{})),
+					SystemIcon: core.Icon(render.PropsForRegistry(r.Icons, icons.ThemeSystem, core.IconProps{})),
 				})),
 			},
 		}

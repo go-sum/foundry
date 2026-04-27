@@ -66,20 +66,23 @@ func (r *Registry) Fingerprint() string {
 	return hex.EncodeToString(hash[:])
 }
 
-// ExternalResolver maps external schema names (from schema.yaml `name` field)
-// to their embedded SQL content.
-type ExternalResolver map[string]string
+// SchemaResolver maps schema names (from schema.yaml `name` field) to their
+// SQL content. Used to provide SQL for package-owned schemas at both runtime
+// (via WithResolver) and in the CLI (via dbcli.WithResolver).
+type SchemaResolver map[string]string
 
 // LoadOption configures LoadRegistryFromYAML.
 type LoadOption func(*loadConfig)
 
 type loadConfig struct {
-	resolver ExternalResolver
+	resolver SchemaResolver
 }
 
-// WithResolver returns a LoadOption that supplies an ExternalResolver for
-// external: true YAML entries.
-func WithResolver(r ExternalResolver) LoadOption {
+// WithResolver returns a LoadOption that supplies a SchemaResolver for schema
+// entries whose source files are not available on the filesystem (standalone
+// apps consuming packages as Go modules). The resolver takes precedence over
+// embed.FS when both are available for the same entry name.
+func WithResolver(r SchemaResolver) LoadOption {
 	return func(cfg *loadConfig) { cfg.resolver = r }
 }
 
@@ -107,7 +110,7 @@ type yamlSchemaEntry struct {
 	Name     string `yaml:"name"`
 	Source   string `yaml:"source"`
 	Priority int    `yaml:"priority"`
-	External bool   `yaml:"external"`
+	Scaffold *bool  `yaml:"scaffold"`
 }
 
 // yamlSchema is a SchemaProvider whose SQL was loaded from an embedded filesystem.
@@ -121,9 +124,14 @@ func (y yamlSchema) Name() string  { return y.name }
 func (y yamlSchema) SQL() string   { return y.sql }
 func (y yamlSchema) Priority() int { return y.priority }
 
-// LoadRegistryFromYAML parses a schema.yaml config, loads non-external schema
-// files from schemaFiles, and resolves external: true entries via the provided
-// ExternalResolver (supplied via WithResolver).
+// LoadRegistryFromYAML parses a schema.yaml config and registers each schema
+// entry using resolver-first, embed.FS-fallback resolution:
+//
+//  1. If a WithResolver option was supplied and the resolver contains the entry
+//     name, the resolver SQL is used (standalone apps without source files).
+//  2. Otherwise, the entry's source path is read from schemaFiles (monorepo
+//     embed.FS usage).
+//  3. If neither path resolves, an error is returned.
 func LoadRegistryFromYAML(configYAML []byte, schemaFiles fs.FS, opts ...LoadOption) (*Registry, error) {
 	var cfg yamlSchemaCfg
 	if err := yaml.Unmarshal(configYAML, &cfg); err != nil {
@@ -143,28 +151,33 @@ func LoadRegistryFromYAML(configYAML []byte, schemaFiles fs.FS, opts ...LoadOpti
 			name = strings.TrimSuffix(path.Base(entry.Source), ".sql")
 		}
 
-		if entry.External {
-			sql, ok := lc.resolver[name]
-			if !ok {
-				return nil, fmt.Errorf("db: external schema %q not in resolver", name)
+		// Resolver-first: resolver takes precedence when available.
+		if lc.resolver != nil {
+			if sql, ok := lc.resolver[name]; ok {
+				reg.Register(yamlSchema{
+					name:     name,
+					sql:      sql,
+					priority: entry.Priority,
+				})
+				continue
+			}
+		}
+
+		// Fallback to embed.FS.
+		if entry.Source != "" {
+			sql, err := fs.ReadFile(schemaFiles, entry.Source)
+			if err != nil {
+				return nil, fmt.Errorf("db: read schema %s: %w", entry.Source, err)
 			}
 			reg.Register(yamlSchema{
 				name:     name,
-				sql:      sql,
+				sql:      string(sql),
 				priority: entry.Priority,
 			})
 			continue
 		}
 
-		sql, err := fs.ReadFile(schemaFiles, entry.Source)
-		if err != nil {
-			return nil, fmt.Errorf("db: read schema %s: %w", entry.Source, err)
-		}
-		reg.Register(yamlSchema{
-			name:     name,
-			sql:      string(sql),
-			priority: entry.Priority,
-		})
+		return nil, fmt.Errorf("db: schema %q: no resolver entry and no source path", name)
 	}
 
 	return reg, nil

@@ -1,4 +1,4 @@
-package main
+package dbcli
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newHealthCmd(configPath *string) *cobra.Command {
+func newHealthCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "health",
 		Short: "Verify database connectivity and schema fingerprint",
@@ -18,6 +18,7 @@ func newHealthCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err

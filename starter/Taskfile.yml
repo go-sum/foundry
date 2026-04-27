@@ -72,7 +72,7 @@ tasks:
       - _inspect:tools
       - _net:proxy:ensure
       - task: _caddy:config
-        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls internal"}
+        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls internal", DEV_FLAG: "--dev"}
     cmd: "{{.DCOMP_ALL}} up --build {{.CLI_ARGS}}"
 
   dev:up:
@@ -81,7 +81,7 @@ tasks:
       - _inspect:tools
       - _net:proxy:ensure
       - task: _caddy:config
-        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls internal"}
+        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls internal", DEV_FLAG: "--dev"}
     cmd: "{{.DCOMP_ALL}} up --build --detach {{.CLI_ARGS}}"
 
   dev:down:
@@ -196,7 +196,7 @@ tasks:
     internal: true
     requires:
       vars: [DOMAIN, TLS_CONFIG]
-    cmd: sh docker/caddy/gen-caddyfile.sh "{{.DOMAIN}}" "{{.TLS_CONFIG}}"
+    cmd: sh docker/caddy/gen-caddyfile.sh "{{.DOMAIN}}" "{{.TLS_CONFIG}}" {{.DEV_FLAG}}
 
   _db:run:
     internal: true

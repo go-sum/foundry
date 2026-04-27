@@ -1,4 +1,4 @@
-package main
+package dbcli
 
 import (
 	"context"
@@ -8,28 +8,27 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/go-sum/foundry/pkg/db/ddl"
+	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/db/migrate"
 	"github.com/spf13/cobra"
 )
 
-func newMigrateCmd(configPath *string) *cobra.Command {
+func newMigrateCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Migration commands",
 	}
 	cmd.AddCommand(
-		newMigrateComposeCmd(configPath),
-		newMigrateApplyCmd(configPath),
-		newMigrateStatusCmd(configPath),
-		newMigrateRollbackCmd(configPath),
+		newMigrateComposeCmd(configPath, resolver),
+		newMigrateApplyCmd(configPath, resolver),
+		newMigrateStatusCmd(configPath, resolver),
+		newMigrateRollbackCmd(configPath, resolver),
 	)
 	return cmd
 }
 
-func newMigrateComposeCmd(configPath *string) *cobra.Command {
+func newMigrateComposeCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	var dir string
-	var fromDB bool
 	cmd := &cobra.Command{
 		Use:   "compose [name]",
 		Short: "Detect schema changes and generate a migration file",
@@ -39,6 +38,7 @@ func newMigrateComposeCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 			schemas, err := cfg.buildSchemaInputs()
 			if err != nil {
 				return err
@@ -57,27 +57,11 @@ func newMigrateComposeCmd(configPath *string) *cobra.Command {
 				MigrationsDir: migrDir,
 			}
 
-			if fromDB {
-				dsn, err := cfg.dsnFunc()()
-				if err != nil {
-					return err
-				}
-				ctx := cmd.Context()
-				introspected, err := migrate.IntrospectDSN(ctx, dsn)
-				if err != nil {
-					return fmt.Errorf("migrate compose --from-db: %w", err)
-				}
-				baseSchemas := make(map[string]*ddl.Schema, len(schemas))
-				for _, s := range schemas {
-					baseSchemas[s.Name] = ddl.Filter(introspected, ddl.Parse(s.SQL))
-				}
-				tmpDir, err := os.MkdirTemp("", "db-schema-*")
-				if err != nil {
-					return fmt.Errorf("migrate compose --from-db: temp dir: %w", err)
-				}
-				createCfg.BaseSchemas = baseSchemas
-				createCfg.SnapshotDir = tmpDir
+			baseSchemas, err := migrate.BuildBaseline(migrDir, schemas)
+			if err != nil {
+				return fmt.Errorf("migrate compose: build baseline: %w", err)
 			}
+			createCfg.BaseSchemas = baseSchemas
 
 			result, err := migrate.Create(createCfg, name)
 			if err != nil {
@@ -104,11 +88,10 @@ func newMigrateComposeCmd(configPath *string) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&dir, "dir", "", "migrations directory (default: from config)")
-	cmd.Flags().BoolVar(&fromDB, "from-db", false, "use live database state as diff baseline instead of .schema/ snapshots")
 	return cmd
 }
 
-func newMigrateApplyCmd(configPath *string) *cobra.Command {
+func newMigrateApplyCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	var dir string
 	var dryRun bool
 	var toVersion int64
@@ -121,6 +104,7 @@ func newMigrateApplyCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err
@@ -178,7 +162,7 @@ func newMigrateApplyCmd(configPath *string) *cobra.Command {
 	return cmd
 }
 
-func newMigrateStatusCmd(configPath *string) *cobra.Command {
+func newMigrateStatusCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	var dir string
 	cmd := &cobra.Command{
 		Use:   "status",
@@ -189,6 +173,7 @@ func newMigrateStatusCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err
@@ -224,7 +209,7 @@ func newMigrateStatusCmd(configPath *string) *cobra.Command {
 	return cmd
 }
 
-func newMigrateRollbackCmd(configPath *string) *cobra.Command {
+func newMigrateRollbackCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	var dir string
 	var toVersion int64
 	cmd := &cobra.Command{
@@ -236,6 +221,7 @@ func newMigrateRollbackCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err

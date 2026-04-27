@@ -1,14 +1,15 @@
-package main
+package dbcli
 
 import (
 	"fmt"
 	"os"
 
+	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/db/migrate"
 	"github.com/spf13/cobra"
 )
 
-func newLintCmd(configPath *string) *cobra.Command {
+func newLintCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	var dir string
 
 	cmd := &cobra.Command{
@@ -20,6 +21,7 @@ func newLintCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 
 			migrDir := dir
 			if migrDir == "" {

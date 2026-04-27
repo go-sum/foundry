@@ -1,4 +1,4 @@
-package main
+package dbcli
 
 import (
 	"context"
@@ -7,24 +7,25 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/db/seed"
 	"github.com/spf13/cobra"
 )
 
-func newSeedCmd(configPath *string) *cobra.Command {
+func newSeedCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "seed",
 		Short: "Seed commands",
 	}
 	cmd.AddCommand(
-		newSeedApplyCmd(configPath),
-		newSeedStatusCmd(configPath),
-		newSeedResetCmd(configPath),
+		newSeedApplyCmd(configPath, resolver),
+		newSeedStatusCmd(configPath, resolver),
+		newSeedResetCmd(configPath, resolver),
 	)
 	return cmd
 }
 
-func newSeedApplyCmd(configPath *string) *cobra.Command {
+func newSeedApplyCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Run pending seed files",
@@ -34,6 +35,7 @@ func newSeedApplyCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err
@@ -62,7 +64,7 @@ func newSeedApplyCmd(configPath *string) *cobra.Command {
 	return cmd
 }
 
-func newSeedStatusCmd(configPath *string) *cobra.Command {
+func newSeedStatusCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show seed status",
@@ -72,6 +74,7 @@ func newSeedStatusCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err
@@ -110,7 +113,7 @@ func newSeedStatusCmd(configPath *string) *cobra.Command {
 	return cmd
 }
 
-func newSeedResetCmd(configPath *string) *cobra.Command {
+func newSeedResetCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Clear seed history so seeds can be re-applied",
@@ -120,6 +123,7 @@ func newSeedResetCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 			dsn, err := cfg.dsnFunc()()
 			if err != nil {
 				return err

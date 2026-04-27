@@ -1,8 +1,17 @@
-package main
+package dbcli
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/go-sum/foundry/pkg/db"
 )
+
+func boolPtr(b bool) *bool { return &b }
+
+// --- expandEnvWithDefaults ---
 
 func TestExpandEnvWithDefaults_PlainVar(t *testing.T) {
 	t.Setenv("MY_VAR", "hello")
@@ -73,5 +82,100 @@ func TestExpandEnvWithDefaults_CredentialVarNames(t *testing.T) {
 	got2 := expandEnvWithDefaults("${POSTGRES_USER:-postgres}")
 	if got2 != "postgres_user_val" {
 		t.Fatalf("POSTGRES_USER expansion = %q, want %q", got2, "postgres_user_val")
+	}
+}
+
+// --- shouldScaffold ---
+
+func TestShouldScaffold_NilIsTrue(t *testing.T) {
+	e := schemaEntry{}
+	if !e.shouldScaffold() {
+		t.Fatal("shouldScaffold() = false for nil Scaffold field, want true")
+	}
+}
+
+func TestShouldScaffold_ExplicitFalse(t *testing.T) {
+	e := schemaEntry{Scaffold: boolPtr(false)}
+	if e.shouldScaffold() {
+		t.Fatal("shouldScaffold() = true for Scaffold=false, want false")
+	}
+}
+
+func TestShouldScaffold_ExplicitTrue(t *testing.T) {
+	e := schemaEntry{Scaffold: boolPtr(true)}
+	if !e.shouldScaffold() {
+		t.Fatal("shouldScaffold() = false for Scaffold=true, want true")
+	}
+}
+
+// --- resolveSQL ---
+
+// writeTempSQL creates a temp file with the given SQL content and returns the path.
+func writeTempSQL(t *testing.T, content string) string {
+	t.Helper()
+	f, err := os.CreateTemp(t.TempDir(), "schema-*.sql")
+	if err != nil {
+		t.Fatalf("create temp file: %v", err)
+	}
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatalf("write temp file: %v", err)
+	}
+	f.Close()
+	return f.Name()
+}
+
+// TestResolveSQL_FilesystemFirst verifies that when both a source file and a
+// resolver entry exist, the file content is returned (filesystem-first).
+func TestResolveSQL_FilesystemFirst(t *testing.T) {
+	const fileSQL = "CREATE TABLE from_file (id int)"
+	const resolverSQL = "CREATE TABLE from_resolver (id int)"
+
+	path := writeTempSQL(t, fileSQL)
+	name := strings.TrimSuffix(filepath.Base(path), ".sql")
+
+	cfg := &dbConfig{
+		resolver: db.SchemaResolver{name: resolverSQL},
+	}
+	entry := schemaEntry{Source: path}
+
+	got, err := cfg.resolveSQL(entry)
+	if err != nil {
+		t.Fatalf("resolveSQL returned unexpected error: %v", err)
+	}
+	if got != fileSQL {
+		t.Fatalf("resolveSQL = %q, want file content %q", got, fileSQL)
+	}
+}
+
+// TestResolveSQL_ResolverFallback verifies that when the source file does not
+// exist but the resolver has a matching key, the resolver content is returned.
+func TestResolveSQL_ResolverFallback(t *testing.T) {
+	const resolverSQL = "CREATE TABLE from_resolver (id int)"
+
+	nonExistent := filepath.Join(t.TempDir(), "missing.sql")
+	cfg := &dbConfig{
+		resolver: db.SchemaResolver{"missing": resolverSQL},
+	}
+	entry := schemaEntry{Source: nonExistent}
+
+	got, err := cfg.resolveSQL(entry)
+	if err != nil {
+		t.Fatalf("resolveSQL returned unexpected error: %v", err)
+	}
+	if got != resolverSQL {
+		t.Fatalf("resolveSQL = %q, want resolver content %q", got, resolverSQL)
+	}
+}
+
+// TestResolveSQL_NoResolverNoFile_Error verifies that when the source file does
+// not exist and there is no resolver, an error is returned.
+func TestResolveSQL_NoResolverNoFile_Error(t *testing.T) {
+	nonExistent := filepath.Join(t.TempDir(), "missing.sql")
+	cfg := &dbConfig{}
+	entry := schemaEntry{Source: nonExistent}
+
+	_, err := cfg.resolveSQL(entry)
+	if err == nil {
+		t.Fatal("resolveSQL returned nil error; want error for missing file with no resolver")
 	}
 }

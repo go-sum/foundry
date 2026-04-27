@@ -1,16 +1,16 @@
-package main
+package dbcli
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/db/codegen"
 	"github.com/spf13/cobra"
 )
 
-func newScaffoldCmd(configPath *string) *cobra.Command {
+func newScaffoldCmd(configPath *string, resolver db.SchemaResolver) *cobra.Command {
 	var force, skipExisting bool
 	var pkgName, outDir string
 
@@ -23,18 +23,19 @@ func newScaffoldCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			cfg.resolver = resolver
 
-			// Collect SQL from non-external local schema files only.
+			// Collect SQL from scaffold-enabled entries only.
 			var schemaSQLParts []string
 			for _, entry := range cfg.Schema {
-				if entry.External {
+				if !entry.shouldScaffold() {
 					continue
 				}
-				data, err := os.ReadFile(entry.Source)
+				sql, err := cfg.resolveSQL(entry)
 				if err != nil {
-					return fmt.Errorf("scaffold: read schema %s: %w", entry.Source, err)
+					return fmt.Errorf("scaffold: read schema: %w", err)
 				}
-				schemaSQLParts = append(schemaSQLParts, string(data))
+				schemaSQLParts = append(schemaSQLParts, sql)
 			}
 			schemaSQL := strings.Join(schemaSQLParts, "\n")
 
@@ -43,11 +44,11 @@ func newScaffoldCmd(configPath *string) *cobra.Command {
 				tableName = args[0]
 			}
 
-			// Determine output directory: default to same directory as schema file.
+			// Determine output directory: default to same directory as first scaffold entry.
 			target := outDir
 			if target == "" {
 				for _, entry := range cfg.Schema {
-					if !entry.External {
+					if entry.shouldScaffold() {
 						target = filepath.Dir(entry.Source)
 						break
 					}

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-sum/foundry/pkg/db/ddl"
 )
 
 // minimalTableSQL returns minimal DDL for a named table with a single column.
@@ -14,17 +16,18 @@ func minimalTableSQL(tableName string) string {
 
 // ---- Create — first run (no snapshot exists) --------------------------------
 
-func TestCreate_DiscreteSchema_CreatesOwnFile(t *testing.T) {
+func TestCreate_GroupedSchema_CreatesOwnFile(t *testing.T) {
 	dir := t.TempDir()
 
 	cfg := CreateConfig{
 		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{},
 		Schemas: []SchemaInput{
 			{
 				Name:     "auth",
 				SQL:      minimalTableSQL("users"),
 				Priority: 0,
-				Discrete: true,
+				Group:    "auth",
 			},
 		},
 	}
@@ -37,39 +40,34 @@ func TestCreate_DiscreteSchema_CreatesOwnFile(t *testing.T) {
 		t.Fatalf("Files: got %d, want 1 — %v", len(result.Files), result.Files)
 	}
 
-	// File name should encode the schema name, not the migration name.
+	// File name should encode the group name (which equals the schema name here).
 	base := filepath.Base(result.Files[0])
 	if !strings.Contains(base, "auth") {
-		t.Errorf("file name %q should contain schema name %q", base, "auth")
+		t.Errorf("file name %q should contain group name %q", base, "auth")
 	}
 	if !strings.HasSuffix(base, ".sql") {
 		t.Errorf("file name %q should end in .sql", base)
 	}
-
-	// Snapshot should be written to .schema/<name>.sql.
-	snapshotPath := filepath.Join(dir, ".schema", "auth.sql")
-	if _, err := os.Stat(snapshotPath); err != nil {
-		t.Errorf("snapshot file missing at %q: %v", snapshotPath, err)
-	}
 }
 
-func TestCreate_NonDiscreteSchema_CombinedFile(t *testing.T) {
+func TestCreate_UngroupedSchemas_CombinedFile(t *testing.T) {
 	dir := t.TempDir()
 
 	cfg := CreateConfig{
 		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{},
 		Schemas: []SchemaInput{
 			{
 				Name:     "contact",
 				SQL:      minimalTableSQL("contact_submissions"),
 				Priority: 1,
-				Discrete: false,
+				Group:    "",
 			},
 			{
 				Name:     "analytics",
 				SQL:      minimalTableSQL("page_views"),
 				Priority: 2,
-				Discrete: false,
+				Group:    "",
 			},
 		},
 	}
@@ -78,9 +76,9 @@ func TestCreate_NonDiscreteSchema_CombinedFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
 	}
-	// Two non-discrete schemas with changes → one combined file.
+	// Two ungrouped schemas with changes → one combined file.
 	if len(result.Files) != 1 {
-		t.Fatalf("Files: got %d, want 1 (non-discrete schemas combine) — %v", len(result.Files), result.Files)
+		t.Fatalf("Files: got %d, want 1 (ungrouped schemas combine) — %v", len(result.Files), result.Files)
 	}
 
 	// Combined file should contain both table DDL statements.
@@ -97,14 +95,15 @@ func TestCreate_NonDiscreteSchema_CombinedFile(t *testing.T) {
 	}
 }
 
-func TestCreate_MixedSchemas_DiscreteAndNonDiscrete(t *testing.T) {
+func TestCreate_MixedGroupedAndUngrouped(t *testing.T) {
 	dir := t.TempDir()
 
 	cfg := CreateConfig{
 		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{},
 		Schemas: []SchemaInput{
-			{Name: "auth", SQL: minimalTableSQL("users"), Priority: 0, Discrete: true},
-			{Name: "app", SQL: minimalTableSQL("posts"), Priority: 1, Discrete: false},
+			{Name: "auth", SQL: minimalTableSQL("users"), Priority: 0, Group: "auth"},
+			{Name: "app", SQL: minimalTableSQL("posts"), Priority: 1, Group: ""},
 		},
 	}
 
@@ -112,9 +111,87 @@ func TestCreate_MixedSchemas_DiscreteAndNonDiscrete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: unexpected error: %v", err)
 	}
-	// One file for discrete auth, one file for non-discrete app.
+	// One file for grouped auth, one file for ungrouped app.
 	if len(result.Files) != 2 {
 		t.Fatalf("Files: got %d, want 2 — %v", len(result.Files), result.Files)
+	}
+}
+
+func TestCreate_MultiSchemaGroup_MergedIntoOneFile(t *testing.T) {
+	dir := t.TempDir()
+
+	cfg := CreateConfig{
+		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{},
+		Schemas: []SchemaInput{
+			{Name: "auth", SQL: minimalTableSQL("users"), Priority: 60, Group: "auth"},
+			{Name: "auth_provider", SQL: minimalTableSQL("oauth_clients"), Priority: 70, Group: "auth"},
+		},
+	}
+
+	result, err := Create(cfg, "initial")
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+	// Two schemas in the same group → one file.
+	if len(result.Files) != 1 {
+		t.Fatalf("Files: got %d, want 1 (same-group schemas merge) — %v", len(result.Files), result.Files)
+	}
+
+	// File name should contain the group name.
+	base := filepath.Base(result.Files[0])
+	if !strings.Contains(base, "auth") {
+		t.Errorf("file name %q should contain group name %q", base, "auth")
+	}
+
+	// Combined file should contain both tables.
+	data, err := os.ReadFile(result.Files[0])
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "users") {
+		t.Errorf("merged file missing users table: %s", content)
+	}
+	if !strings.Contains(content, "oauth_clients") {
+		t.Errorf("merged file missing oauth_clients table: %s", content)
+	}
+}
+
+func TestCreate_GroupOrdering_ByMaxPriority(t *testing.T) {
+	dir := t.TempDir()
+
+	// queue (50) < auth group max (70) < ungrouped (100)
+	cfg := CreateConfig{
+		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{},
+		Schemas: []SchemaInput{
+			{Name: "auth", SQL: minimalTableSQL("users"), Priority: 60, Group: "auth"},
+			{Name: "auth_provider", SQL: minimalTableSQL("oauth_clients"), Priority: 70, Group: "auth"},
+			{Name: "queue", SQL: minimalTableSQL("jobs"), Priority: 50, Group: "queue"},
+			{Name: "contact", SQL: minimalTableSQL("contact_submissions"), Priority: 100, Group: ""},
+		},
+	}
+
+	result, err := Create(cfg, "app")
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+	// queue group, auth group, ungrouped → 3 files
+	if len(result.Files) != 3 {
+		t.Fatalf("Files: got %d, want 3 — %v", len(result.Files), result.Files)
+	}
+
+	// Files should be in priority order: queue (00001), auth (00002), ungrouped (00003).
+	if !strings.Contains(filepath.Base(result.Files[0]), "queue") {
+		t.Errorf("first file should be queue group, got %q", filepath.Base(result.Files[0]))
+	}
+	if !strings.Contains(filepath.Base(result.Files[1]), "auth") {
+		t.Errorf("second file should be auth group, got %q", filepath.Base(result.Files[1]))
+	}
+	// Third file is ungrouped, named after the name param "app".
+	if !strings.Contains(filepath.Base(result.Files[2]), "app") {
+		t.Errorf("third file should use migration name 'app', got %q", filepath.Base(result.Files[2]))
 	}
 }
 
@@ -123,29 +200,22 @@ func TestCreate_MixedSchemas_DiscreteAndNonDiscrete(t *testing.T) {
 func TestCreate_UnchangedSchemas_NoFiles(t *testing.T) {
 	dir := t.TempDir()
 
+	sql := minimalTableSQL("users")
 	cfg := CreateConfig{
 		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{"auth": ddl.Parse(sql)},
 		Schemas: []SchemaInput{
-			{Name: "auth", SQL: minimalTableSQL("users"), Priority: 0, Discrete: true},
+			{Name: "auth", SQL: sql, Priority: 0, Group: "auth"},
 		},
 	}
 
-	// First run.
-	first, err := Create(cfg, "initial")
+	// Single pass with BaseSchemas already matching current SQL → no changes.
+	result, err := Create(cfg, "initial")
 	if err != nil {
-		t.Fatalf("first Create: %v", err)
+		t.Fatalf("Create: %v", err)
 	}
-	if len(first.Files) != 1 {
-		t.Fatalf("first Create: Files = %d, want 1", len(first.Files))
-	}
-
-	// Second run on same config — snapshot is now up to date.
-	second, err := Create(cfg, "initial")
-	if err != nil {
-		t.Fatalf("second Create: %v", err)
-	}
-	if len(second.Files) != 0 {
-		t.Errorf("second Create: Files = %d, want 0 (no changes detected)", len(second.Files))
+	if len(result.Files) != 0 {
+		t.Errorf("Create: Files = %d, want 0 (no changes detected)", len(result.Files))
 	}
 }
 
@@ -154,29 +224,24 @@ func TestCreate_UnchangedSchemas_NoFiles(t *testing.T) {
 func TestCreate_IncrementalMigration_AddsColumn(t *testing.T) {
 	dir := t.TempDir()
 
-	// First run: table with only id column.
 	sqlV1 := "CREATE TABLE IF NOT EXISTS widgets (\n    id UUID PRIMARY KEY DEFAULT gen_random_uuid()\n);\n"
+	sqlV2 := "CREATE TABLE IF NOT EXISTS widgets (\n    id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n    name TEXT NOT NULL\n);\n"
+
 	cfg := CreateConfig{
 		MigrationsDir: dir,
-		Schemas:       []SchemaInput{{Name: "widgets", SQL: sqlV1, Priority: 0, Discrete: false}},
-	}
-	if _, err := Create(cfg, "initial"); err != nil {
-		t.Fatalf("first Create: %v", err)
+		BaseSchemas:   map[string]*ddl.Schema{"widgets": ddl.Parse(sqlV1)},
+		Schemas:       []SchemaInput{{Name: "widgets", SQL: sqlV2, Priority: 0, Group: ""}},
 	}
 
-	// Second run: add a name column.
-	sqlV2 := "CREATE TABLE IF NOT EXISTS widgets (\n    id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n    name TEXT NOT NULL\n);\n"
-	cfg.Schemas[0].SQL = sqlV2
-
-	second, err := Create(cfg, "add_name")
+	result, err := Create(cfg, "add_name")
 	if err != nil {
-		t.Fatalf("second Create: %v", err)
+		t.Fatalf("Create: %v", err)
 	}
-	if len(second.Files) != 1 {
-		t.Fatalf("second Create: Files = %d, want 1 — %v", len(second.Files), second.Files)
+	if len(result.Files) != 1 {
+		t.Fatalf("Create: Files = %d, want 1 — %v", len(result.Files), result.Files)
 	}
 
-	data, err := os.ReadFile(second.Files[0])
+	data, err := os.ReadFile(result.Files[0])
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
@@ -197,8 +262,9 @@ func TestCreate_FileContainsMigrateMarkers(t *testing.T) {
 
 	cfg := CreateConfig{
 		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{},
 		Schemas: []SchemaInput{
-			{Name: "core", SQL: minimalTableSQL("things"), Priority: 0, Discrete: false},
+			{Name: "core", SQL: minimalTableSQL("things"), Priority: 0, Group: ""},
 		},
 	}
 	result, err := Create(cfg, "test_migration")
@@ -214,6 +280,9 @@ func TestCreate_FileContainsMigrateMarkers(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	content := string(data)
+	if !strings.HasPrefix(content, "-- Auto-generated migration - do not edit") {
+		t.Errorf("file missing auto-generated header: %s", content)
+	}
 	if !strings.Contains(content, "-- +migrate Up") {
 		t.Errorf("file missing '-- +migrate Up' marker: %s", content)
 	}
@@ -233,8 +302,9 @@ func TestCreate_SequenceNumbers_Increment(t *testing.T) {
 
 	cfg := CreateConfig{
 		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{},
 		Schemas: []SchemaInput{
-			{Name: "new_schema", SQL: minimalTableSQL("new_table"), Priority: 0, Discrete: false},
+			{Name: "new_schema", SQL: minimalTableSQL("new_table"), Priority: 0, Group: ""},
 		},
 	}
 	result, err := Create(cfg, "new_migration")
@@ -259,6 +329,7 @@ func TestCreate_NoChanges_EmptyResult(t *testing.T) {
 
 	cfg := CreateConfig{
 		MigrationsDir: dir,
+		BaseSchemas:   map[string]*ddl.Schema{},
 		Schemas:       []SchemaInput{},
 	}
 	result, err := Create(cfg, "empty")
@@ -270,37 +341,17 @@ func TestCreate_NoChanges_EmptyResult(t *testing.T) {
 	}
 }
 
-// ---- Create — snapshot stored after first run --------------------------------
+// ---- Create — nil BaseSchemas returns error ----------------------------------
 
-func TestCreate_SnapshotWrittenForEachSchema(t *testing.T) {
+func TestCreate_NilBaseSchemas_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-
 	cfg := CreateConfig{
 		MigrationsDir: dir,
-		Schemas: []SchemaInput{
-			{Name: "auth", SQL: minimalTableSQL("users"), Priority: 0, Discrete: true},
-			{Name: "app", SQL: minimalTableSQL("posts"), Priority: 1, Discrete: false},
-		},
+		Schemas:       []SchemaInput{{Name: "x", SQL: minimalTableSQL("x"), Priority: 0}},
 	}
-	_, err := Create(cfg, "initial")
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-
-	for _, schemaName := range []string{"auth", "app"} {
-		snapshotPath := filepath.Join(dir, ".schema", schemaName+".sql")
-		data, err := os.ReadFile(snapshotPath)
-		if err != nil {
-			t.Errorf("snapshot file missing for schema %q: %v", schemaName, err)
-			continue
-		}
-		// Snapshot content must equal the input SQL.
-		for _, schema := range cfg.Schemas {
-			if schema.Name == schemaName && string(data) != schema.SQL {
-				t.Errorf("schema %q: snapshot content mismatch\ngot:  %q\nwant: %q",
-					schemaName, string(data), schema.SQL)
-			}
-		}
+	_, err := Create(cfg, "test")
+	if err == nil {
+		t.Fatal("expected error for nil BaseSchemas")
 	}
 }
 

@@ -2,26 +2,27 @@ schema:
   - name: base
     source: ../../pkg/db/sql/base.sql
     priority: 0
-    external: true
-    discrete: true
+    scaffold: false
+    group: base
 
   - name: queue
     source: ../../pkg/queue/pgstore/sql/schema.sql
     priority: 50
-    external: true
-    discrete: true
+    scaffold: false
+    group: queue
 
   - name: auth
     source: ../../pkg/auth/pgstore/sql/schema.sql
     priority: 60
-    external: true
-    discrete: true
+    scaffold: false
+    group: auth
 
   - name: auth_provider
     source: ../../pkg/auth/provider/pgstore/sql/schema.sql
     priority: 70
-    external: true
-    discrete: true
+    scaffold: false
+    group: auth
+    seed: seeds/auth_first_party_client.sql
 
   - source: sql/schema/contact.sql
     priority: 100
