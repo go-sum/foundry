@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/go-sum/notification"
+	"github.com/go-sum/foundry/pkg/notification"
 )
 
 // Sender captures notifications for test assertions.

@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 func TestCORS_NoOriginHeader_PassesThroughWithoutCORSHeaders(t *testing.T) {

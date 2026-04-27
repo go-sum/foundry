@@ -6,8 +6,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/ui/data"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/ui/data"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestTable_Root(t *testing.T) {

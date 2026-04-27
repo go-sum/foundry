@@ -43,7 +43,7 @@ func initConfig() error {
 	fmt.Printf("created %s\n", target)
 	fmt.Println("next steps:")
 	fmt.Println("  edit .assets.yaml to configure your assets")
-	fmt.Println("  go run github.com/go-sum/assets/cli build all")
-	fmt.Println("  go run github.com/go-sum/assets/cli sprites")
+	fmt.Println("  go run github.com/go-sum/foundry/pkg/assets/cli build all")
+	fmt.Println("  go run github.com/go-sum/foundry/pkg/assets/cli sprites")
 	return nil
 }

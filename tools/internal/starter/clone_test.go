@@ -88,8 +88,8 @@ func TestStripMonorepoBlocks_NoMarkers(t *testing.T) {
 func TestRewriteModule(t *testing.T) {
 	dir := t.TempDir()
 
-	gomod := "module github.com/go-sum/foundry\n\ngo 1.26.0\n\nrequire (\n\tgithub.com/go-sum/foundry/tools v0.0.0\n)\n"
-	gofile := "package main\n\nimport (\n\t\"github.com/go-sum/foundry/internal/app\"\n)\n"
+	gomod := "module github.com/go-sum/foundry\n\ngo 1.26.0\n\nrequire (\n\tgithub.com/go-sum/foundry/tools v0.0.0\n\tgithub.com/go-sum/foundry/pkg/web v0.1.0\n)\n"
+	gofile := "package main\n\nimport (\n\t\"github.com/go-sum/foundry/internal/app\"\n\t\"github.com/go-sum/foundry/pkg/web\"\n)\n"
 
 	writeTestFile(t, dir+"/go.mod", gomod)
 	writeTestFile(t, dir+"/main.go", gofile)
@@ -106,13 +106,22 @@ func TestRewriteModule(t *testing.T) {
 	if !strings.Contains(gotMod, "module github.com/myorg/myapp") {
 		t.Errorf("go.mod missing new module directive:\n%s", gotMod)
 	}
-	if strings.Contains(gotMod, "github.com/go-sum/foundry") {
-		t.Errorf("go.mod still contains old module path:\n%s", gotMod)
+	// pkg/ paths must NOT be rewritten
+	if !strings.Contains(gotMod, "github.com/go-sum/foundry/pkg/web") {
+		t.Errorf("go.mod pkg path was incorrectly rewritten:\n%s", gotMod)
+	}
+	// internal tools path should be rewritten
+	if !strings.Contains(gotMod, "github.com/myorg/myapp/tools") {
+		t.Errorf("go.mod tools path not rewritten:\n%s", gotMod)
 	}
 
 	gotGo := readTestFile(t, dir+"/main.go")
 	if !strings.Contains(gotGo, `"github.com/myorg/myapp/internal/app"`) {
-		t.Errorf("main.go import not rewritten:\n%s", gotGo)
+		t.Errorf("main.go internal import not rewritten:\n%s", gotGo)
+	}
+	// pkg/ imports must NOT be rewritten
+	if !strings.Contains(gotGo, `"github.com/go-sum/foundry/pkg/web"`) {
+		t.Errorf("main.go pkg import was incorrectly rewritten:\n%s", gotGo)
 	}
 }
 

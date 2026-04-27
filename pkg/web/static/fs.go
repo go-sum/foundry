@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/file"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/file"
 )
 
 // FSHandler returns a web.Handler that serves static files from fsys.

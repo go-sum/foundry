@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-sum/auth/provider"
+	"github.com/go-sum/foundry/pkg/auth/provider"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"

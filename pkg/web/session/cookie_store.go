@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-sum/web/cookiecodec"
+	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 )
 
 const defaultMaxCookieBytes = 3800

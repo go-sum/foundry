@@ -5,7 +5,7 @@ import (
 	"text/tabwriter"
 	"fmt"
 
-	"github.com/go-sum/db/migrate"
+	"github.com/go-sum/foundry/pkg/db/migrate"
 )
 
 func printLintResults(w io.Writer, results []migrate.LintResult) {

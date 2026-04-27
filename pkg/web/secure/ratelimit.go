@@ -11,8 +11,8 @@ import (
 	"time"
 
 	validator "github.com/go-playground/validator/v10"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/headers"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/headers"
 )
 
 // RateLimitConfig configures rate limiting middleware.

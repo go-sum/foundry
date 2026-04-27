@@ -1,9 +1,9 @@
 package kv
 
 import (
-	kvstore "github.com/go-sum/kv"
-	"github.com/go-sum/showcase"
-	"github.com/go-sum/web/router"
+	kvstore "github.com/go-sum/foundry/pkg/kv"
+	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/web/router"
 )
 
 // Config holds configuration for the KV panel.

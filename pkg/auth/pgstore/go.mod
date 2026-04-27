@@ -1,17 +1,11 @@
-module github.com/go-sum/auth/pgstore
+module github.com/go-sum/foundry/pkg/auth/pgstore
 
 go 1.26.0
 
-replace (
-	github.com/go-sum/auth => ../
-	github.com/go-sum/config => ../../config
-	github.com/go-sum/db => ../../db
-	github.com/go-sum/web => ../../web
-)
 
 require (
-	github.com/go-sum/auth v0.0.0
-	github.com/go-sum/db v0.0.0
+	github.com/go-sum/foundry/pkg/auth v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/db v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.1
 )
@@ -22,8 +16,8 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.30.2 // indirect
-	github.com/go-sum/config v0.0.0-00010101000000-000000000000 // indirect
-	github.com/go-sum/web v0.0.0-00010101000000-000000000000 // indirect
+	github.com/go-sum/foundry/pkg/config v0.0.0-00010101000000-000000000000 // indirect
+	github.com/go-sum/foundry/pkg/web v0.0.0-00010101000000-000000000000 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/webauthn v0.17.0 // indirect
 	github.com/go-webauthn/x v0.2.3 // indirect

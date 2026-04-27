@@ -8,7 +8,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 func newContext() *web.Context {

@@ -1,13 +1,13 @@
 package authui
 
 import (
-	"github.com/go-sum/auth"
-	"github.com/go-sum/componentry/form"
-	"github.com/go-sum/componentry/ui/core"
-	"github.com/go-sum/componentry/ui/data"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/secure"
+	"github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/componentry/form"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/componentry/ui/data"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/render"
+	"github.com/go-sum/foundry/pkg/web/secure"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )

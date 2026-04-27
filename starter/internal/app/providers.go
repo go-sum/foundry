@@ -13,27 +13,27 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	cfgpkg "github.com/go-sum/config"
-	"github.com/go-sum/assets/publish"
-	"github.com/go-sum/auth"
-	"github.com/go-sum/auth/authui"
-	authpgstore "github.com/go-sum/auth/pgstore"
-	"github.com/go-sum/auth/provider"
-	providerpgstore "github.com/go-sum/auth/provider/pgstore"
-	"github.com/go-sum/componentry/assets/iconset"
-	"github.com/go-sum/componentry/icons"
-	"github.com/go-sum/db"
-	"github.com/go-sum/kv/redisstore"
-	"github.com/go-sum/notification"
-	"github.com/go-sum/notification/notifylog"
-	"github.com/go-sum/queue"
-	"github.com/go-sum/queue/pgstore"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/cookiecodec"
-	"github.com/go-sum/web/otelweb"
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/session"
-	"github.com/go-sum/web/validate"
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
+	"github.com/go-sum/foundry/pkg/assets/publish"
+	"github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/auth/authui"
+	authpgstore "github.com/go-sum/foundry/pkg/auth/pgstore"
+	"github.com/go-sum/foundry/pkg/auth/provider"
+	providerpgstore "github.com/go-sum/foundry/pkg/auth/provider/pgstore"
+	"github.com/go-sum/foundry/pkg/componentry/assets/iconset"
+	"github.com/go-sum/foundry/pkg/componentry/icons"
+	"github.com/go-sum/foundry/pkg/db"
+	"github.com/go-sum/foundry/pkg/kv/redisstore"
+	"github.com/go-sum/foundry/pkg/notification"
+	"github.com/go-sum/foundry/pkg/notification/notifylog"
+	"github.com/go-sum/foundry/pkg/queue"
+	"github.com/go-sum/foundry/pkg/queue/pgstore"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/cookiecodec"
+	"github.com/go-sum/foundry/pkg/web/otelweb"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/session"
+	"github.com/go-sum/foundry/pkg/web/validate"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
@@ -239,12 +239,6 @@ func provideServices(ctx context.Context, runtime Runtime, security Security, rt
 		return Services{}, fmt.Errorf("services: %w", err)
 	}
 
-	// Seed the first-party OAuth client — redirect_uri depends on runtime Issuer.
-	if err := seedFirstPartyClient(ctx, pool, *runtime.Config); err != nil {
-		pool.Close()
-		return Services{}, fmt.Errorf("services: seed first-party client: %w", err)
-	}
-
 	oauthClientH := oauthclient.New(runtime.Config.Auth.FirstPartyClientConfig())
 
 	// Queue processor
@@ -364,23 +358,6 @@ func provideAuth(
 	}
 
 	return authMod, providerMod, nil
-}
-
-// seedFirstPartyClient upserts the built-in first-party OAuth client into the
-// database at startup. The redirect_uri is derived at runtime from the Issuer
-// URL, so a static migration cannot encode it.
-func seedFirstPartyClient(ctx context.Context, pool *pgxpool.Pool, cfg config.Config) error {
-	redirectURI := cfg.Auth.Provider.Issuer + cfg.Auth.FirstParty.RedirectPath
-	const q = `
-		INSERT INTO oauth_clients (client_id, client_secret, name, redirect_uris, scopes, public, first_party)
-		VALUES ($1, '', 'Starter App (first-party)', ARRAY[$2]::text[], ARRAY['openid','email','profile']::text[], true, true)
-		ON CONFLICT (client_id) DO UPDATE
-			SET redirect_uris = ARRAY[$2]::text[],
-			    first_party   = true,
-			    public        = true,
-			    updated_at    = NOW()`
-	_, err := pool.Exec(ctx, q, cfg.Auth.FirstParty.ClientID, redirectURI)
-	return err
 }
 
 // appErrorRenderer implements web.ErrorRenderer for the starter application.

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-sum/queue"
+	"github.com/go-sum/foundry/pkg/queue"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

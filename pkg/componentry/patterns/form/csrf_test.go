@@ -5,8 +5,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	pform "github.com/go-sum/componentry/patterns/form"
-	testutil "github.com/go-sum/componentry/testutil"
+	pform "github.com/go-sum/foundry/pkg/componentry/patterns/form"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestCSRFField_ExactOutput(t *testing.T) {

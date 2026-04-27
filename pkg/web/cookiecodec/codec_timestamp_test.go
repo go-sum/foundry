@@ -20,7 +20,7 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/hkdf"
 
-	"github.com/go-sum/web/cookiecodec"
+	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 )
 
 // TestCookieCodec_AEAD2_RoundTrip verifies that the new versionAEAD2 format

@@ -7,7 +7,7 @@ import (
 
 	validator "github.com/go-playground/validator/v10"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // FieldError describes a single field-level validation failure.

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/render"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/render"
 	g "maragu.dev/gomponents"
 )
 

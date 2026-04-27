@@ -5,9 +5,9 @@ import (
 	"cmp"
 	"strings"
 
-	icons "github.com/go-sum/componentry/icons"
-	iconrender "github.com/go-sum/componentry/icons/render"
-	"github.com/go-sum/componentry/ui/core"
+	icons "github.com/go-sum/foundry/pkg/componentry/icons"
+	iconrender "github.com/go-sum/foundry/pkg/componentry/icons/render"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"

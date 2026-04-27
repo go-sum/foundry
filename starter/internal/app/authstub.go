@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/go-sum/auth"
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/config"
 )
 

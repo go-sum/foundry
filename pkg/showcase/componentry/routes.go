@@ -1,9 +1,9 @@
 package componentry
 
 import (
-	"github.com/go-sum/componentry/icons"
-	"github.com/go-sum/showcase"
-	"github.com/go-sum/web/router"
+	"github.com/go-sum/foundry/pkg/componentry/icons"
+	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/web/router"
 )
 
 // Config holds configuration for the showcase handler.

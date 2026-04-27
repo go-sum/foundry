@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/go-sum/assets/config"
+	"github.com/go-sum/foundry/pkg/assets/config"
 )
 
 // BuildCSSIfChanged builds each CSS entry only when its tracked input files

@@ -1,8 +1,8 @@
 package provider
 
 import (
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/router"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/router"
 )
 
 // DiscoveryHandler serves the OIDC discovery document.

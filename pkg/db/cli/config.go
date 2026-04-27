@@ -8,9 +8,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-sum/db"
-	"github.com/go-sum/db/migrate"
-	"github.com/go-sum/db/seed"
+	"github.com/go-sum/foundry/pkg/db"
+	"github.com/go-sum/foundry/pkg/db/migrate"
+	"github.com/go-sum/foundry/pkg/db/seed"
 )
 
 type dbConfig struct {
@@ -119,11 +119,12 @@ func (c *dbConfig) buildSeedEntries() ([]seed.Entry, error) {
 		if err != nil {
 			return nil, fmt.Errorf("seed %s: %w", e.Seed, err)
 		}
+		expanded := expandEnvWithDefaults(string(sql))
 		name := e.Name
 		if name == "" {
 			name = strings.TrimSuffix(filepath.Base(e.Source), ".sql")
 		}
-		entries = append(entries, seed.Entry{Name: name, Priority: e.Priority, SQL: string(sql)})
+		entries = append(entries, seed.Entry{Name: name, Priority: e.Priority, SQL: expanded})
 	}
 	return entries, nil
 }

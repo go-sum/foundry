@@ -3,7 +3,7 @@ package attrs_test
 import (
 	"testing"
 
-	"github.com/go-sum/componentry/interactive/runtime/attrs"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/runtime/attrs"
 )
 
 func TestController(t *testing.T) {

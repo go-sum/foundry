@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	testutil "github.com/go-sum/componentry/testutil"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 
-	"github.com/go-sum/componentry/ui/layout"
+	"github.com/go-sum/foundry/pkg/componentry/ui/layout"
 )
 
 // renderNodeLayout renders a g.Node to a string for assertion.

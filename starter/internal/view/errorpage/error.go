@@ -4,11 +4,11 @@ package errorpage
 import (
 	"fmt"
 
-	"github.com/go-sum/componentry/ui/core"
-	"github.com/go-sum/componentry/ui/data"
-	"github.com/go-sum/componentry/ui/feedback"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/componentry/ui/data"
+	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
 	"github.com/go-sum/foundry/internal/view"
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"

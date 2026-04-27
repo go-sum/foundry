@@ -3,7 +3,7 @@ package iconset
 import (
 	"testing"
 
-	"github.com/go-sum/componentry/icons"
+	"github.com/go-sum/foundry/pkg/componentry/icons"
 )
 
 func TestDefaultSprites(t *testing.T) {

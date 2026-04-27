@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-sum/foundry/internal/view"
-	"github.com/go-sum/web/render"
+	"github.com/go-sum/foundry/pkg/web/render"
 )
 
 const (

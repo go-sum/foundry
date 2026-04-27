@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/static"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/static"
 )
 
 // DefaultDocsDir is the subdirectory under PublicDir where Hugo output is stored.

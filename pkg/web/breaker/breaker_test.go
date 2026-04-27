@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/breaker"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/breaker"
 )
 
 var transientErr = errors.Join(web.ErrTransient, errors.New("upstream error"))

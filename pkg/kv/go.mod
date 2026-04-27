@@ -1,4 +1,4 @@
-module github.com/go-sum/kv
+module github.com/go-sum/foundry/pkg/kv
 
 go 1.26.0
 

@@ -3,8 +3,8 @@ package form_test
 import (
 	"testing"
 
-	pform "github.com/go-sum/componentry/patterns/form"
-	componentryform "github.com/go-sum/componentry/form"
+	pform "github.com/go-sum/foundry/pkg/componentry/patterns/form"
+	componentryform "github.com/go-sum/foundry/pkg/componentry/form"
 )
 
 // Compile-time assertion: *FormState satisfies the patterns/form.Form interface.

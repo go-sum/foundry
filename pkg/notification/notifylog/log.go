@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/go-sum/notification"
+	"github.com/go-sum/foundry/pkg/notification"
 )
 
 // Sender emits a structured slog record for each notification. Use in development

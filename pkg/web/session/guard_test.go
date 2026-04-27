@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 func runGuardRequest(t *testing.T, sessionMW web.Middleware, handler web.Handler, extraHeaders map[string]string) (web.Response, error) {

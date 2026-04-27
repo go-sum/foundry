@@ -7,7 +7,7 @@
 package tooltip
 
 import (
-	core "github.com/go-sum/componentry/ui/core"
+	core "github.com/go-sum/foundry/pkg/componentry/ui/core"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"

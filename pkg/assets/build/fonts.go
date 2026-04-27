@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-sum/assets/config"
+	"github.com/go-sum/foundry/pkg/assets/config"
 )
 
 func DownloadFonts(cfg *config.Config, client *http.Client, out io.Writer) error {

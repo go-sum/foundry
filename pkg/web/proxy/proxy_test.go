@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // newTestContext builds a *web.Context from method and path for use in handler tests.

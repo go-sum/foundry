@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/go-sum/config"
+	"github.com/go-sum/foundry/pkg/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"

@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/go-sum/componentry/interactive/theme"
-	cfgpkg "github.com/go-sum/config"
-	"github.com/go-sum/web/secure"
-	"github.com/go-sum/web/serve"
-	"github.com/go-sum/web/session"
-	"github.com/go-sum/web/site"
-	"github.com/go-sum/web/static"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
+	"github.com/go-sum/foundry/pkg/web/secure"
+	"github.com/go-sum/foundry/pkg/web/serve"
+	"github.com/go-sum/foundry/pkg/web/session"
+	"github.com/go-sum/foundry/pkg/web/site"
+	"github.com/go-sum/foundry/pkg/web/static"
 )
 
 // KVConfig holds connection parameters for the key-value store.

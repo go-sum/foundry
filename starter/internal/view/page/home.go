@@ -2,7 +2,7 @@
 package page
 
 import (
-	"github.com/go-sum/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 	"github.com/go-sum/foundry/internal/view"
 
 	g "maragu.dev/gomponents"

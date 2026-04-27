@@ -9,9 +9,9 @@ import (
 	"time"
 
 	configpkg "github.com/go-sum/foundry/config"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/serve"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/serve"
 )
 
 func TestRun_ShutsDownCleanlyOnContextCancel(t *testing.T) {

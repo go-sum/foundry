@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-sum/componentry/icons"
+	"github.com/go-sum/foundry/pkg/componentry/icons"
 )
 
 func TestRegistry_Register_Resolve(t *testing.T) {

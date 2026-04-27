@@ -6,8 +6,6 @@ env:
 vars:
   GO: /usr/local/go/bin/go
   FOUNDRY: '{{.GO}} run ./cmd/foundry'
-  FOUNDRY_DOCKER: >-
-    docker compose -f starter/docker-compose.data.yml -f starter/docker-compose.yml -f starter/docker-compose.dev.yml --profile tools run --rm tools go run ./tools/cmd/foundry
 
 tasks:
 
@@ -30,44 +28,6 @@ tasks:
     cmds:
       - task: _ws:run
         vars: {CMD: "run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v{{.GOLANGCI_LINT_VERSION}} run"}
-
-  # ── Packages ──────────────────────────────────────────────────────────────────
-
-  list:
-    desc: "List all packages and their versions"
-    dir: '{{.ROOT_DIR}}'
-    cmds:
-      - '{{.GO}} run ./tools/cmd/foundry pkg list'
-
-  push:
-    desc: "Push a package subtree to its mirror repo (usage: task ws:push -- <name|all>)"
-    dir: '{{.ROOT_DIR}}'
-    cmds:
-      - '{{.FOUNDRY_DOCKER}} pkg push {{.CLI_ARGS}}'
-
-  release:
-    desc: "Release a package (usage: task ws:release -- <name|all> [version])"
-    dir: '{{.ROOT_DIR}}'
-    cmds:
-      - '{{.FOUNDRY_DOCKER}} pkg release {{.CLI_ARGS}}'
-
-  status:
-    desc: "Show package sync status (usage: task ws:status -- <name|all>)"
-    dir: '{{.ROOT_DIR}}'
-    cmds:
-      - '{{.FOUNDRY_DOCKER}} pkg status {{.CLI_ARGS}}'
-
-  sync:
-    desc: "Sync starter/go.prod.mod from starter/go.mod (strip replace directives)"
-    dir: '{{.ROOT_DIR}}'
-    cmds:
-      - '{{.GO}} run ./tools/cmd/foundry pkg sync'
-
-  deploy:
-    desc: "Full deploy pipeline (usage: task ws:deploy -- [--auto] [version])"
-    dir: '{{.ROOT_DIR}}'
-    cmds:
-      - '{{.FOUNDRY_DOCKER}} pkg deploy {{.CLI_ARGS}}'
 
   # ── Starter ───────────────────────────────────────────────────────────────────
 

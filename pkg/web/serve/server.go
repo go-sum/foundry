@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )

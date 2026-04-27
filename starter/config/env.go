@@ -3,7 +3,7 @@ package config
 import (
 	"os"
 
-	cfgpkg "github.com/go-sum/config"
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
 )
 
 type Env string

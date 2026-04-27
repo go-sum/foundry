@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // HijackFunc is called with the raw TCP connection and buffered reader/writer

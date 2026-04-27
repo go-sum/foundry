@@ -8,9 +8,9 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	testutil "github.com/go-sum/componentry/testutil"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 
-	"github.com/go-sum/componentry/interactive/theme"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
 )
 
 // cspHashOf computes the expected CSP hash for a raw JS string.

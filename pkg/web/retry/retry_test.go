@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/retry"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/retry"
 )
 
 func TestDo(t *testing.T) {

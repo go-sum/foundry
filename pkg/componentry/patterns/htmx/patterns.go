@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/go-sum/componentry/ui/feedback"
+	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
 
 	g "maragu.dev/gomponents"
 )

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-sum/db"
+	"github.com/go-sum/foundry/pkg/db"
 	"github.com/spf13/cobra"
 )
 

@@ -8,8 +8,8 @@ import (
 
 	"go.opentelemetry.io/otel/trace/noop"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/otelweb"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/otelweb"
 )
 
 func makeContext(method, path string) *web.Context {

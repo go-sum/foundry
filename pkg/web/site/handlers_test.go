@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/site"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/site"
 )
 
 // newTestSite creates a Site with the given base URL for use in tests.

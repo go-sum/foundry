@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/componentry/form"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/form"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestCheckbox(t *testing.T) {

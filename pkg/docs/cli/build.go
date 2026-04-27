@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	docs "github.com/go-sum/docs"
+	docs "github.com/go-sum/foundry/pkg/docs"
 	"github.com/spf13/cobra"
 )
 

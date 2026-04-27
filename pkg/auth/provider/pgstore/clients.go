@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-sum/auth/provider"
+	"github.com/go-sum/foundry/pkg/auth/provider"
 	"github.com/jackc/pgx/v5"
 )
 

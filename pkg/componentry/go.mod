@@ -1,8 +1,6 @@
-module github.com/go-sum/componentry
+module github.com/go-sum/foundry/pkg/componentry
 
 go 1.26.0
-
-replace github.com/go-sum/web => ../web
 
 require (
 	github.com/go-playground/validator/v10 v10.30.2

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 type memEntry struct {

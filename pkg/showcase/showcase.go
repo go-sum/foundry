@@ -3,8 +3,8 @@ package showcase
 import (
 	"strconv"
 
-	"github.com/go-sum/componentry/patterns/pager"
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/componentry/patterns/pager"
+	"github.com/go-sum/foundry/pkg/web"
 	g "maragu.dev/gomponents"
 )
 

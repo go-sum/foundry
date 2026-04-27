@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 func TestMemoryStore_AllowsWithinRate(t *testing.T) {

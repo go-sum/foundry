@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/andybalholm/brotli"
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // makeContext builds a web.Context with the given Accept-Encoding header.

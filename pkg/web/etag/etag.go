@@ -8,8 +8,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/headers"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/headers"
 )
 
 // Config configures the ETag middleware.

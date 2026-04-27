@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/go-sum/config"
+	"github.com/go-sum/foundry/pkg/config"
 )
 
 func TestValidate_RequiredField_Fails(t *testing.T) {

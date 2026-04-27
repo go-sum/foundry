@@ -3,7 +3,7 @@ package auth
 import (
 	"errors"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // mapServiceError maps domain error sentinels to transport-facing *web.Error types.

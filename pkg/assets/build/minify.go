@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
-	"github.com/go-sum/assets/config"
+	"github.com/go-sum/foundry/pkg/assets/config"
 )
 
 // MinifyJS minifies each source JS file into its target path using esbuild's

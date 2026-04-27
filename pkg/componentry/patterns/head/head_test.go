@@ -3,7 +3,7 @@ package head
 import (
 	"testing"
 
-	"github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/testutil"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )

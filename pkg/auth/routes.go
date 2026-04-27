@@ -1,6 +1,6 @@
 package auth
 
-import "github.com/go-sum/web/router"
+import "github.com/go-sum/foundry/pkg/web/router"
 
 // Route name constants for all auth endpoints.
 const (

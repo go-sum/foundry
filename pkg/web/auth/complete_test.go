@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
-	websession "github.com/go-sum/web/session"
+	"github.com/go-sum/foundry/pkg/web"
+	websession "github.com/go-sum/foundry/pkg/web/session"
 )
 
 // sessionFromMiddleware creates a real *session.Session by running a request

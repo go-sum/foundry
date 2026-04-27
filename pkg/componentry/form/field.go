@@ -7,7 +7,7 @@ import (
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 
-	"github.com/go-sum/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 )
 
 const (

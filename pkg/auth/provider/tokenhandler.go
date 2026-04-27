@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/go-sum/web"
-	webauth "github.com/go-sum/web/auth"
-	"github.com/go-sum/web/validate"
+	"github.com/go-sum/foundry/pkg/web"
+	webauth "github.com/go-sum/foundry/pkg/web/auth"
+	"github.com/go-sum/foundry/pkg/web/validate"
 )
 
 // tokenResponseJSON is the JSON body returned by the token endpoint.

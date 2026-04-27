@@ -5,8 +5,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/ui/core"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestBadge(t *testing.T) {

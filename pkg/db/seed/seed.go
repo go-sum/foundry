@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/go-sum/db/migrate"
+	"github.com/go-sum/foundry/pkg/db/migrate"
 )
 
 const historyDDL = `CREATE TABLE IF NOT EXISTS _seed_history (

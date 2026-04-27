@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-sum/db/ddl"
+	"github.com/go-sum/foundry/pkg/db/ddl"
 )
 
 // snapshotDir resolves the effective snapshot directory for a CreateConfig.

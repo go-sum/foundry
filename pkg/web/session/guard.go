@@ -3,8 +3,8 @@ package session
 import (
 	"cmp"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/htmx"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/htmx"
 )
 
 // GuardConfig configures the Guard middleware.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-sum/db/migrate"
+	"github.com/go-sum/foundry/pkg/db/migrate"
 	"github.com/spf13/cobra"
 )
 

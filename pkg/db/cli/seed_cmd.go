@@ -7,7 +7,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/go-sum/db/seed"
+	"github.com/go-sum/foundry/pkg/db/seed"
 	"github.com/spf13/cobra"
 )
 

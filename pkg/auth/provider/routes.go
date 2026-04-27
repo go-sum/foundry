@@ -1,8 +1,8 @@
 package provider
 
 import (
-	auth "github.com/go-sum/auth"
-	"github.com/go-sum/web/router"
+	auth "github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/web/router"
 )
 
 // Route name constants.

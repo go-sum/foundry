@@ -1,6 +1,6 @@
 package auth
 
-import "github.com/go-sum/web"
+import "github.com/go-sum/foundry/pkg/web"
 
 type userIDKey struct{}
 type userRoleKey struct{}

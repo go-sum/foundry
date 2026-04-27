@@ -1,10 +1,10 @@
 package queue
 
 import (
-	"github.com/go-sum/showcase"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/htmx"
-	"github.com/go-sum/web/render"
+	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/htmx"
+	"github.com/go-sum/foundry/pkg/web/render"
 )
 
 type handler struct {

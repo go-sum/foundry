@@ -13,8 +13,8 @@ import (
 	"time"
 
 	validator "github.com/go-playground/validator/v10"
-	"github.com/go-sum/web"
-	websession "github.com/go-sum/web/session"
+	"github.com/go-sum/foundry/pkg/web"
+	websession "github.com/go-sum/foundry/pkg/web/session"
 )
 
 // ErrCSRFPreviousKeys is returned by NewCSRFConfigFromHex when the

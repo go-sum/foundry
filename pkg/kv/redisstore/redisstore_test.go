@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/kv"
-	"github.com/go-sum/kv/redisstore"
+	"github.com/go-sum/foundry/pkg/kv"
+	"github.com/go-sum/foundry/pkg/kv/redisstore"
 )
 
 // testConfig returns a RedisStore config from TEST_KV_URL.

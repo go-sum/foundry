@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"github.com/go-sum/web/session"
+	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/google/uuid"
 )
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/showcase/componentry/demo"
+	"github.com/go-sum/foundry/pkg/showcase/componentry/demo"
 	g "maragu.dev/gomponents"
 )
 

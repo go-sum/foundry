@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/go-sum/assets/build"
-	"github.com/go-sum/assets/config"
+	"github.com/go-sum/foundry/pkg/assets/build"
+	"github.com/go-sum/foundry/pkg/assets/config"
 	"github.com/spf13/cobra"
 )
 

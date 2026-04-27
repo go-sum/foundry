@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/cookiecodec"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 )
 
 // fakeErrorStore satisfies Store. Read always returns ErrSessionNotFound (triggers

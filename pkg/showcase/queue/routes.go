@@ -1,8 +1,8 @@
 package queue
 
 import (
-	"github.com/go-sum/showcase"
-	"github.com/go-sum/web/router"
+	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

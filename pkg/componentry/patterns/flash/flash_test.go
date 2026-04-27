@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/componentry/patterns/flash"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/patterns/flash"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestRender(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-sum/componentry/patterns/htmx"
+	"github.com/go-sum/foundry/pkg/componentry/patterns/htmx"
 )
 
 func TestNewRequest_fullHeaders(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	neturl "net/url"
 	"strings"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // OriginGuardConfig configures the OriginGuard middleware.

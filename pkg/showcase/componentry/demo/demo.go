@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"strings"
 
-	uiform "github.com/go-sum/componentry/form"
-	"github.com/go-sum/componentry/interactive/pagination"
-	"github.com/go-sum/componentry/ui/core"
-	"github.com/go-sum/componentry/ui/data"
-	"github.com/go-sum/componentry/ui/feedback"
+	uiform "github.com/go-sum/foundry/pkg/componentry/form"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/pagination"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/componentry/ui/data"
+	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"

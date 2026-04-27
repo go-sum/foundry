@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/site"
-	"github.com/go-sum/web/static"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/site"
+	"github.com/go-sum/foundry/pkg/web/static"
 )
 
 func testRouteContext(method, rawURL string) *web.Context {

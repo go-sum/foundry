@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-sum/componentry/form"
+	"github.com/go-sum/foundry/pkg/componentry/form"
 )
 
 type sampleForm struct {

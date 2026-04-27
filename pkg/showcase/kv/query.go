@@ -9,7 +9,7 @@ import (
 	"sort"
 	"unicode/utf8"
 
-	kvstore "github.com/go-sum/kv"
+	kvstore "github.com/go-sum/foundry/pkg/kv"
 )
 
 const maxDisplayLen = 2000

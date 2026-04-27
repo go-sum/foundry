@@ -5,8 +5,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/interactive/breadcrumb"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/breadcrumb"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestBreadcrumb(t *testing.T) {

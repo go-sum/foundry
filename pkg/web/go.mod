@@ -1,4 +1,4 @@
-module github.com/go-sum/web
+module github.com/go-sum/foundry/pkg/web
 
 go 1.26.0
 

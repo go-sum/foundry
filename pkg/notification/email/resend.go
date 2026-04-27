@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-sum/notification"
+	"github.com/go-sum/foundry/pkg/notification"
 )
 
 const (

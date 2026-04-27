@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-sum/kv"
+	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/redis/go-redis/v9"
 )
 

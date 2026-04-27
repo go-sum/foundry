@@ -12,27 +12,26 @@ ARG TAILWIND_VERSION
 # ──────────────────────────────────────────────────────── cli_builder ───
 FROM golang:${GO_VERSION}-bookworm AS cli_builder
 ARG TARGETARCH
-ENV GONOSUMDB='*' GOPRIVATE='github.com/go-sum/*' GOWORK=off
+ENV GONOSUMDB='*' GOPRIVATE='github.com/go-sum/foundry' GOWORK=off
 WORKDIR /build
 
 # ── assets CLI (self-contained, no replace directives) ──
 COPY --from=workspace pkg/assets/ ./pkg/assets/
 RUN cd pkg/assets && go mod download && CGO_ENABLED=0 go build -ldflags='-s -w' -o /usr/local/bin/assets ./cli
 
-# ── db CLI (replace: github.com/go-sum/config => ../config) ──
+# ── db CLI ──
 COPY --from=workspace pkg/db/ ./pkg/db/
 COPY --from=workspace pkg/config/ ./pkg/config/
 RUN cd pkg/db && go mod download && CGO_ENABLED=0 go build -ldflags='-s -w' -o /usr/local/bin/db ./cli
 
-# ── docs CLI (replace: github.com/go-sum/web => ../web) ──
+# ── docs CLI ──
 COPY --from=workspace pkg/docs/ ./pkg/docs/
 COPY --from=workspace pkg/web/ ./pkg/web/
 RUN cd pkg/docs && go mod download && CGO_ENABLED=0 go build -ldflags='-s -w' -o /usr/local/bin/docs ./cli
 
-# ── foundry CLI (requires CGO for libgit2/git2go) ──
-RUN apt-get update && apt-get install -y --no-install-recommends libgit2-dev pkgconf && rm -rf /var/lib/apt/lists/*
+# ── foundry CLI ──
 COPY --from=workspace tools/ ./tools/
-RUN cd tools && go mod download && CGO_ENABLED=1 go build -ldflags='-s -w' -o /usr/local/bin/foundry ./cmd/foundry
+RUN cd tools && go mod download && CGO_ENABLED=0 go build -ldflags='-s -w' -o /usr/local/bin/foundry ./cmd/foundry
 
 # ───────────────────────────────────────────────────── production_toolchain ───
 FROM golang:${GO_VERSION}-bookworm AS production_toolchain

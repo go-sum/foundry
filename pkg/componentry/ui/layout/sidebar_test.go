@@ -6,8 +6,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/ui/layout"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/ui/layout"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestSidebar(t *testing.T) {

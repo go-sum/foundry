@@ -4,10 +4,10 @@
 package oauthclient
 
 import (
-	"github.com/go-sum/auth"
-	webauth "github.com/go-sum/web/auth"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/session"
+	"github.com/go-sum/foundry/pkg/auth"
+	webauth "github.com/go-sum/foundry/pkg/web/auth"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/session"
 )
 
 // Handler handles the first-party OAuth connect and callback routes.

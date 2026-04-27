@@ -6,9 +6,9 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/patterns/htmx"
-	testutil "github.com/go-sum/componentry/testutil"
-	"github.com/go-sum/componentry/ui/feedback"
+	"github.com/go-sum/foundry/pkg/componentry/patterns/htmx"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
 )
 
 // renderNodes wraps a slice of nodes in a div for rendering.

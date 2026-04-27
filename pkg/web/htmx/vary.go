@@ -1,6 +1,6 @@
 package htmx
 
-import "github.com/go-sum/web"
+import "github.com/go-sum/foundry/pkg/web"
 
 // VaryMiddleware returns middleware that adds "HX-Request" to the Vary response header,
 // ensuring HTMX partial responses are not served from cache as full-page responses.

@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/go-sum/web/serve"
+	"github.com/go-sum/foundry/pkg/web/serve"
 )
 
 const (

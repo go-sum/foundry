@@ -6,8 +6,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/email"
-	"github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/email"
+	"github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestEmail(t *testing.T) {

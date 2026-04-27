@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/componentry/interactive/theme"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
-	"github.com/go-sum/web/render"
+	"github.com/go-sum/foundry/pkg/web/render"
 )
 
 func TestContactContent_ContainsForm(t *testing.T) {

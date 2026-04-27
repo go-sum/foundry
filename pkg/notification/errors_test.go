@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/go-sum/notification"
+	"github.com/go-sum/foundry/pkg/notification"
 )
 
 func TestSentinelErrors_ErrorsIs(t *testing.T) {

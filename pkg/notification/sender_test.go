@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/notification"
-	"github.com/go-sum/notification/memory"
+	"github.com/go-sum/foundry/pkg/notification"
+	"github.com/go-sum/foundry/pkg/notification/memory"
 )
 
 // fakeSender is a Sender that always returns a configured error.

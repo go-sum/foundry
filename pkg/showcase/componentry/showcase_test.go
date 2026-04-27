@@ -3,9 +3,9 @@ package componentry_test
 import (
 	"testing"
 
-	"github.com/go-sum/showcase/componentry"
-	"github.com/go-sum/showcase/componentry/demo"
-	"github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/showcase/componentry"
+	"github.com/go-sum/foundry/pkg/showcase/componentry/demo"
+	"github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestShowcase_renders(t *testing.T) {

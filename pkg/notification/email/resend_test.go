@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/notification"
-	"github.com/go-sum/notification/email"
+	"github.com/go-sum/foundry/pkg/notification"
+	"github.com/go-sum/foundry/pkg/notification/email"
 )
 
 func TestNewResend_MissingAPIKey_ReturnsErrInvalidConfig(t *testing.T) {

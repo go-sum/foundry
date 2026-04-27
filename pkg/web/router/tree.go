@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 type nodeKind int

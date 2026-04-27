@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/go-sum/notification"
-	"github.com/go-sum/notification/notifylog"
+	"github.com/go-sum/foundry/pkg/notification"
+	"github.com/go-sum/foundry/pkg/notification/notifylog"
 )
 
 func TestSender_Send_EmitsStructuredLog(t *testing.T) {

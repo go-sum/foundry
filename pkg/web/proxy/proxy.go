@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // defaultClient is a production-safe HTTP client used when Options.Client is nil.

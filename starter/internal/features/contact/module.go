@@ -3,11 +3,11 @@ package contact
 import (
 	"log/slog"
 
-	"github.com/go-sum/kv"
-	"github.com/go-sum/notification"
-	"github.com/go-sum/queue"
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/validate"
+	"github.com/go-sum/foundry/pkg/kv"
+	"github.com/go-sum/foundry/pkg/notification"
+	"github.com/go-sum/foundry/pkg/queue"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/validate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/go-sum/foundry/internal/view"

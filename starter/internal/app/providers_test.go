@@ -13,12 +13,12 @@ import (
 	configpkg "github.com/go-sum/foundry/config"
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/internal/view/errorpage"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/secure"
-	"github.com/go-sum/web/session"
-	"github.com/go-sum/web/site"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/render"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/secure"
+	"github.com/go-sum/foundry/pkg/web/session"
+	"github.com/go-sum/foundry/pkg/web/site"
 )
 
 func testAppContext(method, rawURL string) *web.Context {

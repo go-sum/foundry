@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	cfgpkg "github.com/go-sum/config"
-	"github.com/go-sum/web/secure"
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
+	"github.com/go-sum/foundry/pkg/web/secure"
 )
 
 func defaultCSRF() (secure.CSRFConfig, error) {

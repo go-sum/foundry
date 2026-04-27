@@ -5,8 +5,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/interactive/tooltip"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/tooltip"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestTooltip(t *testing.T) {

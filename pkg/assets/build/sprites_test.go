@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/assets/config"
+	"github.com/go-sum/foundry/pkg/assets/config"
 )
 
 func TestProcessSVG_basic(t *testing.T) {

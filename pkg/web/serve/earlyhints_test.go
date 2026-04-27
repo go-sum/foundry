@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-sum/web/serve"
+	"github.com/go-sum/foundry/pkg/web/serve"
 )
 
 // fakeInfoResponder is a mock http.ResponseWriter that also implements the

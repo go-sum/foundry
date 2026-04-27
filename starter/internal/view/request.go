@@ -2,14 +2,14 @@
 package view
 
 import (
-	"github.com/go-sum/auth"
-	"github.com/go-sum/componentry/compound"
-	"github.com/go-sum/componentry/icons"
+	"github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/componentry/compound"
+	"github.com/go-sum/foundry/pkg/componentry/icons"
 	"github.com/go-sum/foundry/internal/view/layout"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/secure"
-	"github.com/go-sum/web/session"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/render"
+	"github.com/go-sum/foundry/pkg/web/secure"
+	"github.com/go-sum/foundry/pkg/web/session"
 
 	g "maragu.dev/gomponents"
 )

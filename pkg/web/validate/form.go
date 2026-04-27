@@ -7,7 +7,7 @@ import (
 
 	"github.com/gorilla/schema"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 var (

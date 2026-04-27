@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 func testContext(method, path string) *web.Context {

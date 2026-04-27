@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web/cookiecodec"
+	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 )
 
 func mustNew(t *testing.T, cfg cookiecodec.Config) *cookiecodec.Codec {

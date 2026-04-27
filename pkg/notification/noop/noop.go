@@ -3,7 +3,7 @@ package noop
 import (
 	"context"
 
-	"github.com/go-sum/notification"
+	"github.com/go-sum/foundry/pkg/notification"
 )
 
 // Sender discards all notifications silently. Use as a safe default in development.

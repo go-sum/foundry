@@ -3,8 +3,8 @@ package app
 import (
 	"errors"
 
-	"github.com/go-sum/auth/provider"
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/auth/provider"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // stubConsentRenderer is a placeholder ConsentRenderer that returns an error response.

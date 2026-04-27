@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-sum/web/cookiecodec"
+	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 )
 
 // ParseTokenKeys decodes hex-encoded AEAD key material for use as auth token

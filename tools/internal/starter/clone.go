@@ -231,20 +231,47 @@ func stripMonorepoBlocks(target string) (int, error) {
 	return count, err
 }
 
-// rewriteModule replaces fromModule with toModule in go.mod and all *.go files.
+// rewriteModuleContent rewrites fromModule to toModule in content,
+// preserving fromModule+"/pkg/" paths (external monorepo dependencies).
+// It handles both quoted imports (Go source files) and unquoted paths (go.mod).
+func rewriteModuleContent(content, fromModule, toModule string) string {
+	pkgPrefix := fromModule + "/pkg/"
+	placeholder := "\x00FOUNDRY_PKG\x00"
+	// Protect pkg/ paths before any replacement.
+	content = strings.ReplaceAll(content, pkgPrefix, placeholder)
+	// Rewrite module declaration line (go.mod).
+	content = strings.ReplaceAll(content, "module "+fromModule+"\n", "module "+toModule+"\n")
+	// Rewrite quoted imports in .go files.
+	content = strings.ReplaceAll(content, `"`+fromModule+`/`, `"`+toModule+`/`)
+	// Rewrite unquoted paths in go.mod require/replace blocks.
+	content = strings.ReplaceAll(content, "\t"+fromModule+"/", "\t"+toModule+"/")
+	content = strings.ReplaceAll(content, " "+fromModule+"/", " "+toModule+"/")
+	// Restore protected pkg/ paths.
+	content = strings.ReplaceAll(content, placeholder, pkgPrefix)
+	return content
+}
+
+// rewriteModule replaces fromModule with toModule in go.mod and all *.go files,
+// preserving fromModule+"/pkg/" paths (external monorepo dependencies).
 func rewriteModule(target, fromModule, toModule string) (int, error) {
 	count := 0
 
 	goModPath := filepath.Join(target, "go.mod")
 	if _, err := os.Stat(goModPath); err == nil {
-		modified, err := rewriteFileStrings(goModPath, map[string]string{
-			"module " + fromModule: "module " + toModule,
-			fromModule + "/":       toModule + "/",
-		})
+		data, err := os.ReadFile(goModPath)
 		if err != nil {
 			return count, fmt.Errorf("rewrite go.mod: %w", err)
 		}
-		if modified {
+		original := string(data)
+		updated := rewriteModuleContent(original, fromModule, toModule)
+		if updated != original {
+			info, err := os.Stat(goModPath)
+			if err != nil {
+				return count, fmt.Errorf("rewrite go.mod: %w", err)
+			}
+			if err := os.WriteFile(goModPath, []byte(updated), info.Mode()); err != nil {
+				return count, fmt.Errorf("rewrite go.mod: %w", err)
+			}
 			count++
 		}
 	}
@@ -256,15 +283,23 @@ func rewriteModule(target, fromModule, toModule string) (int, error) {
 		if d.IsDir() || !strings.HasSuffix(path, ".go") {
 			return nil
 		}
-		modified, err := rewriteFileStrings(path, map[string]string{
-			`"` + fromModule + `/`: `"` + toModule + `/`,
-		})
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("rewrite %s: %w", path, err)
 		}
-		if modified {
-			count++
+		original := string(data)
+		updated := rewriteModuleContent(original, fromModule, toModule)
+		if updated == original {
+			return nil
 		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return fmt.Errorf("rewrite %s: %w", path, err)
+		}
+		if err := os.WriteFile(path, []byte(updated), info.Mode()); err != nil {
+			return fmt.Errorf("rewrite %s: %w", path, err)
+		}
+		count++
 		return nil
 	})
 	return count, err

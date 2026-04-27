@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	auth "github.com/go-sum/auth"
-	"github.com/go-sum/web"
+	auth "github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/web"
 	"github.com/google/uuid"
 )
 

@@ -6,11 +6,7 @@ exclude:
   - pkg/
   - tools/
 
-rename:
-  - from: starter/go.prod.mod
-    to:   starter/go.mod
-  - from: starter/go.prod.sum
-    to:   starter/go.sum
+rename: []
 
 moduleRewrite:
   from: github.com/go-sum/foundry

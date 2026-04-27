@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/kv"
-	"github.com/go-sum/queue"
+	"github.com/go-sum/foundry/pkg/kv"
+	"github.com/go-sum/foundry/pkg/queue"
 )
 
 // fakeRepo is a manual implementation of Repository for service tests.

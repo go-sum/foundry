@@ -1,6 +1,6 @@
 package provider
 
-import "github.com/go-sum/web"
+import "github.com/go-sum/foundry/pkg/web"
 
 // ConsentRenderer produces HTML for the OAuth consent screen.
 // The host application implements this interface to control layout and styling.

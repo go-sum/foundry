@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web/retrybudget"
+	"github.com/go-sum/foundry/pkg/web/retrybudget"
 )
 
 func TestBudget_FullBudgetAllowsRetries(t *testing.T) {

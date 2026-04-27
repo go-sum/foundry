@@ -1,6 +1,6 @@
 package iconset
 
-import "github.com/go-sum/componentry/icons"
+import "github.com/go-sum/foundry/pkg/componentry/icons"
 
 // Catalog maps semantic icon keys to their sprite and symbol IDs.
 type Catalog struct {

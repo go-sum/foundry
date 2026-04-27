@@ -5,8 +5,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/interactive/accordion"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/accordion"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestAccordion(t *testing.T) {

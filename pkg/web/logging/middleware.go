@@ -3,7 +3,7 @@ package logging
 import (
 	"log/slog"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // Middleware returns a web.Middleware that attaches a request-scoped logger

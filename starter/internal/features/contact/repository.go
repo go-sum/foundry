@@ -3,7 +3,7 @@ package contact
 import (
 	"context"
 
-	coredb "github.com/go-sum/db"
+	coredb "github.com/go-sum/foundry/pkg/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

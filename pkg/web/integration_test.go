@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/serve"
-	"github.com/go-sum/web/htmx"
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/secure"
-	"github.com/go-sum/web/session"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/serve"
+	"github.com/go-sum/foundry/pkg/web/htmx"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/secure"
+	"github.com/go-sum/foundry/pkg/web/session"
 	xhtml "golang.org/x/net/html"
 )
 

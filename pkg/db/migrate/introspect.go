@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/go-sum/db/ddl"
+	"github.com/go-sum/foundry/pkg/db/ddl"
 )
 
 // Introspect queries the PostgreSQL catalog to build a Schema representing

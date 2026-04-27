@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/componentry/ui/core"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestSeparator_horizontal(t *testing.T) {

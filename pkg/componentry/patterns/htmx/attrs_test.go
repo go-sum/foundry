@@ -6,8 +6,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/patterns/htmx"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/patterns/htmx"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func renderAttrs(t *testing.T, nodes []g.Node) string {

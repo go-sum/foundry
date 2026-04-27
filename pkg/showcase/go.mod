@@ -1,19 +1,13 @@
-module github.com/go-sum/showcase
+module github.com/go-sum/foundry/pkg/showcase
 
 go 1.26.0
 
-replace (
-	github.com/go-sum/componentry => ../componentry
-	github.com/go-sum/kv => ../kv
-	github.com/go-sum/web => ../web
-	github.com/go-sum/web/render => ../web/render
-)
 
 require (
-	github.com/go-sum/componentry v0.0.0
-	github.com/go-sum/kv v0.0.0
-	github.com/go-sum/web v0.0.0
-	github.com/go-sum/web/render v0.0.0
+	github.com/go-sum/foundry/pkg/componentry v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/kv v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/web v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/web/render v0.0.0-00010101000000-000000000000
 	github.com/jackc/pgx/v5 v5.9.1
 	maragu.dev/gomponents v1.3.0
 )

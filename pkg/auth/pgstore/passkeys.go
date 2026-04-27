@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-sum/auth"
-	coredb "github.com/go-sum/db"
+	"github.com/go-sum/foundry/pkg/auth"
+	coredb "github.com/go-sum/foundry/pkg/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )

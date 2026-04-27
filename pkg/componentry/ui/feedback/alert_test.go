@@ -5,8 +5,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/ui/feedback"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestAlert(t *testing.T) {

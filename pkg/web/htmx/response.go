@@ -3,7 +3,7 @@ package htmx
 import (
 	"encoding/json"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // SetLocation sets HX-Location. Accepts a URL string or JSON-encoded object.

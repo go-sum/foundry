@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // ErrBreakerOpen is returned when a call is rejected because the breaker is open.

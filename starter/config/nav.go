@@ -1,14 +1,14 @@
 package config
 
 import (
-	"github.com/go-sum/auth"
-	"github.com/go-sum/componentry/compound"
-	"github.com/go-sum/componentry/icons"
-	"github.com/go-sum/componentry/icons/render"
-	"github.com/go-sum/componentry/interactive/theme"
-	"github.com/go-sum/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/componentry/compound"
+	"github.com/go-sum/foundry/pkg/componentry/icons"
+	"github.com/go-sum/foundry/pkg/componentry/icons/render"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 	"github.com/go-sum/foundry/internal/view"
-	"github.com/go-sum/web/router"
+	"github.com/go-sum/foundry/pkg/web/router"
 )
 
 // DefaultNav returns a view.RequestOption that builds the nav on each request.

@@ -5,8 +5,8 @@ import (
 
 	g "maragu.dev/gomponents"
 
-	"github.com/go-sum/componentry/interactive/dialog"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/dialog"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestDialog(t *testing.T) {

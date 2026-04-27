@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/web/site"
+	"github.com/go-sum/foundry/pkg/web/site"
 )
 
 func TestBuildRobots(t *testing.T) {

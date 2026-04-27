@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-sum/assets/config"
+	"github.com/go-sum/foundry/pkg/assets/config"
 )
 
 // Options controls which asset types to build.

@@ -3,22 +3,22 @@ module github.com/go-sum/foundry
 go 1.26.0
 
 require (
-	github.com/go-sum/assets v0.0.0
-	github.com/go-sum/auth v0.0.0
-	github.com/go-sum/auth/authui v0.0.0
-	github.com/go-sum/auth/pgstore v0.0.0
-	github.com/go-sum/auth/provider/pgstore v0.0.0
-	github.com/go-sum/componentry v0.0.0
-	github.com/go-sum/config v0.0.0
-	github.com/go-sum/db v0.0.0
-	github.com/go-sum/docs v0.0.0
-	github.com/go-sum/kv v0.0.0
-	github.com/go-sum/notification v0.0.0
-	github.com/go-sum/queue v0.0.0
-	github.com/go-sum/queue/pgstore v0.0.0
-	github.com/go-sum/showcase v0.0.0
-	github.com/go-sum/web v0.0.0
-	github.com/go-sum/web/render v0.0.0
+	github.com/go-sum/foundry/pkg/assets v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/auth v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/auth/authui v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/auth/pgstore v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/auth/provider/pgstore v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/componentry v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/config v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/db v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/docs v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/kv v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/notification v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/queue v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/queue/pgstore v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/showcase v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/web v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/web/render v0.0.0-00010101000000-000000000000
 	github.com/jackc/pgx/v5 v5.9.1
 	go.opentelemetry.io/otel/trace v1.43.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -55,23 +55,4 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
-)
-
-replace (
-	github.com/go-sum/assets => ../pkg/assets
-	github.com/go-sum/auth => ../pkg/auth
-	github.com/go-sum/auth/authui => ../pkg/auth/authui
-	github.com/go-sum/auth/pgstore => ../pkg/auth/pgstore
-	github.com/go-sum/auth/provider/pgstore => ../pkg/auth/provider/pgstore
-	github.com/go-sum/componentry => ../pkg/componentry
-	github.com/go-sum/config => ../pkg/config
-	github.com/go-sum/db => ../pkg/db
-	github.com/go-sum/docs => ../pkg/docs
-	github.com/go-sum/kv => ../pkg/kv
-	github.com/go-sum/notification => ../pkg/notification
-	github.com/go-sum/queue => ../pkg/queue
-	github.com/go-sum/queue/pgstore => ../pkg/queue/pgstore
-	github.com/go-sum/showcase => ../pkg/showcase
-	github.com/go-sum/web => ../pkg/web
-	github.com/go-sum/web/render => ../pkg/web/render
 )

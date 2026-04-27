@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -eu
 
-# ── System packages (libgit2 for foundry CLI subtree operations) ─────────────
-apt-get update && apt-get install -y --no-install-recommends libgit2-dev pkgconf
-rm -rf /var/lib/apt/lists/*
-
 # ── Air (hot-reload) ─────────────────────────────────────────────────────────
 go install github.com/air-verse/air@v${AIR_VERSION}
 

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-sum/kv"
-	"github.com/go-sum/queue"
+	"github.com/go-sum/foundry/pkg/kv"
+	"github.com/go-sum/foundry/pkg/queue"
 )
 
 // Service handles contact form submission business logic.

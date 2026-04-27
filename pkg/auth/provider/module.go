@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/validate"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/validate"
 )
 
 // ProviderModule bundles the OAuth 2.0 authorization server handlers.

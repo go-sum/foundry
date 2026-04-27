@@ -7,8 +7,8 @@ import (
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 
-	"github.com/go-sum/componentry/testutil"
-	"github.com/go-sum/componentry/ui/feedback"
+	"github.com/go-sum/foundry/pkg/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
 )
 
 func TestSpinner_default(t *testing.T) {

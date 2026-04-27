@@ -3,7 +3,7 @@ package secure
 import (
 	"strings"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // ClearSiteData returns middleware that emits a Clear-Site-Data response header

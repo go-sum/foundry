@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/serve"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/serve"
 )
 
 // TestSwitching_HijackCalled verifies that a 101 response causes the

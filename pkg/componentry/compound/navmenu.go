@@ -3,8 +3,8 @@ package compound
 
 import (
 	"github.com/go-playground/validator/v10"
-	icons "github.com/go-sum/componentry/icons"
-	"github.com/go-sum/componentry/ui/layout"
+	icons "github.com/go-sum/foundry/pkg/componentry/icons"
+	"github.com/go-sum/foundry/pkg/componentry/ui/layout"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )

@@ -1,8 +1,8 @@
 package render
 
 import (
-	icons "github.com/go-sum/componentry/icons"
-	"github.com/go-sum/componentry/ui/core"
+	icons "github.com/go-sum/foundry/pkg/componentry/icons"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 )
 
 // PropsForRegistry returns IconProps for a semantic icon key using an explicit registry.

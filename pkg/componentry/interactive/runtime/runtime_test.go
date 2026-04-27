@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/componentry/interactive/runtime"
-	testutil "github.com/go-sum/componentry/testutil"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/runtime"
+	testutil "github.com/go-sum/foundry/pkg/componentry/testutil"
 )
 
 func TestScript_nonEmpty(t *testing.T) {

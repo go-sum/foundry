@@ -1,4 +1,4 @@
-module github.com/go-sum/config
+module github.com/go-sum/foundry/pkg/config
 
 go 1.26.0
 

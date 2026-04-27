@@ -1,7 +1,7 @@
 package secure
 
 import (
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // HeadersConfig configures security headers middleware.

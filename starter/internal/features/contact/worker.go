@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-sum/componentry/email"
-	"github.com/go-sum/notification"
-	"github.com/go-sum/queue"
+	"github.com/go-sum/foundry/pkg/componentry/email"
+	"github.com/go-sum/foundry/pkg/notification"
+	"github.com/go-sum/foundry/pkg/queue"
 	g "maragu.dev/gomponents"
 )
 

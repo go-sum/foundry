@@ -1,6 +1,6 @@
 package docs
 
-import "github.com/go-sum/web/router"
+import "github.com/go-sum/foundry/pkg/web/router"
 
 // Routes returns the router nodes for the documentation handler.
 func Routes(cfg Config) []router.Node {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	websession "github.com/go-sum/web/session"
+	websession "github.com/go-sum/foundry/pkg/web/session"
 )
 
 // DefaultTransactionTTL is the maximum age of an OAuthTransaction before it is

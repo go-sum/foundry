@@ -4,8 +4,8 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/file"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/file"
 )
 
 // SPAFallback returns a NotFound handler for use in Options.NotFound that

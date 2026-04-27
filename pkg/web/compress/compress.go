@@ -12,8 +12,8 @@ import (
 	"sync"
 
 	"github.com/andybalholm/brotli"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/headers"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/headers"
 )
 
 // defaultAllowedTypes is the default set of MIME type prefixes that are eligible

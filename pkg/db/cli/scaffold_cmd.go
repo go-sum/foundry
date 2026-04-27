@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-sum/db/codegen"
+	"github.com/go-sum/foundry/pkg/db/codegen"
 	"github.com/spf13/cobra"
 )
 

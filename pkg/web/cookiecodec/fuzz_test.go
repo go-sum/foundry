@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web/cookiecodec"
+	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 )
 
 func FuzzParseSigned(f *testing.F) {

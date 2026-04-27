@@ -3,10 +3,10 @@ package db
 import (
 	"embed"
 
-	authpgstore "github.com/go-sum/auth/pgstore"
-	providerpgstore "github.com/go-sum/auth/provider/pgstore"
-	coredb "github.com/go-sum/db"
-	"github.com/go-sum/queue/pgstore"
+	authpgstore "github.com/go-sum/foundry/pkg/auth/pgstore"
+	providerpgstore "github.com/go-sum/foundry/pkg/auth/provider/pgstore"
+	coredb "github.com/go-sum/foundry/pkg/db"
+	"github.com/go-sum/foundry/pkg/queue/pgstore"
 )
 
 //go:embed schema.yaml

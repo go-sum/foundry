@@ -2,10 +2,10 @@
 package contactpartial
 
 import (
-	"github.com/go-sum/componentry/form"
-	pform "github.com/go-sum/componentry/patterns/form"
-	"github.com/go-sum/componentry/ui/core"
-	"github.com/go-sum/componentry/ui/feedback"
+	"github.com/go-sum/foundry/pkg/componentry/form"
+	pform "github.com/go-sum/foundry/pkg/componentry/patterns/form"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
 	"github.com/go-sum/foundry/internal/view"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"

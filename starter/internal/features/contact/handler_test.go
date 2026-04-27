@@ -12,10 +12,10 @@ import (
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/internal/view/page"
 	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/render"
-	"github.com/go-sum/web/router"
-	"github.com/go-sum/web/validate"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/render"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/validate"
 )
 
 // fakeService is a manual implementation of Service for handler tests.

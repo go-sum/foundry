@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/go-sum/componentry/compound"
+	"github.com/go-sum/foundry/pkg/componentry/compound"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )

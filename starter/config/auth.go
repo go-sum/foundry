@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-sum/auth"
-	cfgpkg "github.com/go-sum/config"
-	webauth "github.com/go-sum/web/auth"
+	"github.com/go-sum/foundry/pkg/auth"
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
+	webauth "github.com/go-sum/foundry/pkg/web/auth"
 )
 
 // AuthConfig consolidates all authentication and authorization settings.

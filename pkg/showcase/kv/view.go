@@ -5,11 +5,11 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/go-sum/componentry/interactive/pagination"
-	"github.com/go-sum/componentry/patterns/pager"
-	"github.com/go-sum/componentry/ui/core"
-	"github.com/go-sum/componentry/ui/data"
-	"github.com/go-sum/web/render"
+	"github.com/go-sum/foundry/pkg/componentry/interactive/pagination"
+	"github.com/go-sum/foundry/pkg/componentry/patterns/pager"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/componentry/ui/data"
+	"github.com/go-sum/foundry/pkg/web/render"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )

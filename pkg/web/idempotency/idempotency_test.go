@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/idempotency"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/idempotency"
 )
 
 func makeContext(method string) *web.Context {

@@ -8,8 +8,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/go-sum/db/ddl"
-	"github.com/go-sum/db/migrate"
+	"github.com/go-sum/foundry/pkg/db/ddl"
+	"github.com/go-sum/foundry/pkg/db/migrate"
 	"github.com/spf13/cobra"
 )
 

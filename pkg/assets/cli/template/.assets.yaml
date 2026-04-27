@@ -1,6 +1,6 @@
 # .assets.yaml — asset pipeline configuration
-# Run: go run github.com/go-sum/assets/cli build all
-#      go run github.com/go-sum/assets/cli sprites
+# Run: go run github.com/go-sum/foundry/pkg/assets/cli build all
+#      go run github.com/go-sum/foundry/pkg/assets/cli sprites
 
 paths:
   source_dir: static       # raw source assets committed to the repo

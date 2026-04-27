@@ -26,11 +26,9 @@ func main() {
 		SilenceUsage: true,
 	}
 
-	root.PersistentFlags().StringVar(&cfg.Owner, "owner", "go-sum", "GitHub repository owner")
 	root.PersistentFlags().BoolVar(&cfg.DryRun, "dry-run", false, "print actions without executing")
 
 	root.AddCommand(
-		cli.NewPkgCmd(cfg),
 		cli.NewStarterCmd(cfg),
 	)
 

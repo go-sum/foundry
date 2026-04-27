@@ -3,7 +3,7 @@ package htmx
 import (
 	"strings"
 
-	"github.com/go-sum/web"
+	"github.com/go-sum/foundry/pkg/web"
 )
 
 // IsHTMX reports whether the request was made by HTMX (HX-Request: true).

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web/site"
+	"github.com/go-sum/foundry/pkg/web/site"
 )
 
 // fp returns a pointer to a float64 value, for use in test literals.

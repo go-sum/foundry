@@ -11,6 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Config holds the global CLI configuration shared by all subcommands.
+type Config struct {
+	DryRun   bool
+	RepoRoot string
+}
+
 // NewStarterCmd returns the "starter" subcommand group.
 func NewStarterCmd(cfg *Config) *cobra.Command {
 	cmd := &cobra.Command{

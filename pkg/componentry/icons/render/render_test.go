@@ -3,9 +3,9 @@ package render_test
 import (
 	"testing"
 
-	"github.com/go-sum/componentry/icons"
-	iconrender "github.com/go-sum/componentry/icons/render"
-	"github.com/go-sum/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/componentry/icons"
+	iconrender "github.com/go-sum/foundry/pkg/componentry/icons/render"
+	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 )
 
 func TestPropsForRegistry_explicit(t *testing.T) {

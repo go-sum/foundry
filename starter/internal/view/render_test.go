@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/go-sum/web/render"
+	"github.com/go-sum/foundry/pkg/web/render"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )

@@ -67,10 +67,9 @@ RUN apk update && apk add --no-cache ca-certificates-bundle git
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 WORKDIR /app
-# go.prod.mod has no replace directives — pkg/ modules resolve from GitHub.
-# To regenerate: task ws:sync
-COPY go.prod.mod go.mod
-COPY go.prod.sum go.sum
+# go.mod has no replace directives — pkg/ modules resolve from the monorepo.
+COPY go.mod go.mod
+COPY go.sum go.sum
 # Private modules require GITHUB_ACCESS_TOKEN passed as a build secret.
 RUN --mount=type=secret,id=github_token \
     TOKEN="$(cat /run/secrets/github_token 2>/dev/null)" && \
@@ -78,14 +77,14 @@ RUN --mount=type=secret,id=github_token \
       printf "machine github.com\nlogin x-access-token\npassword %s\n" "${TOKEN}" > /root/.netrc && \
       chmod 600 /root/.netrc; \
     fi && \
-    GONOSUMDB='github.com/go-sum/*' GOPRIVATE='github.com/go-sum/*' go mod download
+    GONOSUMDB='github.com/go-sum/*' GOPRIVATE='github.com/go-sum/foundry' go mod download
 COPY cmd/ ./cmd/
 COPY config/ ./config/
 RUN rm -f config/*.development.yaml
 COPY internal/ ./internal/
 COPY static/ ./static/
 ARG APP_VERSION
-RUN GONOSUMDB='github.com/go-sum/*' GOPRIVATE='github.com/go-sum/*' \
+RUN GONOSUMDB='github.com/go-sum/*' GOPRIVATE='github.com/go-sum/foundry' \
     CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${APP_VERSION}" -o /bin/server ./cmd/server
 
 # ──────────────────────────────────────────────────────── production_target ───

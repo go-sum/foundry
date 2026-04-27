@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-sum/web"
-	"github.com/go-sum/web/cookiecodec"
-	websession "github.com/go-sum/web/session"
+	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/cookiecodec"
+	websession "github.com/go-sum/foundry/pkg/web/session"
 )
 
 func testCSRFKey() []byte {

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/evanw/esbuild/pkg/api"
-	"github.com/go-sum/assets/config"
+	"github.com/go-sum/foundry/pkg/assets/config"
 )
 
 // BuildJSIfChanged builds JS bundles, embed bundles, and minify entries only
