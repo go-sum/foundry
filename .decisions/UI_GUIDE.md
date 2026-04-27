@@ -1,6 +1,6 @@
 ---
 title: UI Design Guide
-description: Visual design and composition guidance for this application's UI.
+description: "UI design purpose, component library scope, design principles, typography scale, font rules, color palette, semantic color, layout grid, spacing scale, elevation shadows, images, finishing touches, core components, button variants, data display, feedback components, layout components, form components, interactive components, view composition, layout templates, page views, partials, error pages, practical UI rules, accessibility, decision checklist"
 weight: 30
 ---
 
@@ -26,7 +26,19 @@ weight: 30
 
 ---
 
-## Purpose
+## 0. Quick Reference
+
+- §1 Purpose: why this guide exists and how it fits the application
+- §2 Scope: which packages and components are covered
+- §3 Design Principles: 19 rules — start with features, hierarchy first, spacing, color, accessibility
+- §4 Visual Language: typography scale, color palette, layout grid, spacing, elevation, images
+- §5 Component Library: core, data, feedback, layout, form, interactive, patterns, examples
+- §6 View Composition: layout templates, page views, partials, error pages
+- §7 Practical Rules: when to use shared components, composition over variants, form readability
+- §8 Decision Checklist: questions to answer before shipping new UI
+- §9 Reference Map: quick lookup for patterns and components
+
+## 1. Purpose and Goals
 
 This application targets high-performance modern web applications rendered
 primarily on the server. The UI should therefore feel:
@@ -42,7 +54,7 @@ inside views.
 
 ---
 
-## Scope
+## 2. Scope and Package Coverage
 
 This guide covers:
 
@@ -73,9 +85,9 @@ Primary code references:
 
 ---
 
-## Design Principles
+## 3. Design Principles
 
-### 1. Start with a feature, not the shell
+### 3a. Start with a Feature, Not the Shell
 
 The most important rule still applies: design around the job
 the user is doing, not around abstract page chrome.
@@ -95,7 +107,7 @@ Good current examples:
 The shell should emerge from repeated feature needs. It should not be the first
 thing designed.
 
-### 2. Detail comes later
+### 3b. Add Detail Later, Not Upfront
 
 Do not begin by tuning shadows, icon sizes, borders, or decorative accents.
 
@@ -118,7 +130,7 @@ Design in grayscale first when exploring a new surface. Forcing spacing,
 contrast, and size to carry the hierarchy produces a clearer result than
 reaching for color too early.
 
-### 3. Ship the smallest useful version first
+### 3c. Ship the Smallest Useful Version First
 
 Do not design or imply functionality that is not ready to build.
 
@@ -133,7 +145,7 @@ Then iterate on the real implementation. The repo already follows this pattern:
 the users region supports listing, inline editing, loading, and empty state
 without trying to solve every future admin workflow on day one.
 
-### 4. Work in short cycles
+### 3d. Work in Short Design Cycles
 
 Do not try to design every edge case in the abstract before implementation.
 
@@ -147,7 +159,7 @@ Preferred loop:
 This application favors server-rendered HTML precisely because it makes iteration
 cheap. Use that advantage.
 
-### 5. Choose a personality deliberately
+### 3e. Choose a Visual Personality Deliberately
 
 Every interface communicates a personality whether intended or not. The
 default personality should be:
@@ -168,7 +180,7 @@ That personality is expressed through:
 If the product needs a different tone, change it centrally
 through tokens, typography, and component defaults. Do not drift page by page.
 
-### 6. Limit choices on purpose
+### 3f. Limit User Choices on Purpose
 
 Design quality improves when the system narrows the decision surface.
 
@@ -185,7 +197,7 @@ When making a UI decision, choose from the system first. If the system feels
 too small, extend it deliberately; do not bypass it with arbitrary one-off
 values.
 
-### 7. Hierarchy comes before decoration
+### 3g. Visual Hierarchy Before Decoration
 
 Most emphasis should come from:
 
@@ -211,7 +223,7 @@ Examples:
 - `github.com/go-sum/componentry/ui/core` (button)
 - `internal/view/page/home.go`
 
-### 8. Size is not everything
+### 3h. Size Alone Does Not Create Hierarchy
 
 Users notice contrast, placement, and density before they notice a one-step
 font-size change.
@@ -226,7 +238,7 @@ Prefer to emphasize by:
 Before making something larger, ask if the surrounding content should instead
 be quieter.
 
-### 9. Emphasize by de-emphasizing
+### 3i. Emphasize by De-emphasizing Surrounding Elements
 
 When a screen feels noisy, the fix is usually not to make the important thing
 louder. The fix is to soften everything that is less important.
@@ -237,7 +249,7 @@ Common patterns:
 - descriptions use `text-muted-foreground` so headings and values lead
 - nav metadata and helper text stay quieter than primary actions
 
-### 10. Labels are a last resort
+### 3j. Labels Are a Last Resort
 
 In display UI, labels are secondary. The value is what the user came to see.
 
@@ -250,7 +262,7 @@ This means:
 Forms still need explicit labels unless there is a deliberate accessible
 alternative. Display UI usually does not.
 
-### 11. Separate visual hierarchy from document hierarchy
+### 3k. Separate Visual Hierarchy from Document Hierarchy
 
 Choose semantic elements for structure and accessibility, then style them for
 their visual role.
@@ -263,7 +275,7 @@ Examples:
 
 Do not let heading levels force a visual type scale that harms the page.
 
-### 12. Design in grayscale first, then apply semantic color
+### 3l. Design in Grayscale First, Then Apply Semantic Color
 
 Use semantic tokens only when they carry meaning:
 
@@ -275,7 +287,7 @@ Use semantic tokens only when they carry meaning:
 Do not introduce arbitrary palette classes in views when a semantic token or
 component variant already exists.
 
-### 13. Keep the scale tight
+### 3m. Keep the Spacing and Type Scale Tight
 
 The app already leans on a small number of recurring sizes. Keep using them.
 
@@ -298,7 +310,7 @@ Recommended text rhythm:
 If a design needs a large new ramp of spacing or typography values, simplify
 the design before extending the system.
 
-### 14. Start with too much white space
+### 3n. Start with Generous White Space
 
 When a UI feels cramped, the problem is usually layout density, not a missing
 shadow or color accent.
@@ -308,7 +320,7 @@ Default bias:
 - give forms, cards, and grouped sections more room first
 - tighten only when density has a clear product reason
 
-### 15. Keep more space around a group than inside it
+### 3o. More Space Around Groups Than Inside Them
 
 This is one of the most important spacing rules in the system.
 
@@ -321,7 +333,7 @@ Examples:
 If intra-group and inter-group spacing are too similar, the UI becomes hard to
 scan.
 
-### 16. Do not fill the whole screen by default
+### 3p. Do Not Fill the Whole Screen by Default
 
 You do not need to use the full available width just because it exists.
 
@@ -333,7 +345,7 @@ Preferred patterns:
 
 Most app tasks become easier when the content width is intentionally limited.
 
-### 17. Avoid ambiguous spacing
+### 3q. Avoid Ambiguous Spacing
 
 Spacing should communicate structure. If two gaps look the same, users will
 assume the relationships are the same.
@@ -346,7 +358,7 @@ Be explicit about:
 
 Use spacing to answer those questions without needing extra borders.
 
-### 18. Use depth sparingly and intentionally
+### 3r. Use Depth (Shadows, Elevation) Sparingly
 
 Depth is already encoded in the shared components:
 
@@ -357,7 +369,7 @@ Depth is already encoded in the shared components:
 Use borders for separation and shadows for elevation. Do not stack both
 aggressively everywhere.
 
-### 19. Accessibility is part of the design language
+### 3s. Accessibility Is Part of the Design Language
 
 Accessible UI is the default, not a later pass.
 
@@ -378,9 +390,9 @@ Examples:
 
 ---
 
-## Visual Language
+## 4. Visual Language System
 
-### Typography
+### 4a. Typography Scale and Font Rules
 
 Use a narrow, purposeful type scale:
 
@@ -453,7 +465,7 @@ Default alignment rules:
   empty-state blocks
 - right-align numeric table columns for comparison
 
-### Color
+### 4b. Color Palette and Semantic Color Usage
 
 Use semantic color tokens already present in the design system:
 
@@ -533,7 +545,7 @@ communicating:
 - selection
 - disabled state
 
-### Layout and Spacing
+### 4c. Layout Grid and Spacing Scale
 
 Use consistent spacing instead of one-off values. Page composition should read
 as a rhythm, not as a pile of local tweaks.
@@ -578,7 +590,7 @@ In practice:
 Numeric columns should be right-aligned so values of different magnitudes stay
 comparable at a glance. Keep free text and mixed-content columns left-aligned.
 
-### Elevation
+### 4d. Elevation and Shadow System
 
 Use these defaults:
 
@@ -614,7 +626,7 @@ Layering is appropriate for:
 
 Do not overlap elements in normal page flow merely for visual novelty.
 
-### Images
+### 4e. Image Usage and Aspect Ratio Rules
 
 Use images carefully and only when they have a job.
 
@@ -646,7 +658,7 @@ User images have unpredictable aspect ratios, backgrounds, and quality. Contain
 them in fixed-size wrappers and crop with `object-fit: cover` when the layout
 depends on consistency.
 
-### Finishing Touches
+### 4f. Finishing Touches and Polish Patterns
 
 Apply these only after hierarchy, spacing, and accessibility are already solid.
 
@@ -710,9 +722,9 @@ The empty users card and loading indicator are the current model for this:
 
 ---
 
-## Component Guide
+## 5. Component Library Guide
 
-### `github.com/go-sum/componentry/ui/core`
+### 5a. Core UI Components (componentry/ui/core)
 
 Use `ui/core` for the smallest shared primitives.
 
@@ -735,7 +747,7 @@ Rules:
   ad hoc
 - soften icon contrast before increasing icon size when icons compete with text
 
-### Button usage
+### 5b. Button Variants and Usage Guidelines
 
 Use variants consistently:
 
@@ -753,7 +765,7 @@ Use sizes consistently:
 - `SizeSm` for row actions, pagination controls, and compact nav actions
 - `SizeLg` only when the layout genuinely needs a larger target
 
-### `github.com/go-sum/componentry/ui/data`
+### 5c. Data Display Components (componentry/ui/data)
 
 Use `ui/data` for grouped informational surfaces and tabular display.
 
@@ -771,7 +783,7 @@ Rules:
 - keep table actions compact and aligned for scanning
 - keep card padding inside card subcomponents, not wrapper `div` clutter
 
-### `github.com/go-sum/componentry/ui/feedback`
+### 5d. Feedback Components (componentry/ui/feedback)
 
 Use `ui/feedback` for feedback surfaces and progress, not for terse status
 chips.
@@ -789,7 +801,7 @@ Rules:
 - destructive variants are for danger or failure, not generic emphasis
 - preserve the accessibility roles and structure already encoded in the package
 
-### `github.com/go-sum/componentry/ui/layout`
+### 5e. Layout Components (componentry/ui/layout)
 
 Use `ui/layout` for shell-level navigation and structural navigation patterns.
 
@@ -806,7 +818,7 @@ Rules:
   drawer pattern
 - push auth and theme differences through nav slots, not duplicated view logic
 
-### `github.com/go-sum/componentry/form`
+### 5f. Form Components (componentry/form)
 
 Use `form` for accessible field composition and consistent input wiring.
 
@@ -829,7 +841,7 @@ Rules:
 - prefer package defaults over hand-assembling error markup
 - keep standalone forms narrow unless the task genuinely requires density
 
-### `github.com/go-sum/componentry/interactive`
+### 5g. Interactive Components (componentry/interactive)
 
 Use `interactive/*` for higher-level UI that remains HTML-first and progressive.
 
@@ -849,7 +861,7 @@ Rules:
 - keep interaction affordances consistent with the rest of the design language
 - use these packages when behavior would otherwise be reimplemented in a page
 
-### `github.com/go-sum/componentry/patterns`
+### 5h. UI Patterns Library (componentry/patterns)
 
 Use `patterns/*` for cross-cutting UI behavior and wiring rather than visual
 primitives.
@@ -871,7 +883,7 @@ Rules:
 - use flash and head helpers for app-wide conventions instead of view-local
   duplication
 
-### `github.com/go-sum/componentry/examples`
+### 5i. Component Examples (componentry/examples)
 
 Treat `github.com/go-sum/componentry/examples` as the living visual reference
 for the component library.
@@ -884,9 +896,9 @@ Use it to:
 
 ---
 
-## View Composition Guide
+## 6. View Composition and Layout
 
-### `internal/view/layout/`
+### 6a. Layout Templates (internal/view/layout/)
 
 `internal/view/layout/base.go` is the application shell.
 
@@ -900,7 +912,7 @@ It is responsible for:
 
 Do not duplicate shell concerns in page-level views.
 
-### `internal/view/page/`
+### 6b. Full Page Views (internal/view/page/)
 
 Use `internal/view/page/` for full-page constructors.
 
@@ -919,7 +931,7 @@ Current page patterns:
 - `users.go`: heading plus HTMX-replaceable region
 - `contact.go`: focused form flow and supportive copy
 
-### `internal/view/partial/`
+### 6c. HTMX Partial Views (internal/view/partial/)
 
 Use `internal/view/partial/` for HTMX-replaceable fragments.
 
@@ -936,7 +948,7 @@ Reference implementations:
 - `userpartial/user_form.go`: inline editing while preserving table structure
 - `contactpartial/contact_form.go`: fragment-safe form composition
 
-### `internal/view/errorpage/`
+### 6d. Error Page Views (internal/view/errorpage/)
 
 Errors should look like part of the application, not fallback HTML.
 
@@ -954,9 +966,9 @@ Reference:
 
 ---
 
-## Practical Rules for New UI
+## 7. Practical Rules for New UI
 
-### When a shared component exists, use it
+### 7a. Use Existing Shared Components First
 
 Do not hand-roll:
 
@@ -976,13 +988,13 @@ Ad hoc utilities are acceptable for:
 - view-specific alignment
 - one-off composition around shared components
 
-### Prefer composition over variant explosion
+### 7b. Prefer Composition over Variant Explosion
 
 If a screen needs a special arrangement, compose existing primitives first.
 Add a new component variant only when the same visual pattern is reused in
 multiple places.
 
-### Make action hierarchy obvious
+### 7c. Make Action Hierarchy Visually Obvious
 
 Default action hierarchy:
 
@@ -994,7 +1006,7 @@ Destructive actions do not automatically become the visual primary action. If a
 dangerous action is not the main intended path, keep it quiet until the point
 of no return.
 
-### Keep forms readable
+### 7d. Keep Forms Readable and Accessible
 
 Most forms in this app should follow this shape:
 
@@ -1004,7 +1016,7 @@ Most forms in this app should follow this shape:
 - one obvious primary submit action
 - quiet secondary navigation or cancellation
 
-### Keep table actions quiet until needed
+### 7e. Keep Table Row Actions Quiet Until Needed
 
 For tabular data:
 
@@ -1013,7 +1025,7 @@ For tabular data:
 - reserve destructive styling for real danger
 - keep row actions in a right-aligned compact group
 
-### Balance text, icons, and borders
+### 7f. Balance Text, Icons, and Borders
 
 When one element feels too heavy:
 
@@ -1021,7 +1033,7 @@ When one element feels too heavy:
 - increase border weight slightly before making the color harsher
 - de-emphasize competing content before over-emphasizing the target
 
-### Writing is part of the design
+### 7g. Writing and Microcopy Are Part of the Design
 
 Default copy style:
 
@@ -1035,7 +1047,7 @@ Choose words that reduce friction and match the visual restraint of the system.
 
 ---
 
-## Decision Checklist
+## 8. UI Decision Checklist
 
 Before merging a UI change, confirm:
 
@@ -1061,7 +1073,7 @@ Before merging a UI change, confirm:
 
 ---
 
-## Reference Map
+## 9. Reference Map
 
 Use these as the practical source of truth:
 

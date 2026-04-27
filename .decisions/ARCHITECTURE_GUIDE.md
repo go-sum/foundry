@@ -1,6 +1,6 @@
 ---
 title: Architecture Guide
-description: Governing principles for Go application structure, dependency injection, routing, server design, and graceful shutdown.
+description: "project structure, flat vs modular layout, server struct pattern, Go 1.22+ routing, dependency injection, constructor functions, functional options, graceful shutdown, signal handling, package design, DRY, YAGNI, SOLID, rendering model, anti-patterns"
 weight: 15
 ---
 
@@ -26,9 +26,24 @@ weight: 15
 
 ---
 
+## 0. Quick Reference
+
+- §1 Core principles: standard library first, DI over globals, explicit over magic, small interfaces
+- §2/2a Project structure: flat vs modular layout, migration signals, technology stack
+- §3 Server struct: single struct owns all dependencies, middleware wrapping
+- §4 Routing: Go 1.22+ method-based routing, path params, wildcard matching, precedence
+- §5 Dependency injection: constructors, layered DI, interfaces for testability, functional options
+- §6 Graceful shutdown: run() pattern, signal handling, shutdown timeout, cleanup ordering
+- §7/7a-c Package design: inward dependencies, DRY, YAGNI, SOLID, rendering model
+- §8 Anti-patterns: global DB vars, framework-first thinking, god packages, init() misuse
+- §9 Review checklist: architecture review items
+- §10a Guide relationships and how to navigate the decision docs
+
+---
+
 ## 1. Core Architectural Principles
 
-### Standard library first
+### 1a. Standard Library Preference over Third-Party
 
 Prefer `net/http`, `encoding/json`, `log/slog`, `errors`, `context`, and
 `database/sql` (or `pgx` for PostgreSQL) before reaching for a framework.
@@ -36,7 +51,7 @@ Go 1.22+ `http.ServeMux` supports method-based routing, path parameters, and
 wildcard matching. A framework is justified only when its benefits are concrete
 and measurable against the standard library surface for the problem at hand.
 
-### Dependency injection over globals
+### 1b. Dependency Injection over Global State
 
 Never use `init()` for setup. Never use package-level mutable `var` for
 runtime dependencies. Every dependency is constructed explicitly and passed
@@ -47,14 +62,14 @@ where concrete implementations are created and wired together. No other
 package reads environment variables, opens database connections, or
 initializes shared state.
 
-### Explicit over magic
+### 1c. Explicit Configuration over Convention Magic
 
 The program's assembly is readable top-to-bottom in the composition root.
 There are no service locators, no annotation-driven wiring, and no
 reflection-based dependency graphs. A new developer reads `main.go` and
 understands what is constructed, in what order, and what depends on what.
 
-### Small interfaces, big structs
+### 1d. Small Interfaces and Large Concrete Structs
 
 Define interfaces at the consumer, not the provider. A concrete type does not
 need to declare which interfaces it satisfies. The consumer defines the
@@ -73,7 +88,7 @@ This keeps coupling minimal and testability high without premature abstraction.
 
 ## 2. Project Structure
 
-### Flat structure
+### 2a. Flat Package Structure for Small Applications
 
 A flat structure is appropriate when the project is small, has one developer,
 and serves a single bounded context. All files live in `package main` or a
@@ -94,7 +109,7 @@ Rules for flat structure:
 - No file exceeds 500 lines. When it does, split by domain or concern.
 - Test files are co-located: `handlers_test.go`, `store_test.go`.
 
-### Modular structure
+### 2b. Modular Feature Package Structure for Large Applications
 
 A modular structure is appropriate when the project has multiple domains,
 multiple developers, or needs independent test isolation.
@@ -143,7 +158,7 @@ Rules for modular structure:
 - Route registration lives in `internal/app/routes.go`, never inside feature
   packages.
 
-### Migration signals: flat to modular
+### 2c. Migration Signals from Flat to Modular Structure
 
 Move from flat to modular when any of these conditions hold:
 
@@ -154,7 +169,7 @@ Move from flat to modular when any of these conditions hold:
 - Test isolation requires separate packages to avoid import cycles.
 - The `store.go` file serves multiple unrelated tables.
 
-### How to migrate incrementally
+### 2d. Incremental Migration Strategy from Flat to Modular
 
 1. Extract one domain at a time. Start with the domain that has the most
    naming pressure or the most test isolation need.
@@ -179,13 +194,13 @@ This is a server-rendered Go web application built around:
 - **Reusable external modules** from `github.com/go-sum/*` consumed as ordinary
   Go dependencies via `go.mod`
 
-### Source zone
+### 2aa. Source Zone — Checked-In Application Code
 
 All application code lives in `internal/`. External modules are ordinary Go
 dependencies — they are not part of this repository and are consumed via their
 public API.
 
-### Runtime assembly
+### 2ab. Runtime Assembly — Generated and External Code
 
 The composition root lives in `internal/app/`. It wires:
 
@@ -199,7 +214,7 @@ The composition root lives in `internal/app/`. It wires:
 - external modules (auth, queue storage, sessions, senders, site metadata)
 - app-owned feature modules and views
 
-### Hybrid architecture
+### 2ac. Hybrid Architecture Overview
 
 The application is intentionally hybrid:
 
@@ -218,7 +233,7 @@ an external module's internals. To change behavior, upstream the change.
 The server struct is the dependency container for the HTTP layer. It
 implements `http.Handler` and holds all dependencies needed by handlers.
 
-### Structure
+### 3a. Server Struct Field and Dependency Structure
 
 ```go
 type Server struct {
@@ -242,7 +257,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-### Rules
+### 3b. Server Struct Ownership Rules
 
 - `NewServer` accepts dependencies as parameters. It never reads environment
   variables or opens connections.
@@ -252,7 +267,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
   standard `http.Handler` usable with `httptest` directly.
 - Middleware wraps the router at the server level or per-route inside `routes()`.
 
-### Middleware wrapping
+### 3c. Middleware Wrapping on the Server Struct
 
 ```go
 func (s *Server) routes() *http.ServeMux {
@@ -284,7 +299,7 @@ Go 1.22 introduced method-based routing, path parameters, and wildcard
 matching to `http.ServeMux`. Use these features instead of third-party routers
 when the standard library covers the routing need.
 
-### Method-based routing
+### 4a. Method-Based Route Registration
 
 ```go
 mux.HandleFunc("GET /api/users", s.handleListUsers)
@@ -297,7 +312,7 @@ mux.HandleFunc("DELETE /api/users/{id}", s.handleDeleteUser)
 A request with an unmatched method returns 405 Method Not Allowed
 automatically.
 
-### Path parameter extraction
+### 4b. Path Parameter Extraction
 
 ```go
 func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
@@ -315,7 +330,7 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 Always parse and validate path parameters at the handler boundary. Never pass
 raw strings into service or repository layers.
 
-### Wildcard and exact match patterns
+### 4c. Wildcard and Exact Match Route Patterns
 
 ```go
 // Exact match: only "/"
@@ -332,7 +347,7 @@ mux.HandleFunc("GET /files/{path...}", s.handleFiles)
 - A trailing slash acts as a subtree wildcard.
 - `{name...}` captures the rest of the path into a named parameter.
 
-### Routing precedence
+### 4d. Route Matching Precedence Rules
 
 `http.ServeMux` uses most-specific-wins precedence:
 
@@ -348,7 +363,7 @@ startup. This is correct behavior: ambiguous routes are a bug.
 
 ## 5. Dependency Injection
 
-### Constructor functions
+### 5a. Constructor Functions for Dependency Wiring
 
 Every dependency is created by a constructor function. Constructors:
 
@@ -366,7 +381,7 @@ func NewOrderService(repo OrderRepository, notify Notifier) *OrderService {
 }
 ```
 
-### Layered dependency injection
+### 5b. Layered Dependency Injection Pattern
 
 Build dependencies bottom-up in the composition root. Each layer depends only
 on the layer below it:
@@ -410,7 +425,7 @@ func run(ctx context.Context) error {
 }
 ```
 
-### Interface-based dependencies for testability
+### 5c. Interface-Based Dependencies for Testability
 
 Define interfaces at the consumer. The service defines what it needs from
 the repository; the handler defines what it needs from the service:
@@ -431,7 +446,7 @@ type OrderCreator interface {
 Never define a "god interface" that mirrors the entire concrete type. Each
 consumer defines only the methods it calls.
 
-### Configuration as a dependency
+### 5d. Configuration Struct as a Dependency
 
 Load configuration once in the composition root. Pass individual values or
 small config structs to constructors. Never pass the entire application
@@ -448,7 +463,7 @@ func NewMailer(cfg AppConfig) *Mailer { ... }
 Components never read environment variables directly. The composition root
 is the only code that touches `os.Getenv`, config files, or flag parsing.
 
-### Functional options for optional dependencies
+### 5e. Functional Options for Optional Dependencies
 
 Use functional options when most callers need zero configuration and the
 constructor has optional collaborators or settings:
@@ -481,7 +496,7 @@ Use an option struct instead when most callers need multiple settings together
 or when the configuration surface is large enough that variadic closures
 become unwieldy.
 
-### Cross-domain dependencies
+### 5f. Cross-Domain Dependency Resolution
 
 When one domain needs a capability from another, define a consumer-scoped
 interface rather than importing the other domain's concrete type:
@@ -500,7 +515,7 @@ this interface. Neither package imports the other.
 
 ## 6. Graceful Shutdown
 
-### The run() pattern
+### 6a. The run() Blocking Pattern for Server Lifecycle
 
 Separate `main()` from `run()` to enable defer-based cleanup and testability:
 
@@ -529,7 +544,7 @@ Rules:
 - All `defer` cleanup calls execute when `run()` returns.
 - `run()` is testable: pass a cancelable context to simulate shutdown.
 
-### Signal-based shutdown
+### 6b. OS Signal-Based Shutdown Trigger
 
 Use `signal.NotifyContext` to derive a context that cancels on SIGINT or
 SIGTERM:
@@ -542,7 +557,7 @@ defer stop()
 When the signal fires, the context cancels, and the server shutdown path
 begins.
 
-### Shutdown timeout
+### 6c. Shutdown Timeout Configuration
 
 Always apply a timeout to `http.Server.Shutdown`:
 
@@ -566,7 +581,7 @@ Choose timeout duration by scenario:
 The timeout must be shorter than the container orchestrator's kill grace
 period (typically 30 seconds for Kubernetes, configurable).
 
-### Cleanup ordering
+### 6d. Shutdown Cleanup Ordering (LIFO)
 
 Shut down in reverse order of creation. The last thing created is the first
 thing stopped:
@@ -615,7 +630,7 @@ func run(ctx context.Context) error {
 }
 ```
 
-### Health check endpoint
+### 6e. Health Check Endpoint for Load Balancer Drain
 
 Expose a health endpoint for container orchestrators (Kubernetes liveness and
 readiness probes, ECS health checks):
@@ -632,7 +647,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-### Pre-shutdown drain
+### 6f. Pre-Shutdown Connection Drain Period
 
 For zero-downtime deployments behind a load balancer:
 
@@ -659,7 +674,7 @@ interval.
 
 ## 7. Package Design Principles
 
-### Dependencies flow inward
+### 7a. Dependencies Flow Inward — No Reverse Imports
 
 Domain packages do not import each other. A `user` package never imports
 `order`, and `order` never imports `user`. Cross-domain communication flows
@@ -675,7 +690,7 @@ handlers -> services -> repositories -> database
 
 Higher layers depend on lower layers. Lower layers never import higher layers.
 
-### Avoid circular dependencies
+### 7b. Circular Dependency Prevention
 
 When two packages seem to need each other:
 
@@ -687,7 +702,7 @@ When two packages seem to need each other:
 
 Never use `internal/` sub-package tricks to break cycles artificially.
 
-### No utils or helpers packages
+### 7c. No Catch-All Utils or Helpers Packages
 
 Never create a package named `util`, `utils`, `helper`, `helpers`, or
 `common`. Name packages for what they provide:
@@ -699,7 +714,7 @@ Never create a package named `util`, `utils`, `helper`, `helpers`, or
 | `common.Config` | `config.Config` |
 | `util.Contains` | Use `slices.Contains` from the standard library |
 
-### Export only what is needed
+### 7d. Minimal Exports — Only Public API Surface
 
 Start every type, function, and method as unexported. Export only when another
 package genuinely needs it. An unexported symbol can always be exported later;
@@ -709,17 +724,17 @@ an exported symbol is part of the package's public contract.
 
 ## 7a. Core Programming Principles
 
-### DRY
+### 7aa. DRY — Don't Repeat Yourself
 
 Reduce repetition in behavior, policies, and data mapping, but do not create a
 shared abstraction until the duplication is real and stable.
 
-### YAGNI
+### 7ab. YAGNI — You Aren't Gonna Need It
 
 Do not add hooks, wrappers, config keys, or extension points for hypothetical
 future use. Be conservative.
 
-### Separation of Concerns
+### 7ac. Separation of Concerns by Layer
 
 Split code by responsibility:
 
@@ -729,20 +744,20 @@ Split code by responsibility:
 - presentation in views
 - assembly in the composition root
 
-### SOLID, applied pragmatically
+### 7ad. SOLID Principles Applied Pragmatically
 
 - **SRP**: each function, type, and file has one primary reason to change.
 - **ISP**: prefer narrow interfaces with a clear consumer.
 - **DIP**: depend on abstractions only where that reduces coupling at a real
   boundary; do not create speculative interfaces.
 
-### Favor composition and encapsulation
+### 7ae. Favor Composition and Encapsulation over Inheritance
 
 Prefer small collaborating types over inheritance-style layering or broad
 utility packages. Expose the smallest public API that the next caller actually
 needs.
 
-### Layer discipline
+### 7af. Layer Discipline — No Skipping Layers
 
 Do not let a lower layer depend on a higher one:
 
@@ -757,23 +772,23 @@ Do not let a lower layer depend on a higher one:
 
 Patterns are tools, not goals. Use them where they simplify existing code.
 
-### Factory / Registry
+### 7ba. Factory and Registry Pattern
 
 Use when protocol or provider selection is a real requirement: sender/provider
 selection, transport/backend selection, constructing different implementations
 behind one entry point.
 
-### Chain of Responsibility
+### 7bb. Chain of Responsibility Pattern
 
 Use when the request or operation passes through a sequence of orthogonal
 behaviors: middleware stacks, request guards, layered cross-cutting policies.
 
-### Adapter
+### 7bc. Adapter Pattern for Interface Bridging
 
 Use when an external-module interface must be satisfied by app-owned rendering,
 session, form, or redirect behavior.
 
-### Enum-to-value maps
+### 7bd. Enum-to-Value Map Pattern
 
 When a function maps a typed enum to a fixed value, use a package-level map
 literal instead of a switch:
@@ -794,7 +809,7 @@ func variantClass(v Variant) string {
 
 This applies when every case returns a value and has no side effects.
 
-### Pattern selection by problem type
+### 7be. Pattern Selection Decision Table
 
 Diagnose the problem before reaching for a pattern:
 
@@ -811,7 +826,7 @@ If no pattern simplifies the code that exists today, do not introduce one.
 The application supports multiple HTML response modes without splitting into
 separate rendering stacks.
 
-### Canonical rendering modes
+### 7ca. Canonical Rendering Modes (Full Page vs Fragment)
 
 | Mode | Handler pattern |
 |------|-----------------|
@@ -821,7 +836,7 @@ separate rendering stacks.
 | JSON / problem | Selected by the global error handler based on request headers |
 | Redirect | HTMX-aware redirect helpers |
 
-### Rules
+### 7cb. Rendering Model Rules and HTMX Integration
 
 - Use `view.NewRequest(...)` to build request-scoped presentation state.
 - Use `view.Render(...)` when one endpoint serves both full-page and HTMX
@@ -835,7 +850,7 @@ separate rendering stacks.
 
 ## 8. Anti-Patterns
 
-### Global database variables
+### 8a. Anti-Pattern — Global Database Variables
 
 Never store a database pool in a package-level variable:
 
@@ -855,20 +870,20 @@ func init() {
 The pool is constructed in the composition root and passed to every
 constructor that needs it.
 
-### Framework-first thinking
+### 8b. Anti-Pattern — Framework-First Architecture
 
 Do not begin a project by choosing a framework and building around its
 conventions. Begin with the standard library. Introduce a framework only when
 a specific, measurable deficiency in the standard library justifies it.
 
-### God packages
+### 8c. Anti-Pattern — God Packages
 
 A `handlers/` package with 50 files is not a package; it is a dumping ground.
 Split by domain: `user/handler.go`, `order/handler.go`. The same applies to
 `services/`, `repositories/`, and `models/` when they grow beyond a single
 coherent domain.
 
-### Using init() for setup
+### 8d. Anti-Pattern — init() for Application Setup
 
 `init()` runs before `main()`, cannot accept parameters, cannot return
 errors, and makes testing unpredictable. Never use it for database
@@ -877,13 +892,13 @@ runtime dependency. The only acceptable use of `init()` is registering
 drivers with `database/sql` or similar compile-time registration schemes
 (and even then, prefer explicit registration when the API supports it).
 
-### Reading config in business logic
+### 8e. Anti-Pattern — Config Access in Business Logic
 
 Services and repositories never call `os.Getenv`, read config files, or
 access a global config object. Configuration values arrive as constructor
 parameters or typed config structs from the composition root.
 
-### Passing the entire config struct
+### 8f. Anti-Pattern — Passing Entire Config Struct
 
 Never pass the full application configuration to a component. Pass only the
 values the component needs:

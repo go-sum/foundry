@@ -1,6 +1,6 @@
 ---
 title: Data Storage Guide
-description: Governing patterns for Go data persistence — driver selection, connection pooling, migrations, transactions, and the repository pattern.
+description: "raw SQL vs ORM, pgx driver, database/sql, connection pooling, pgxpool configuration, pool sizing, cloud database limits, PgBouncer, DNS failover, repository pattern, interface at consumer, concrete implementation, model struct tags, sentinel errors, PostgreSQL error codes, schema migrations, atlas, migration file naming, transactional DDL, transaction management, DBTX interface, WithTx helper, isolation levels, deadlock prevention, long-running transactions, idempotency, anti-patterns"
 weight: 28
 ---
 
@@ -27,9 +27,20 @@ weight: 28
 
 ---
 
+## 0. Quick Reference
+
+- §1 Driver choice: raw SQL vs ORM decision, pgx driver, connection setup
+- §2 Connection pooling: pool settings, sizing formula, pgxpool configuration, health checks
+- §3 Cloud databases: connection limits by provider, PgBouncer, DNS failover
+- §4 Repository pattern: interface at consumer, concrete implementation, sentinel errors, error code mapping
+- §5 Schema migrations: atlas tool, file naming, format, transactional DDL, safe practices, CI/CD
+- §6 Transaction management: service-layer transactions, DBTX interface, WithTx helper, isolation levels, deadlock prevention
+- §7 Anti-patterns: common data access mistakes to avoid
+- §8 Review checklist
+
 ## 1. Choosing Your Approach
 
-### Raw SQL vs ORM
+### 1a. Raw SQL vs ORM Trade-off Analysis
 
 | Criterion | Raw SQL (pgx / sqlx) | ORM (Ent / GORM) |
 |---|---|---|
@@ -42,7 +53,7 @@ weight: 28
 | Prototyping speed | Slower for CRUD | Faster for standard CRUD patterns |
 | Debugging | Readable — the query is what you wrote | Indirect — must inspect generated SQL |
 
-### When to use raw SQL
+### 1b. When to Use Raw SQL
 
 - Complex queries with joins, window functions, CTEs, or recursive queries
 - Full performance control over query plans and index usage
@@ -50,13 +61,13 @@ weight: 28
   full-text search, `COPY` protocol
 - When the team already has strong SQL skills and prefers explicit control
 
-### When to use an ORM
+### 1c. When to Use an ORM
 
 - Type-safe generated query builders reduce mapping bugs in CRUD-heavy domains
 - Rapid prototyping where schema iteration speed matters more than query control
 - Teams that prefer a Go-native DSL over writing SQL directly
 
-### Driver recommendations
+### 1d. PostgreSQL Driver Recommendations (pgx, lib/pq)
 
 **pgx** is the recommended PostgreSQL driver. It provides:
 
@@ -71,7 +82,7 @@ weight: 28
 - the project already depends on `database/sql` and benefits from `sqlx`
   extensions (`NamedExec`, `StructScan`, `Select`, `Get`)
 
-### ORM recommendations
+### 1e. ORM Recommendations (sqlc, gorm, ent)
 
 **Ent** is preferred over GORM for new projects:
 
@@ -88,7 +99,7 @@ and less predictable query generation.
 
 ## 2. Connection Pool Management
 
-### How `database/sql` pooling works
+### 2a. How database/sql Connection Pooling Works
 
 When code calls `db.QueryContext`, the pool follows this sequence:
 
@@ -96,7 +107,7 @@ When code calls `db.QueryContext`, the pool follows this sequence:
 2. If none available and under `MaxOpenConns`, open a new connection
 3. If at `MaxOpenConns`, block until a connection is returned or context expires
 
-### Pool settings
+### 2b. Connection Pool Configuration Settings
 
 | Setting | Purpose | Default | Guidance |
 |---|---|---|---|
@@ -105,7 +116,7 @@ When code calls `db.QueryContext`, the pool follows this sequence:
 | `ConnMaxLifetime` | Maximum time a connection stays open | Unlimited | Set to 30-60 minutes to rotate connections and respect DNS/failover changes |
 | `ConnMaxIdleTime` | Maximum time an idle connection stays in pool | Unlimited | Set to 5-10 minutes to release unused connections during low traffic |
 
-### Sizing formula
+### 2c. Pool Size Calculation Formula
 
 ```
 MaxOpenConns = (database max_connections - reserved_connections) / app_instances
@@ -118,7 +129,7 @@ Reserve connections for:
 - connection poolers (PgBouncer)
 - replication slots
 
-### Workload-based sizing
+### 2d. Workload-Based Pool Sizing Guidance
 
 | Workload | MaxOpenConns | MaxIdleConns | ConnMaxLifetime | ConnMaxIdleTime |
 |---|---|---|---|---|
@@ -130,7 +141,7 @@ Reserve connections for:
 These are starting points. Tune based on observed pool wait times and database
 connection counts.
 
-### pgx native pooling vs `database/sql`
+### 2e. pgx Native Pooling vs database/sql Comparison
 
 | Feature | `pgxpool.Pool` | `database/sql` |
 |---|---|---|
@@ -147,7 +158,7 @@ Use `pgxpool.Pool` directly when the project is PostgreSQL-only and benefits
 from native features. Use `pgx/v5/stdlib` when `database/sql` compatibility is
 required for libraries like sqlx or existing middleware.
 
-### pgxpool configuration
+### 2f. pgxpool Configuration and Recommended Settings
 
 ```go
 config, err := pgxpool.ParseConfig(databaseURL)
@@ -167,7 +178,7 @@ if err != nil {
 }
 ```
 
-### Health checks
+### 2g. Connection Pool Health Check Pattern
 
 **pgxpool** performs automatic health checks at a configurable interval
 (`HealthCheckPeriod`). Additionally, expose a manual health endpoint:
@@ -180,7 +191,7 @@ func HealthCheck(ctx context.Context, pool *pgxpool.Pool) error {
 }
 ```
 
-### Monitoring
+### 2h. Connection Pool Monitoring and Metrics
 
 **`database/sql` stats** — call `db.Stats()` periodically and export:
 
@@ -207,7 +218,7 @@ func HealthCheck(ctx context.Context, pool *pgxpool.Pool) error {
 
 ## 3. Cloud Database Considerations
 
-### Connection limits by provider
+### 3a. Connection Limits by Cloud Provider
 
 | Provider | Plan | Approximate max_connections |
 |---|---|---|
@@ -225,7 +236,7 @@ func HealthCheck(ctx context.Context, pool *pgxpool.Pool) error {
 Always check the actual provider documentation for the current plan. These
 numbers change.
 
-### PgBouncer adjustments
+### 3b. PgBouncer Pool Mode and Configuration Adjustments
 
 When running behind PgBouncer in **transaction mode**:
 
@@ -241,7 +252,7 @@ config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 - Advisory locks do not work across transaction boundaries in transaction mode
 - `LISTEN/NOTIFY` requires a dedicated connection outside the pooler
 
-### DNS-based failover
+### 3c. DNS-Based Failover for Cloud Databases
 
 Cloud databases use DNS for primary/replica failover. Set a short
 `ConnMaxLifetime` so connections rotate and pick up DNS changes:
@@ -257,7 +268,7 @@ continues sending traffic to a decommissioned node.
 
 ## 4. Repository Pattern
 
-### Interface at the consumer
+### 4a. Repository Interface Defined at the Consumer
 
 Define the store interface where it is consumed, not where it is implemented.
 This keeps the consumer testable without importing the concrete store:
@@ -271,7 +282,7 @@ type OrderStore interface {
 }
 ```
 
-### Concrete implementation
+### 4b. Concrete Repository Implementation
 
 The repository implements the interface with the chosen driver:
 
@@ -301,7 +312,7 @@ func (s *pgOrderStore) GetByID(ctx context.Context, id uuid.UUID) (Order, error)
 }
 ```
 
-### Model struct tags
+### 4c. Model Struct and Database Tag Conventions
 
 Use `db` tags for column mapping when using sqlx:
 
@@ -319,7 +330,7 @@ With pgx, use explicit `Scan` calls or `pgx.RowToStructByName` with matching
 field names. Do not rely on implicit struct mapping without explicit tags or
 scan targets.
 
-### Sentinel errors
+### 4d. Domain Sentinel Errors for Repository Failures
 
 Define domain error sentinels in the domain package, not the repository
 package:
@@ -331,7 +342,7 @@ var (
 )
 ```
 
-### PostgreSQL error code mapping
+### 4e. PostgreSQL Error Code to Sentinel Error Mapping
 
 Map database error codes to domain errors in the repository layer. The
 repository is the only layer that should know about database-specific error
@@ -379,7 +390,7 @@ translation step.
 
 ## 5. Schema Migrations
 
-### Tool
+### 5a. Migration Tool Selection (atlas)
 
 Use **goose** (via `github.com/go-sum/db/migrate`) as the standard migration
 tool. It provides:
@@ -390,7 +401,7 @@ tool. It provides:
 - Schema fingerprint storage after each successful migration
 - CLI and programmatic usage via `pkg/db/cli`
 
-### File naming
+### 5b. Migration File Naming Convention
 
 ```
 {version}_{description}.sql
@@ -409,7 +420,7 @@ Examples:
 000003_create_orders_table.sql
 ```
 
-### File format
+### 5c. Migration File Format and Structure
 
 Each migration file contains both directions delimited by goose annotations:
 
@@ -446,14 +457,14 @@ $$ LANGUAGE plpgsql;
 DROP FUNCTION IF EXISTS update_updated_at();
 ```
 
-### Always write both directions
+### 5d. Always Write Up and Down Migrations
 
 Every migration must contain both a `-- +goose Up` and a `-- +goose Down`
 section. The `Down` section must precisely reverse the `Up` section. Write the
 `Down` SQL manually — do not commit auto-generated Down SQL without reviewing
 it.
 
-### Idempotency
+### 5e. Migration Idempotency Requirements
 
 Use `IF NOT EXISTS` and `IF EXISTS` to make migrations safe for re-execution:
 
@@ -470,14 +481,14 @@ CREATE TABLE IF NOT EXISTS orders (
 DROP TABLE IF EXISTS orders;
 ```
 
-### Transactional DDL
+### 5f. Transactional DDL for Safe Schema Changes
 
 PostgreSQL supports transactional DDL — schema changes within a transaction
 either all commit or all roll back. Goose wraps each migration in a transaction
 by default. Do not disable this unless the migration explicitly requires it
 (e.g., concurrent index creation).
 
-### Running migrations programmatically
+### 5g. Running Migrations Programmatically at Startup
 
 Use the `github.com/go-sum/db/migrate` package directly:
 
@@ -492,7 +503,7 @@ func RunMigrations(ctx context.Context, dsn, migrDir string) error {
 `migrate.Up` runs all pending migrations in order. It is safe to call on every
 startup — it is a no-op when no migrations are pending.
 
-### CLI usage
+### 5h. Migration CLI Usage
 
 The project CLI (`db migrate`, `db rollback`, `db status`) wraps the
 `github.com/go-sum/db/migrate` package. Run it from `starter/`:
@@ -520,7 +531,7 @@ go run ./cmd/db status
 A pre-flight lint runs automatically before `migrate` applies any SQL. If lint
 finds errors, no migrations are applied.
 
-### Safe migration practices
+### 5i. Safe Migration Practices for Production
 
 **Concurrent index creation** — large tables require `CREATE INDEX
 CONCURRENTLY` to avoid locking reads and writes. This statement cannot run
@@ -555,7 +566,7 @@ deployments:
 Never rename or remove a column in a single deployment when the old code is
 still running.
 
-### Schema fingerprint
+### 5j. Schema Fingerprint Verification
 
 After each successful `migrate` run, the CLI stores a schema fingerprint in
 the database via `db.StoreFingerprint`. On application startup,
@@ -563,7 +574,7 @@ the database via `db.StoreFingerprint`. On application startup,
 the stored value and refuses to start if they diverge. This prevents schema
 drift from causing silent data corruption.
 
-### Migration rules
+### 5k. Migration Authoring Rules
 
 - Never modify an already-applied migration — create a new migration to
   correct a previous one
@@ -574,7 +585,7 @@ drift from causing silent data corruption.
 - Test migrations against a copy of production data when feasible
 - Include migration review in the deployment checklist
 
-### CI/CD integration
+### 5l. CI/CD Migration Integration
 
 - Run migrations in the test pipeline against a clean database before running
   tests — this validates that all migrations apply cleanly from zero
@@ -586,7 +597,7 @@ drift from causing silent data corruption.
 
 ## 6. Transaction Management
 
-### Service-layer transactions
+### 6a. Service-Layer Transaction Ownership
 
 Transactions are a service-layer concern, not a repository concern. Stores do
 not own transaction lifecycle — they accept a transaction handle from the
@@ -598,7 +609,7 @@ This is critical because:
 - only the service knows which operations must be atomic
 - stores that own their own transactions cannot be composed
 
-### DBTX interface pattern
+### 6b. DBTX Interface Pattern for Transaction Abstraction
 
 Define an interface satisfied by both `*sql.DB` and `*sql.Tx` (or
 `pgxpool.Pool` and `pgx.Tx`). Store methods accept this interface:
@@ -635,7 +646,7 @@ func NewOrderStore(db DBTX) *pgOrderStore {
 }
 ```
 
-### WithTx helper
+### 6c. WithTx Helper for Transaction Wrapping
 
 Provide a helper that manages begin, commit, and rollback:
 
@@ -680,7 +691,7 @@ func (s *OrderService) PlaceOrder(ctx context.Context, input PlaceOrderInput) er
 }
 ```
 
-### WithTxOptions for custom isolation levels
+### 6d. WithTxOptions for Custom Isolation Levels
 
 ```go
 func WithTxOptions(
@@ -709,7 +720,7 @@ func WithTxOptions(
 }
 ```
 
-### Isolation levels
+### 6e. Transaction Isolation Level Selection
 
 | Level | Use case | Trade-off |
 |---|---|---|
@@ -742,7 +753,7 @@ func WithSerializableTx(ctx context.Context, pool *pgxpool.Pool, fn func(tx pgx.
 }
 ```
 
-### Deadlock prevention
+### 6f. Deadlock Prevention Patterns
 
 - Access tables and rows in a consistent order across all transactions.
   If service A always locks `orders` then `inventory`, service B must follow
@@ -758,7 +769,7 @@ _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", lockID)
 Advisory locks acquired with `pg_advisory_xact_lock` are released
 automatically when the transaction commits or rolls back.
 
-### Long-running transactions
+### 6g. Long-Running Transaction Risks and Mitigation
 
 Long transactions hold locks, prevent autovacuum, and cause connection pool
 starvation.
@@ -785,7 +796,7 @@ defer cancel()
   failures extend transaction duration unpredictably. Perform external calls
   before or after the transaction, and compensate on failure.
 
-### Testing transactions
+### 6h. Transaction Testing with Rollback
 
 Use real database transactions in repository tests with rollback for cleanup:
 
@@ -827,7 +838,7 @@ _, err = tx.Exec(ctx, "SAVEPOINT sp1")
 _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT sp1")
 ```
 
-### Idempotency for database operations
+### 6i. Idempotency for Database Write Operations
 
 Non-idempotent operations (insert, payment capture, email dispatch) must not be
 retried without an idempotency key:
@@ -850,7 +861,7 @@ Reference implementation: `pkg/web/idempotency`.
 
 ## 7. Anti-Patterns
 
-### String concatenation for queries
+### 7a. Anti-Pattern — String Concatenation for SQL Queries
 
 Never build SQL by concatenating user input. This is the most common source of
 SQL injection.
@@ -864,7 +875,7 @@ query := "SELECT id, name FROM users WHERE name = $1"
 row := pool.QueryRow(ctx, query, name)
 ```
 
-### Leaking database types into handlers
+### 7b. Anti-Pattern — Leaking Database Types into Handlers
 
 Never let `pgx.ErrNoRows`, `sql.ErrNoRows`, or `*pgconn.PgError` escape the
 repository layer. Map them to domain errors in the repository:
@@ -881,12 +892,12 @@ if errors.Is(err, ErrNotFound) {
 }
 ```
 
-### Opening a new connection per request
+### 7c. Anti-Pattern — New Connection per HTTP Request
 
 The pool exists to reuse connections. Never call `pgx.Connect` or `sql.Open`
 inside a request handler. Use the shared pool injected at construction time.
 
-### `SELECT *` in production
+### 7d. Anti-Pattern — SELECT * in Production Queries
 
 Always specify the columns you need:
 
@@ -899,7 +910,7 @@ rows, err := pool.Query(ctx,
     "SELECT id, status, total, created_at FROM orders WHERE user_id = $1", userID)
 ```
 
-### Not using context variants
+### 7e. Anti-Pattern — Not Using Context-Aware Query Methods
 
 Always pass context to database operations. Without context, queries cannot be
 cancelled when a request is cancelled:
@@ -915,7 +926,7 @@ rows, err := db.QueryContext(ctx, "SELECT id FROM users")
 With pgx, context is always the first parameter — there are no non-context
 variants.
 
-### Transactions in store methods
+### 7f. Anti-Pattern — Transactions Managed in Repository Layer
 
 Store methods must not begin or commit transactions. A store that manages its
 own transaction cannot be composed with other stores in a single atomic
@@ -942,7 +953,7 @@ func (s *pgOrderStore) Create(ctx context.Context, order Order) error {
 }
 ```
 
-### Forgetting to handle rollback errors
+### 7g. Anti-Pattern — Ignoring Rollback Errors
 
 The `defer tx.Rollback()` pattern requires checking for `pgx.ErrTxClosed`
 (or `sql.ErrTxDone`) to avoid logging noise on successful commits:
@@ -963,7 +974,7 @@ defer func() {
 }()
 ```
 
-### Holding transactions open during external API calls
+### 7h. Anti-Pattern — Transactions Held During External API Calls
 
 External network calls have unpredictable latency. Holding a database
 transaction open while waiting for an HTTP response or message queue
@@ -988,7 +999,7 @@ if err != nil {
 return paymentClient.Charge(ctx, order.Total)
 ```
 
-### Not passing context to transaction operations
+### 7i. Anti-Pattern — Omitting Context in Transaction Operations
 
 Every operation inside a transaction must use the same context that governs the
 transaction's deadline. Dropping context inside a transaction means individual

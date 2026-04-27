@@ -18,33 +18,66 @@
 - ALWAYS trace ALL callers when refactoring Go config structs or YAML mappings
 - ALWAYS account for HTML-encoded entities in test assertions for HTML output
 - ALWAYS enforce exact-match test assertions — never substring matching
-- ALWAYS use LSP (`mcp__gomcp__lsp_*`) ahead of Grep/Glob for Go code navigation
-- FALLBACK to Grep only for non-code text or when `gomcp` MCP server is unavailable
+- ALWAYS call `mcp__gomcp__ping` before any investigation to confirm MCP is available
+- ALWAYS use MCP tools ahead of Bash for all code navigation, file search, and content search — bash find/grep/cat are last resort only
+- NEVER use bash `grep`, `find`, or `Read` on `.decisions/` files when MCP is available
+- NEVER load a full `.decisions/` file via `Read` — always use the section-aware tools below
+
+**Go symbol navigation — in order:**
+1. `mcp__gomcp__lsp_workspace_symbols` — find any symbol by name (fast, indexed)
+2. `mcp__gomcp__lsp_definition` — jump to the definition of a known symbol
+3. `mcp__gomcp__lsp_find_references` — find all callers / implementors
+4. `mcp__gomcp__lsp_file_symbols` — list all symbols in a specific file
+
+**File and content search:**
+- `mcp__gomcp__find_files` for file name lookup (never `find`)
+- `mcp__gomcp__grep` for content search — smart-case, regex-capable (never bash `grep`)
+- `mcp__gomcp__multi_grep` for OR-logic multi-pattern search in a single call
+
+**Governance docs — in order:**
+1. `mcp__gomcp__decisions_list` — discover docs and their section index
+2. `mcp__gomcp__decisions_search` — locate relevant sections by keyword
+3. `mcp__gomcp__decisions_read` — read a specific section: `section: "5a"` (not the full doc)
+
+- FALLBACK to bash grep/find only for non-code text or when `gomcp` MCP server is confirmed unavailable
 
 ---
 
 ## Guide Index
 > Before writing code, depending on the requirement consult:
-- [`ARCHITECTURE_GUIDE.md`](.decisions/ARCHITECTURE_GUIDE.md): project structure, dependency injection, routing, server design, graceful shutdown, and design patterns.
-- [`DESIGN_PATTERNS.md`](.decisions/DESIGN_PATTERNS.md): handler, middleware, service, logging, error taxonomy, validation, testing, and resilience patterns.
-- [`CODE_REVIEW.md`](.decisions/CODE_REVIEW.md): review checklists, severity calibration, verification protocol, and valid patterns.
-- [`DATA_STORAGE.md`](.decisions/DATA_STORAGE.md): driver selection, connection pooling, migrations, transactions, and the repository pattern.
-- [`WEB_DESIGN.md`](.decisions/WEB_DESIGN.md): concurrency, worker pools, rate limiting, race detection, and runtime safety.
-- [`UI_GUIDE.md`](.decisions/UI_GUIDE.md): defines how UI should be designed and composed.
+- [`ARCHITECTURE_GUIDE.md`](.decisions/ARCHITECTURE_GUIDE.md): project structure, dependency injection, routing, server design, graceful shutdown
+- [`CODE_REVIEW.md`](.decisions/CODE_REVIEW.md): review checklists, severity calibration, verification protocol, valid patterns
+- [`DATA_STORAGE.md`](.decisions/DATA_STORAGE.md): driver selection, connection pooling, migrations, transactions, repository pattern
+- [`ERROR_HANDLING.md`](.decisions/ERROR_HANDLING.md): AppHandler pattern, error taxonomy, panic policy, recovery middleware, retry and resilience
+- [`HANDLER_TESTING.md`](.decisions/HANDLER_TESTING.md): httptest, table-driven tests, middleware testing, integration tests, golden files
+- [`INPUT_VALIDATION.md`](.decisions/INPUT_VALIDATION.md): custom validators, cross-field validation, error formatting, body size limiting
+- [`MIDDLEWARE_AND_CONTEXT.md`](.decisions/MIDDLEWARE_AND_CONTEXT.md): middleware chains, context propagation, request IDs, multi-tenant context
+- [`PRODUCTION_GO_RULES.md`](.decisions/PRODUCTION_GO_RULES.md): five rules of production Go — zero globals, explicit errors, validation first, testability, documentation
+- [`STRUCTURED_LOGGING.md`](.decisions/STRUCTURED_LOGGING.md): slog setup, log levels, logging middleware, child loggers
+- [`UI_GUIDE.md`](.decisions/UI_GUIDE.md): visual design, component library, view composition
+- [`WEB_DESIGN.md`](.decisions/WEB_DESIGN.md): concurrency, worker pools, rate limiting, race detection, runtime safety
+- [`AGENT_GUIDE.md`](.decisions/AGENT_GUIDE.md): document structure rules for MCP efficiency
 
 ---
 
-## MCP Server — gomcp (LSP)
+## MCP Server — gomcp
 
-Registered in `.mcp.json`. Available in all agents. Prefer over Grep/Glob for Go.
+Registered in `.mcp.json`. Available in all agents. Source lives in `starter/docker/mcp/`. Start with `task mcp:up`.
 
 | Tool | Use |
 |------|-----|
-| `mcp__gomcp__lsp_workspace_symbols` | Find types, functions, interfaces by name |
+| `mcp__gomcp__ping` | Verify server availability |
+| `mcp__gomcp__lsp_workspace_symbols` | Find types, functions, interfaces by name (indexed, fast) |
 | `mcp__gomcp__lsp_find_references` | All callers / all implementors |
 | `mcp__gomcp__lsp_definition` | Jump to any symbol definition |
-| `mcp__gomcp__lsp_document_symbols` | Inventory all symbols in a file |
-| `mcp__gomcp__ping` | Verify server availability |
+| `mcp__gomcp__lsp_file_symbols` | List symbols in a Go file by path — preferred over `lsp_document_symbols` |
+| `mcp__gomcp__lsp_document_symbols` | List symbols from arbitrary Go source content |
+| `mcp__gomcp__decisions_list` | List governing docs with section index — start here |
+| `mcp__gomcp__decisions_read` | Read a doc or a specific section (`section: "5a"`) |
+| `mcp__gomcp__decisions_search` | Search all governing docs by keyword |
+| `mcp__gomcp__find_files` | Fuzzy file name search across workspace |
+| `mcp__gomcp__grep` | Smart-case content search (lowercase = case-insensitive) |
+| `mcp__gomcp__multi_grep` | OR-logic multi-pattern content search |
 
 ---
 

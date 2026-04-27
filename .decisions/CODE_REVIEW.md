@@ -1,6 +1,6 @@
 ---
 title: Code Review Standards
-description: Governing document for Go code review checklists, severity calibration, verification protocol, and valid patterns.
+description: "code review workflow, pre-review checklist, error handling review, concurrency review, interface and type review, resource lifecycle review, naming conventions, security review checklist, performance review, severity calibration, critical block-merge, major should-fix, minor, verification protocol, valid patterns, anti-patterns, architecture compliance"
 weight: 30
 ---
 
@@ -18,9 +18,22 @@ weight: 30
 
 ---
 
+## 0. Quick Reference
+
+- §1 Review workflow: pre-review prep, during review process, output format
+- §2 Review checklists: error handling, concurrency, interfaces, resources, naming, security, performance
+- §3 Common mistakes: resource leaks, naming violations, sync misuse, anti-patterns
+- §4 Severity calibration: critical (block merge), major (should fix), minor, informational
+- §5 Verification protocol: general rules, by issue type, checklist
+- §6 Valid patterns: patterns that look wrong but are correct — do NOT flag
+- §7 Context-sensitive rules: when standard rules have exceptions
+- §8 Architecture and layer compliance checks
+
+---
+
 ## 1. Review Workflow
 
-### 1.1 Before reviewing
+### 1a. Pre-Review Preparation Steps
 
 1. **Check `go.mod` for the Go version.** The Go version determines which
    patterns are applicable:
@@ -37,14 +50,14 @@ weight: 30
 
 4. **Verify every finding** against the protocol in section 5 before reporting.
 
-### 1.2 During review
+### 1b. During Review Process
 
 - Review one checklist category at a time. Do not mix concerns.
 - For each potential issue, read the full function and its callers before
   writing a comment.
 - Classify every finding by severity (section 4) in the report.
 
-### 1.3 Output format
+### 1c. Review Output Format and Comment Structure
 
 Report each finding as:
 
@@ -60,7 +73,7 @@ Group findings by file, then by severity (critical first).
 
 ## 2. Review Checklists
 
-### 2.1 Error Handling
+### 2a. Error Handling Review Checklist
 
 - [ ] All errors checked (no `_ = err` without a justifying comment)
 - [ ] Errors wrapped with context (`fmt.Errorf("pkg: op: %w", err)`)
@@ -119,7 +132,7 @@ if err != nil {
 }
 ```
 
-### 2.2 Concurrency
+### 2b. Concurrency Safety Review Checklist
 
 - [ ] No goroutine leaks (context cancellation or shutdown signal exists)
 - [ ] Channels closed by sender only, exactly once
@@ -186,7 +199,7 @@ go func() {
 }()
 ```
 
-### 2.3 Interfaces and Types
+### 2c. Interface and Type Design Review
 
 - [ ] Interfaces defined by consumers, not producers
 - [ ] Interface names follow `-er` convention where possible
@@ -221,7 +234,7 @@ func Process(data interface{}) {}
 func Process(data any) {}
 ```
 
-### 2.4 Resources and Lifecycle
+### 2d. Resource and Lifecycle Management Review
 
 - [ ] Resources closed with `defer` immediately after creation
 - [ ] HTTP response bodies always closed
@@ -273,7 +286,7 @@ for _, f := range files {
 }
 ```
 
-### 2.5 Naming and Style
+### 2e. Naming Conventions and Style Review
 
 - [ ] Exported names have doc comments
 - [ ] No stuttering names (`user.UserService` should be `user.Service`)
@@ -341,7 +354,7 @@ if cfg.HeaderName == "" {
 cfg.HeaderName = cmp.Or(cfg.HeaderName, "X-CSRF-Token")
 ```
 
-### 2.6 Security
+### 2f. Security Review Checklist
 
 - [ ] No secrets, API keys, or credentials hardcoded in source
 - [ ] User input validated at system boundaries
@@ -354,7 +367,7 @@ cfg.HeaderName = cmp.Or(cfg.HeaderName, "X-CSRF-Token")
 - [ ] CSRF tokens validated on state-changing requests
 - [ ] No `//nolint` directives without an accompanying reason
 
-### 2.7 Performance
+### 2g. Performance and Allocation Review
 
 - [ ] No string concatenation with `+=` in loops (use `strings.Builder`)
 - [ ] Slices preallocated only when capacity is known at call site
@@ -392,7 +405,7 @@ if len(items) > 0 {
 }
 ```
 
-### 2.8 Function and Type Design
+### 2h. Function and Type Design Review
 
 - [ ] Functions focused on one job with obvious happy path
 - [ ] Early returns preferred over nested branching
@@ -406,7 +419,7 @@ if len(items) > 0 {
 
 ## 3. Common Mistakes Reference
 
-### 3.1 Resource Leaks
+### 3a. Resource Leak Patterns
 
 | Mistake | Fix |
 |---|---|
@@ -415,7 +428,7 @@ if len(items) > 0 {
 | HTTP response body not closed | `defer resp.Body.Close()` after error check |
 | Database rows not closed | `defer rows.Close()` after error check |
 
-### 3.2 Naming Violations
+### 3b. Naming Convention Violations
 
 | Mistake | Fix |
 |---|---|
@@ -424,7 +437,7 @@ if len(items) > 0 {
 | Naked returns in functions > 5 lines | Use explicit return values |
 | Package named `util`, `helper`, `common` | Rename to what it provides |
 
-### 3.3 Initialization Anti-Patterns
+### 3c. Initialization Anti-Patterns
 
 | Mistake | Fix |
 |---|---|
@@ -432,7 +445,7 @@ if len(items) > 0 {
 | Global mutable state | Pass via constructor injection |
 | Package-level infrastructure initialization | Initialize in composition root, inject as dependency |
 
-### 3.4 Structured Logging (Go 1.21+)
+### 3d. Structured Logging Mistakes
 
 ```go
 // Bad: unstructured log
@@ -445,7 +458,7 @@ slog.ErrorContext(ctx, "user: save",
 )
 ```
 
-### 3.5 Testing
+### 3e. Testing Mistakes
 
 | Mistake | Fix |
 |---|---|
@@ -457,7 +470,7 @@ slog.ErrorContext(ctx, "user: save",
 | Missing sentinel tests | Every exported sentinel has a test triggering the condition and asserting `errors.Is` |
 | Missing handler error path tests | Every error path in a handler has a dedicated test case |
 
-### 3.6 Sync Misuse
+### 3f. Sync Primitive Misuse
 
 ```go
 // Bad: storing a pointer in sync.Pool (pointer to local may escape)
@@ -467,7 +480,7 @@ pool.Put(&buf)
 pool.Put(buf)
 ```
 
-### 3.7 Functional Options
+### 3g. Functional Options Misuse
 
 ```go
 // Good: functional options for optional configuration
@@ -488,7 +501,7 @@ func New(opts ...Option) *Service {
 }
 ```
 
-### 3.8 Structural Anti-Patterns
+### 3h. Structural Anti-Patterns
 
 | Mistake | Fix |
 |---|---|
@@ -505,7 +518,7 @@ func New(opts ...Option) *Service {
 
 ## 4. Severity Calibration
 
-### Critical (Block Merge)
+### 4a. Critical Severity — Block Merge
 
 These findings represent correctness, safety, or security defects that must be
 resolved before the code is merged:
@@ -519,7 +532,7 @@ resolved before the code is merged:
 - Panic for recoverable errors in library code
 - Non-idempotent operation retried without idempotency key
 
-### Major (Should Fix)
+### 4b. Major Severity — Should Fix Before Merge
 
 These findings represent significant quality or maintainability issues that
 should be fixed in the current review cycle:
@@ -534,7 +547,7 @@ should be fixed in the current review cycle:
 - Missing `defer` for resource cleanup
 - `*web.Error` constructed with struct literal outside `pkg/web`
 
-### Minor (Consider Fixing)
+### 4c. Minor Severity — Consider Fixing
 
 These findings are style or minor quality issues. Fix if convenient; acceptable
 to defer:
@@ -547,7 +560,7 @@ to defer:
 - Verbose nil-and-length checks
 - Switch arms with identical bodies not merged
 
-### Informational (Note Only)
+### 4d. Informational — Note Only
 
 These are observations, not defects. They do not require action in the current
 review:
@@ -565,7 +578,7 @@ review:
 Every finding must be verified before it is reported. False positives erode
 trust in reviews and waste reviewer and author time.
 
-### 5.1 General Verification Rules
+### 5a. General Verification Rules
 
 Before reporting any issue:
 
@@ -584,7 +597,7 @@ Before reporting any issue:
    deliberate. Check comments, commit messages, and related code before
    reporting.
 
-### 5.2 Verification by Issue Type
+### 5b. Verification Steps by Issue Type
 
 **"Unused Variable/Function"**
 - Search all references across the workspace (not just the current file)
@@ -612,7 +625,7 @@ Before reporting any issue:
 - Verify the impact is measurable, not theoretical
 - Check if the current approach is intentional for readability
 
-### 5.3 Verification Checklist
+### 5c. Pre-Report Verification Checklist
 
 Before adding a finding to the report, answer all applicable questions:
 
