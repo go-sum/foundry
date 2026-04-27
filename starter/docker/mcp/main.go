@@ -1274,7 +1274,10 @@ func resolveWorkspace(param string) string {
 	if param != "" {
 		return param
 	}
-	return "/workspace"
+	if ws := os.Getenv("WORKSPACE"); ws != "" {
+		return ws
+	}
+	return "/src/foundry"
 }
 
 // --- Decision document handlers ----------------------------------------------
@@ -1491,7 +1494,7 @@ func handleDecisionsSearch(docs []DecisionDoc) func(context.Context, *mcp.CallTo
 // --- Main --------------------------------------------------------------------
 
 func main() {
-	workspace := "/workspace"
+	workspace := resolveWorkspace("")
 
 	idx := newWorkspaceIndex(workspace, 30*time.Second)
 

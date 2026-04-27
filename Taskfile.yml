@@ -59,7 +59,7 @@ tasks:
     cmds:
       - docker build -f starter/docker/mcp/gomcp.dockerfile -t go-mcp starter/docker/mcp/
       - docker rm -f go-mcp 2>/dev/null || true
-      - docker run -d --name go-mcp -p 8086:8086 -v "$(pwd):/workspace:ro" go-mcp
+      - docker run -d --name go-mcp -p 8086:8086 -v "{{.USER_WORKING_DIR}}:/src/{{base .USER_WORKING_DIR}}:ro" -e WORKSPACE=/src/{{base .USER_WORKING_DIR}} go-mcp
 
   mcp:down:
     desc: "Stop and remove the gomcp MCP server"

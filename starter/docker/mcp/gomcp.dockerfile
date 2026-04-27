@@ -2,7 +2,7 @@
 # Build context: starter/docker/mcp/
 # Via task:      task mcp:up   (from repo root)
 # Manual:        docker build -f gomcp.dockerfile -t go-mcp .
-#                docker run -d --name go-mcp -p 8086:8086 -v /path/to/workspace:/workspace:ro go-mcp
+#                docker run -d --name go-mcp -p 8086:8086 -v /path/to/project:/src/project:ro -e WORKSPACE=/src/project go-mcp
 
 ARG PORT=8086
 
