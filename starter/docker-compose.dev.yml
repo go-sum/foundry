@@ -39,7 +39,7 @@ services:
     volumes:
       - ../:/app
     working_dir: /app/${PROJECT_NAME}
-    restart: "no"
+    restart: on-failure:7
     networks:
       - app_net
       - proxy_net
