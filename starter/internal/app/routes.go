@@ -6,12 +6,11 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-sum/foundry/internal/features/home"
+	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/auth/provider"
 	"github.com/go-sum/foundry/pkg/docs"
-	"github.com/go-sum/foundry/internal/features/hello"
-	"github.com/go-sum/foundry/internal/features/home"
-	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/pkg/showcase/componentry"
 	showcasedb "github.com/go-sum/foundry/pkg/showcase/db"
 	showcasekv "github.com/go-sum/foundry/pkg/showcase/kv"
@@ -98,14 +97,25 @@ const (
 )
 
 func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site.Site, pres Presentation) error {
-	homeH := home.NewHandler(rt, pres.ViewOpts...)
-	helloH := hello.NewHandler(rt, pres.ViewOpts...)
+	var serviceChecks []home.Checker
+	if svc.DBPool != nil {
+		serviceChecks = append(serviceChecks, home.Checker{
+			Name: "Database",
+			Fn:   func(ctx context.Context) error { return svc.DBPool.Ping(ctx) },
+		})
+	}
+	if svc.KVStore != nil {
+		serviceChecks = append(serviceChecks, home.Checker{
+			Name: "KV Store",
+			Fn:   svc.KVStore.Ping,
+		})
+	}
+	homeH := home.NewHandler(serviceChecks, pres.ViewOpts...)
 	metaH := site.NewHandlers(s, rt,
 		site.RobotsConfig{DefaultAllow: true},
 		site.SitemapConfig{
 			Routes: []site.RouteEntry{
 				{Name: "home.show"},
-				{Name: "hello.greeting"},
 				{Name: "demos.showcase"},
 				{Name: "contact.form"},
 			},
@@ -141,8 +151,6 @@ func registerPublicRoutes(rt *router.Router, sec Security, svc Services, s *site
 				router.GET("/robots.txt", "meta.robots", metaH.RobotsTxt),
 				router.GET("/sitemap.xml", "meta.sitemap", metaH.SitemapXML),
 				router.GET("/", "home.show", homeH.Show),
-				router.GET("/hello/greeting", "hello.greeting", helloH.Greeting),
-				router.GET("/hello/{name}", "hello.show", helloH.Show),
 				router.GET("/contact", "contact.form", contactForm),
 				router.POST("/contact", "contact.submit", contactSubmit),
 				router.Group("/account",

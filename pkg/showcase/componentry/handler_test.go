@@ -122,6 +122,41 @@ func TestHandler_Show_PageFuncErrorPropagates(t *testing.T) {
 }
 
 // ──────────────────────────────────────────────
+// Preview
+// ──────────────────────────────────────────────
+
+func TestHandler_Preview(t *testing.T) {
+	tests := []struct {
+		name    string
+		query   string
+		want    string
+	}{
+		{"typed text is reflected", "/demo/preview?text=Hello+HTMX", "Hello HTMX"},
+		{"typed text includes character count", "/demo/preview?text=Hi", "2 characters"},
+		{"empty text renders prompt", "/demo/preview", "Start typing"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := newTestHandler()
+			c := newCtx(t, http.MethodGet, tc.query)
+
+			resp, err := handler.Preview(c)
+			if err != nil {
+				t.Fatalf("Preview: unexpected error: %v", err)
+			}
+			if resp.Status != http.StatusOK {
+				t.Errorf("Preview: status = %d, want %d", resp.Status, http.StatusOK)
+			}
+			body := readBody(t, resp)
+			if !strings.Contains(body, tc.want) {
+				t.Errorf("Preview: body missing %q\nbody: %s", tc.want, body)
+			}
+		})
+	}
+}
+
+// ──────────────────────────────────────────────
 // Search
 // ──────────────────────────────────────────────
 
@@ -286,50 +321,44 @@ func TestHandler_Paginate(t *testing.T) {
 // OOBToast
 // ──────────────────────────────────────────────
 
-func TestHandler_OOBToast_ReturnsOK(t *testing.T) {
-	h := newTestHandler()
-	c := newCtx(t, http.MethodGet, "/demo/oob-toast")
+func TestHandler_OOBToast(t *testing.T) {
+	tests := []struct {
+		name      string
+		query     string
+		wantTitle string
+	}{
+		{"no variant defaults to default", "/demo/oob-toast", "Event created"},
+		{"explicit default", "/demo/oob-toast?variant=default", "Event created"},
+		{"success", "/demo/oob-toast?variant=success", "Success"},
+		{"error", "/demo/oob-toast?variant=error", "Error"},
+		{"warning", "/demo/oob-toast?variant=warning", "Warning"},
+		{"info", "/demo/oob-toast?variant=info", "Info"},
+		{"unknown variant falls back to default", "/demo/oob-toast?variant=bogus", "Event created"},
+	}
 
-	resp, err := h.OOBToast(c)
-	if err != nil {
-		t.Fatalf("OOBToast: unexpected error: %v", err)
-	}
-	if resp.Status != http.StatusOK {
-		t.Errorf("OOBToast: status = %d, want %d", resp.Status, http.StatusOK)
-	}
-	body := readBody(t, resp)
-	if body == "" {
-		t.Error("OOBToast: response body is empty")
-	}
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := newTestHandler()
+			c := newCtx(t, http.MethodGet, tc.query)
 
-// OOBToast must include the hx-swap-oob attribute so HTMX processes it out-of-band.
-func TestHandler_OOBToast_ContainsOOBAttr(t *testing.T) {
-	h := newTestHandler()
-	c := newCtx(t, http.MethodGet, "/demo/oob-toast")
-
-	resp, err := h.OOBToast(c)
-	if err != nil {
-		t.Fatalf("OOBToast: unexpected error: %v", err)
-	}
-	body := readBody(t, resp)
-	if !strings.Contains(body, "hx-swap-oob") {
-		t.Errorf("OOBToast: body missing hx-swap-oob attribute\nbody: %s", body)
-	}
-}
-
-// OOBToast must include the toast success message.
-func TestHandler_OOBToast_ContainsSavedText(t *testing.T) {
-	h := newTestHandler()
-	c := newCtx(t, http.MethodGet, "/demo/oob-toast")
-
-	resp, err := h.OOBToast(c)
-	if err != nil {
-		t.Fatalf("OOBToast: unexpected error: %v", err)
-	}
-	body := readBody(t, resp)
-	if !strings.Contains(body, "Saved!") {
-		t.Errorf("OOBToast: body missing expected title %q\nbody: %s", "Saved!", body)
+			resp, err := handler.OOBToast(c)
+			if err != nil {
+				t.Fatalf("OOBToast: unexpected error: %v", err)
+			}
+			if resp.Status != http.StatusOK {
+				t.Errorf("OOBToast: status = %d, want %d", resp.Status, http.StatusOK)
+			}
+			body := readBody(t, resp)
+			if !strings.Contains(body, "hx-swap-oob") {
+				t.Errorf("OOBToast: body missing hx-swap-oob\nbody: %s", body)
+			}
+			if !strings.Contains(body, "data-controller") {
+				t.Errorf("OOBToast: body missing data-controller\nbody: %s", body)
+			}
+			if !strings.Contains(body, tc.wantTitle) {
+				t.Errorf("OOBToast: body missing title %q\nbody: %s", tc.wantTitle, body)
+			}
+		})
 	}
 }
 

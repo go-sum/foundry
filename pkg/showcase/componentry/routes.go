@@ -24,6 +24,7 @@ func Routes(cfg Config) []router.Node {
 	return []router.Node{
 		router.Group(cfg.BasePath,
 			router.GET("/components", "demos.showcase", h.Show),
+			router.GET("/demo/preview", "demos.preview", h.Preview),
 			router.GET("/demo/search", "demos.search", h.Search),
 			router.GET("/demo/validate", "demos.validate", h.Validate),
 			router.GET("/demo/paginate", "demos.paginate", h.Paginate),

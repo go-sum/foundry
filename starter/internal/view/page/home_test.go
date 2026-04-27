@@ -10,12 +10,10 @@ import (
 
 func TestHomePage(t *testing.T) {
 	req := view.Request{}
-	got := render.RenderNode(t, HomePage(req, "/hello/World"))
+	got := render.RenderNode(t, HomePage(req, nil))
 
 	themeScript := render.RenderNode(t, theme.InitScript())
 	const selectorScript = `<script src="/js/componentry.min.js" defer></script>`
-
-	const btnClass = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] cursor-pointer bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
 
 	want := `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Home</title>` +
 		`<meta name="viewport" content="width=device-width, initial-scale=1">` +
@@ -32,7 +30,6 @@ func TestHomePage(t *testing.T) {
 		`<h1 class="text-2xl font-bold">Welcome to Foundry</h1>` +
 		`<p class="mx-auto max-w-2xl text-sm text-muted-foreground">A Go web application built on W3C Web API primitives.</p>` +
 		`</div>` +
-		`<div class="flex flex-col gap-3 sm:flex-row"><a class="` + btnClass + `" href="/hello/World">Get Started</a></div>` +
 		`</div>` +
 		`</main>` +
 		selectorScript + `</body></html>`
@@ -42,15 +39,67 @@ func TestHomePage(t *testing.T) {
 	}
 }
 
-func TestHomeContent(t *testing.T) {
+func TestHomeContent_NoServices(t *testing.T) {
 	req := view.Request{}
-	got := render.RenderNode(t, HomeContent(req, "/hello/World"))
+	got := render.RenderNode(t, HomeContent(req, nil))
 
-	const btnClass = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] cursor-pointer bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
-
-	want := `<div class="mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 py-24 text-center"><div class="space-y-4"><p class="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Go Web Starter</p><h1 class="text-2xl font-bold">Welcome to Foundry</h1><p class="mx-auto max-w-2xl text-sm text-muted-foreground">A Go web application built on W3C Web API primitives.</p></div><div class="flex flex-col gap-3 sm:flex-row"><a class="` + btnClass + `" href="/hello/World">Get Started</a></div></div>`
+	want := `<div class="mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 py-24 text-center">` +
+		`<div class="space-y-4">` +
+		`<p class="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Go Web Starter</p>` +
+		`<h1 class="text-2xl font-bold">Welcome to Foundry</h1>` +
+		`<p class="mx-auto max-w-2xl text-sm text-muted-foreground">A Go web application built on W3C Web API primitives.</p>` +
+		`</div>` +
+		`</div>`
 
 	if got != want {
 		t.Errorf("HomeContent output mismatch\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestHomeContent_HealthyService(t *testing.T) {
+	req := view.Request{}
+	got := render.RenderNode(t, HomeContent(req, []ServiceStatus{{Name: "Database", Healthy: true}}))
+
+	want := `<div class="mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 py-24 text-center">` +
+		`<div class="space-y-4">` +
+		`<p class="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Go Web Starter</p>` +
+		`<h1 class="text-2xl font-bold">Welcome to Foundry</h1>` +
+		`<p class="mx-auto max-w-2xl text-sm text-muted-foreground">A Go web application built on W3C Web API primitives.</p>` +
+		`</div>` +
+		`<div class="flex flex-wrap gap-3 justify-center">` +
+		`<div class="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm shadow-sm">` +
+		`<span class="size-2 rounded-full bg-green-500"></span>` +
+		`<span class="font-medium text-foreground">Database</span>` +
+		`<span class="text-muted-foreground">Healthy</span>` +
+		`</div>` +
+		`</div>` +
+		`</div>`
+
+	if got != want {
+		t.Errorf("HomeContent healthy output mismatch\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestHomeContent_UnhealthyService(t *testing.T) {
+	req := view.Request{}
+	got := render.RenderNode(t, HomeContent(req, []ServiceStatus{{Name: "Database", Healthy: false}}))
+
+	want := `<div class="mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 py-24 text-center">` +
+		`<div class="space-y-4">` +
+		`<p class="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Go Web Starter</p>` +
+		`<h1 class="text-2xl font-bold">Welcome to Foundry</h1>` +
+		`<p class="mx-auto max-w-2xl text-sm text-muted-foreground">A Go web application built on W3C Web API primitives.</p>` +
+		`</div>` +
+		`<div class="flex flex-wrap gap-3 justify-center">` +
+		`<div class="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm shadow-sm">` +
+		`<span class="size-2 rounded-full bg-red-500"></span>` +
+		`<span class="font-medium text-foreground">Database</span>` +
+		`<span class="text-muted-foreground">Unavailable</span>` +
+		`</div>` +
+		`</div>` +
+		`</div>`
+
+	if got != want {
+		t.Errorf("HomeContent unhealthy output mismatch\ngot:  %s\nwant: %s", got, want)
 	}
 }

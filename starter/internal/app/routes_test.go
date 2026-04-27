@@ -100,8 +100,6 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 		{name: "meta.sitemap", want: "/sitemap.xml"},
 		{name: "health.check", want: "/healthz"},
 		{name: "home.show", want: "/"},
-		{name: "hello.greeting", want: "/hello/greeting"},
-		{name: "hello.show", params: map[string]string{"name": "Alice"}, want: "/hello/Alice"},
 		{name: "docs.index", want: "/docs"},
 		{name: "docs.show", params: map[string]string{"path": "guide/intro"}, want: "/docs/guide/intro"},
 	}

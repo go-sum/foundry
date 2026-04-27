@@ -2,26 +2,39 @@
 package home
 
 import (
+	"context"
+
 	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/internal/view/page"
 	"github.com/go-sum/foundry/pkg/web"
-	"github.com/go-sum/foundry/pkg/web/router"
 )
+
+// Checker describes a service whose health is shown on the home page.
+type Checker struct {
+	Name string
+	Fn   func(ctx context.Context) error
+}
 
 // Handler serves the home page.
 type Handler struct {
-	rt      *router.Router
-	reqOpts []view.RequestOption
+	checkers []Checker
+	reqOpts  []view.RequestOption
 }
 
 // NewHandler creates a new home Handler.
-func NewHandler(rt *router.Router, opts ...view.RequestOption) *Handler {
-	return &Handler{rt: rt, reqOpts: opts}
+func NewHandler(checkers []Checker, opts ...view.RequestOption) *Handler {
+	return &Handler{checkers: checkers, reqOpts: opts}
 }
 
-// Show renders the home page with HTMX dual-mode support.
+// Show renders the home page with live health status for each configured service.
 func (h *Handler) Show(c *web.Context) (web.Response, error) {
-	helloURL := h.rt.MustReverse("hello.show", map[string]string{"name": "World"})
+	var statuses []page.ServiceStatus
+	for _, ch := range h.checkers {
+		statuses = append(statuses, page.ServiceStatus{
+			Name:    ch.Name,
+			Healthy: ch.Fn(c.Context()) == nil,
+		})
+	}
 	vr := view.NewRequest(c, h.reqOpts...)
-	return view.Render(vr, page.HomePage(vr, helloURL), page.HomeContent(vr, helloURL))
+	return view.Render(vr, page.HomePage(vr, statuses), page.HomeContent(vr, statuses))
 }

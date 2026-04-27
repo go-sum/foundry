@@ -12,6 +12,12 @@ type handler struct{ cfg Config }
 
 func newHandler(cfg Config) *handler { return &handler{cfg: cfg} }
 
+// Preview returns a text preview fragment for the value passed as ?text=.
+func (h *handler) Preview(c *web.Context) (web.Response, error) {
+	text := c.URL().Query().Get("text")
+	return render.Fragment(demo.Preview(text))
+}
+
 // Show renders the component showcase full page.
 func (h *handler) Show(c *web.Context) (web.Response, error) {
 	return h.cfg.Page(c, "Component Showcase", Showcase(h.cfg.Icons, demo.NewPaths(h.cfg.BasePath)))
@@ -42,10 +48,12 @@ func (h *handler) Paginate(c *web.Context) (web.Response, error) {
 	return render.Fragment(demo.PaginatedTable(page, perPage, demo.NewPaths(h.cfg.BasePath).Paginate))
 }
 
-// OOBToast returns an out-of-band toast fragment. The trigger must use
-// hx-swap="none" so HTMX processes only the OOB element in the response.
+// OOBToast returns an out-of-band toast fragment. Accepts ?variant= (success,
+// error, warning, info, default). The trigger must use hx-swap="none" so HTMX
+// processes only the OOB element in the response.
 func (h *handler) OOBToast(c *web.Context) (web.Response, error) {
-	return render.Fragment(demo.OOBToast())
+	variant := c.URL().Query().Get("variant")
+	return render.Fragment(demo.OOBToast(variant))
 }
 
 // Region returns a select fragment of regions for the given country ID.

@@ -479,20 +479,23 @@ func Showcase(r *icons.Registry, paths demo.Paths) g.Node {
 		// ── HTMX Patterns ───────────────────────────────
 		section("htmx-patterns", "HTMX Patterns",
 			h.Div(h.Class("grid gap-4 md:grid-cols-2"),
-				example("htmx-search", "Live search input",
-					// src:htmx-search
+				example("htmx-preview", "Live text preview",
+					// src:htmx-preview
 					h.Div(
+						h.Class("space-y-3"),
 						uiform.Input(uiform.InputProps{
-							ID:          "search-users",
-							Name:        "q",
-							Placeholder: "Search users...",
+							ID:          "preview-input",
+							Name:        "text",
+							Placeholder: "Type something…",
 							Extra: htmx.Attrs(htmx.AttrsProps{
-								Get:     paths.Search,
-								Target:  "#search-results",
-								Trigger: "input changed delay:300ms",
+								Get:     paths.Preview,
+								Target:  "#preview-output",
+								Trigger: "keyup changed delay:200ms",
+								Swap:    "innerHTML",
+								Include: "this",
 							}),
 						}),
-						h.Div(h.ID("search-results")),
+						h.Div(h.ID("preview-output"), demo.Preview("")),
 					),
 					// src:end
 					capHTMX,
@@ -511,6 +514,24 @@ func Showcase(r *icons.Registry, paths demo.Paths) g.Node {
 							}),
 						}),
 						h.Div(h.ID("validate-field")),
+					),
+					// src:end
+					capHTMX,
+				),
+				example("htmx-search", "Live search input",
+					// src:htmx-search
+					h.Div(
+						uiform.Input(uiform.InputProps{
+							ID:          "search-users",
+							Name:        "q",
+							Placeholder: "Search users...",
+							Extra: htmx.Attrs(htmx.AttrsProps{
+								Get:     paths.Search,
+								Target:  "#search-results",
+								Trigger: "input changed delay:300ms",
+							}),
+						}),
+						h.Div(h.ID("search-results")),
 					),
 					// src:end
 					capHTMX,
@@ -567,15 +588,30 @@ func Showcase(r *icons.Registry, paths demo.Paths) g.Node {
 							h.Code(h.Class("font-mono"), g.Text("hx-swap-oob")),
 							g.Text(" so it is appended to the fixed #toast-container regardless of the primary swap target."),
 						),
-						core.Button(core.ButtonProps{
-							Label:   "Trigger OOB toast",
-							Variant: core.VariantOutline,
-							Size:    core.SizeSm,
-							Extra: htmx.Attrs(htmx.AttrsProps{
-								Get:  paths.OOBToast,
-								Swap: htmx.SwapNone,
+						h.Div(
+							h.Class("flex items-end gap-3"),
+							uiform.Select(uiform.SelectProps{
+								ID:   "oob-toast-variant",
+								Name: "variant",
+								Options: []uiform.Option{
+									{Value: "default", Label: "Default"},
+									{Value: "success", Label: "Success"},
+									{Value: "error", Label: "Error"},
+									{Value: "warning", Label: "Warning"},
+									{Value: "info", Label: "Info"},
+								},
 							}),
-						}),
+							core.Button(core.ButtonProps{
+								Label:   "Trigger OOB toast",
+								Variant: core.VariantOutline,
+								Size:    core.SizeSm,
+								Extra: htmx.Attrs(htmx.AttrsProps{
+									Get:     paths.OOBToast,
+									Swap:    htmx.SwapNone,
+									Include: "#oob-toast-variant",
+								}),
+							}),
+						),
 					),
 					// src:end
 					capHTMX,

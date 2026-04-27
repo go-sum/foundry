@@ -23,6 +23,7 @@ import (
 // Construct one with NewPaths so the values stay consistent with whatever
 // BasePath the showcase is mounted at.
 type Paths struct {
+	Preview  string
 	Search   string
 	Validate string
 	Paginate string
@@ -33,6 +34,7 @@ type Paths struct {
 // NewPaths derives all demo endpoint paths from basePath (e.g. "/showcase/componentry").
 func NewPaths(basePath string) Paths {
 	return Paths{
+		Preview:  basePath + "/demo/preview",
 		Search:   basePath + "/demo/search",
 		Validate: basePath + "/demo/validate",
 		Paginate: basePath + "/demo/paginate",
@@ -41,22 +43,58 @@ func NewPaths(basePath string) Paths {
 	}
 }
 
-// OOBToast returns a success toast fragment with an hx-swap-oob attribute that
-// instructs HTMX to append it to #toast-container out-of-band, independent of
-// the primary swap target. The endpoint returns this as the entire response body
-// alongside hx-swap="none" on the trigger so the primary target is untouched.
-func OOBToast() g.Node {
-	return feedback.Toast(feedback.ToastProps{
-		Title:       "Saved!",
-		Description: "Changes saved in the background.",
-		Variant:     feedback.ToastSuccess,
-		Dismissible: true,
-		Extra: []g.Node{
-			g.Attr("hx-swap-oob", "beforeend:#toast-container"),
-			g.Attr("data-controller", "toast"),
-			g.Attr("data-toast-duration", "5000"),
-		},
-	})
+// Preview returns a fragment reflecting text back with its character count.
+// An empty input renders a prompt so the target div is never blank.
+func Preview(text string) g.Node {
+	if text == "" {
+		return h.P(
+			h.Class("text-sm text-muted-foreground italic"),
+			g.Text("Start typing to see the server response."),
+		)
+	}
+	return h.Div(
+		h.P(h.Class("text-sm text-foreground"), g.Text(text)),
+		h.P(h.Class("text-xs text-muted-foreground mt-1"),
+			g.Textf("%d characters", len([]rune(text))),
+		),
+	)
+}
+
+type oobToastConfig struct {
+	variant     feedback.ToastVariant
+	title       string
+	description string
+}
+
+var oobToastVariants = map[string]oobToastConfig{
+	"success": {feedback.ToastSuccess, "Success", "Changes saved successfully."},
+	"error":   {feedback.ToastError, "Error", "Something went wrong."},
+	"warning": {feedback.ToastWarning, "Warning", "This action is irreversible."},
+	"info":    {feedback.ToastInfo, "Info", "New updates are available."},
+}
+
+// OOBToast returns a toast fragment for the given variant (success, error,
+// warning, info, or default/"") with an hx-swap-oob attribute that instructs
+// HTMX to append it to #toast-container out-of-band. The wrapper div carries
+// hx-swap-oob; HTMX strips it and inserts the inner toast element intact.
+func OOBToast(variant string) g.Node {
+	cfg, ok := oobToastVariants[variant]
+	if !ok {
+		cfg = oobToastConfig{feedback.ToastDefault, "Event created", "Your event has been created."}
+	}
+	return h.Div(
+		g.Attr("hx-swap-oob", "beforeend:#toast-container"),
+		feedback.Toast(feedback.ToastProps{
+			Title:       cfg.title,
+			Description: cfg.description,
+			Variant:     cfg.variant,
+			Dismissible: true,
+			Extra: []g.Node{
+				g.Attr("data-controller", "toast"),
+				g.Attr("data-toast-duration", "5000"),
+			},
+		}),
+	)
 }
 
 type user struct {
