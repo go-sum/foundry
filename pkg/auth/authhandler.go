@@ -205,7 +205,7 @@ func (h *AuthHandler) Verify(c *web.Context) (web.Response, error) {
 	}
 
 	sess.Regenerate()
-	if err := SetAuth(sess, result.User.ID.String(), result.User.DisplayName); err != nil {
+	if err := SetAuth(sess, result.User.ID.String(), result.User.DisplayName, result.User.Verified); err != nil {
 		return web.Response{}, web.ErrInternal(err)
 	}
 

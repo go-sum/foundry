@@ -8,6 +8,7 @@ import (
 const (
 	sessionKeyUserID          = "auth.user_id"
 	sessionKeyDisplayName     = "auth.display_name"
+	sessionKeyVerified        = "auth.verified"
 	sessionKeyPendingFlow     = "auth.pending_flow"
 	sessionKeyPasskeyCeremony = "auth.passkey_ceremony"
 )
@@ -15,11 +16,14 @@ const (
 // SetAuth records the authenticated user in the session. It is exported so
 // OAuth callback handlers can establish the same session state after resolving
 // identity from the userinfo endpoint.
-func SetAuth(sess *session.Session, userID, displayName string) error {
+func SetAuth(sess *session.Session, userID, displayName string, verified bool) error {
 	if err := sess.Set(sessionKeyUserID, userID); err != nil {
 		return err
 	}
 	if err := sess.Set(sessionKeyDisplayName, displayName); err != nil {
+		return err
+	}
+	if err := sess.Set(sessionKeyVerified, verified); err != nil {
 		return err
 	}
 	sess.Unset(sessionKeyPendingFlow)
@@ -40,6 +44,11 @@ func IsAuthenticated(sess *session.Session) bool {
 func getDisplayName(sess *session.Session) (string, bool) {
 	name, ok, _ := session.Get[string](sess, sessionKeyDisplayName)
 	return name, ok && name != ""
+}
+
+func getVerified(sess *session.Session) bool {
+	v, _, _ := session.Get[bool](sess, sessionKeyVerified)
+	return v
 }
 
 func setPendingFlow(sess *session.Session, flow PendingFlow) error {

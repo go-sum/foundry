@@ -24,7 +24,7 @@ type Request struct {
 	RequestID       string             // Correlation ID; set via WithRequestID.
 	Nonce           string             // CSP nonce; set via WithNonce.
 	Flash           []string           // Flash messages; set via WithFlash.
-	IsAuthenticated bool               // Auth state; set via WithIsAuthenticated.
+	Auth            auth.Identity      // Auth identity; auto-populated from context via auth.LoadSession middleware.
 	NavConfig       compound.NavConfig // Declarative nav config; set via WithNavConfig.
 	PathFunc        func(string) string // Asset path resolver; set via WithPathFunc.
 	Icons           *icons.Registry    // Icon registry; set via WithIconRegistry.
@@ -63,9 +63,10 @@ func WithFlash(messages ...string) RequestOption {
 	return func(r *Request) { r.Flash = append(r.Flash, messages...) }
 }
 
-// WithIsAuthenticated sets the auth state used for nav visibility filtering.
-func WithIsAuthenticated(authenticated bool) RequestOption {
-	return func(r *Request) { r.IsAuthenticated = authenticated }
+// WithAuth sets the auth identity on the view request, overriding the value
+// auto-populated from context. Useful in tests and middleware that synthesise identity.
+func WithAuth(id auth.Identity) RequestOption {
+	return func(r *Request) { r.Auth = id }
 }
 
 // WithNavConfig sets the declarative nav configuration rendered in the page shell.
@@ -114,11 +115,11 @@ func NewRequest(c *web.Context, opts ...RequestOption) Request {
 		r.CSRFFieldName = secure.CSRFFieldName(c)
 		r.CSRFHeaderName = secure.CSRFHeaderName(c)
 		r.Nonce = secure.Nonce(c)
+		r.Auth = auth.GetIdentity(c)
 		if sess, ok := session.FromContext(c); ok {
 			if msgs, ok := session.PopFlashMessages(sess); ok {
 				r.Flash = msgs
 			}
-			r.IsAuthenticated = auth.IsAuthenticated(sess)
 		}
 	}
 
@@ -154,7 +155,7 @@ func (r Request) Page(title string, children ...g.Node) g.Node {
 		nav = compound.NavMenu(compound.NavMenuProps{
 			Config:          r.NavConfig,
 			CurrentPath:     r.CurrentPath,
-			IsAuthenticated: r.IsAuthenticated,
+			IsAuthenticated: r.Auth.IsAuthenticated,
 			Icons:           r.Icons,
 		})
 	}

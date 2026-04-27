@@ -1,15 +1,19 @@
 package config
 
 import (
+	"cmp"
+
+	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/componentry/compound"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
 	"github.com/go-sum/foundry/pkg/componentry/icons/render"
 	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
 	"github.com/go-sum/foundry/pkg/componentry/ui/core"
-	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/pkg/web/router"
 )
+
+const maxLen = 12
 
 // DefaultNav returns a view.RequestOption that builds the nav on each request.
 // Route URL reversal is deferred until request time so this option is safe to
@@ -17,6 +21,11 @@ import (
 // is injected from the per-request view.Request.
 func DefaultNav(rt *router.Router) view.RequestOption {
 	return func(r *view.Request) {
+		name := r.Auth.DisplayName
+		if runes := []rune(name); len(runes) > maxLen {
+			name = string(runes[:maxLen])
+		}
+		accountLabel := cmp.Or(name, "Account")
 		r.NavConfig = compound.NavConfig{
 			Brand: compound.NavBrand{
 				Label: "Starter",
@@ -54,16 +63,21 @@ func DefaultNav(rt *router.Router) view.RequestOption {
 					Items: []compound.NavItem{
 						{Label: "Documentation", Href: rt.MustReverse("docs.index", nil)},
 						{Label: "Contact", Href: rt.MustReverse("contact.form", nil)},
-						{Label: "Sign in", Href: rt.MustReverse(auth.RouteSigninShow, nil), Visibility: compound.NavVisibilityGuest},
-						{Label: "Sign up", Href: rt.MustReverse(auth.RouteSignupShow, nil), Visibility: compound.NavVisibilityGuest},
 						{
-							Label:  "Sign out",
-							Action: rt.MustReverse(auth.RouteSignout, nil),
-							Method: "POST",
-							HiddenFields: []compound.NavHiddenField{
-								{Name: r.CSRFFieldName, Value: r.CSRFToken},
+							Label: accountLabel,
+							Items: []compound.NavItem{
+								{Label: "Sign in", Href: rt.MustReverse(auth.RouteSigninShow, nil), Visibility: compound.NavVisibilityGuest},
+								{Label: "Sign up", Href: rt.MustReverse(auth.RouteSignupShow, nil), Visibility: compound.NavVisibilityGuest},
+								{
+									Label:  "Sign out",
+									Action: rt.MustReverse(auth.RouteSignout, nil),
+									Method: "POST",
+									HiddenFields: []compound.NavHiddenField{
+										{Name: r.CSRFFieldName, Value: r.CSRFToken},
+									},
+									Visibility: compound.NavVisibilityUser,
+								},
 							},
-							Visibility: compound.NavVisibilityUser,
 						},
 						{Slot: compound.SlotThemeToggle},
 					},

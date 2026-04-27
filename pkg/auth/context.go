@@ -4,7 +4,15 @@ import "github.com/go-sum/foundry/pkg/web"
 
 type userIDKey struct{}
 type userRoleKey struct{}
-type displayNameKey struct{}
+type identityKey struct{}
+
+// Identity holds the request-scoped auth state for the current user,
+// populated by the LoadSession middleware on every request.
+type Identity struct {
+	IsAuthenticated bool
+	IsVerified      bool
+	DisplayName     string
+}
 
 // SetUserID stores the authenticated user's ID in the request context.
 func SetUserID(c *web.Context, id string) { c.Set(userIDKey{}, id) }
@@ -18,8 +26,9 @@ func SetUserRole(c *web.Context, role string) { c.Set(userRoleKey{}, role) }
 // UserRole returns the authenticated user's role from the request context.
 func UserRole(c *web.Context) string { v, _ := web.Get[string](c, userRoleKey{}); return v }
 
-// SetDisplayName stores the authenticated user's display name in the request context.
-func SetDisplayName(c *web.Context, n string) { c.Set(displayNameKey{}, n) }
+// SetIdentity stores the current user's identity in the request context.
+func SetIdentity(c *web.Context, id Identity) { c.Set(identityKey{}, id) }
 
-// DisplayName returns the authenticated user's display name from the request context.
-func DisplayName(c *web.Context) string { v, _ := web.Get[string](c, displayNameKey{}); return v }
+// GetIdentity returns the current user's identity from the request context.
+// Returns a zero Identity (unauthenticated) if none has been set.
+func GetIdentity(c *web.Context) Identity { v, _ := web.Get[Identity](c, identityKey{}); return v }

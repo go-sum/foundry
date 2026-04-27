@@ -90,7 +90,7 @@ func (h *Handler) Callback(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	if err := auth.SetAuth(sess, claims.Sub, claims.Name); err != nil {
+	if err := auth.SetAuth(sess, claims.Sub, claims.Name, claims.EmailVerified); err != nil {
 		return web.Response{}, web.ErrInternal(err)
 	}
 

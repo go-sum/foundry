@@ -39,9 +39,12 @@ func LoadSession() web.Middleware {
 			}
 			if userID, ok := getUserID(sess); ok {
 				SetUserID(c, userID)
-				if name, ok := getDisplayName(sess); ok {
-					SetDisplayName(c, name)
-				}
+				name, _ := getDisplayName(sess)
+				SetIdentity(c, Identity{
+					IsAuthenticated: true,
+					IsVerified:      getVerified(sess),
+					DisplayName:     name,
+				})
 			}
 			return next(c)
 		}
