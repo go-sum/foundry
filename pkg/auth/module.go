@@ -42,6 +42,30 @@ type ModuleConfig struct {
 // The caller registers routes via router.Register(rt, auth.Routes(m)...).
 func NewModule(cfg ModuleConfig) (*Module, error) {
 	config := ApplyDefaults(cfg.Config)
+	if cfg.Router == nil {
+		return nil, fmt.Errorf("auth: Router is required")
+	}
+	if cfg.Validator == nil {
+		return nil, fmt.Errorf("auth: Validator is required")
+	}
+	if cfg.Users == nil {
+		return nil, fmt.Errorf("auth: Users (UserWriter) is required")
+	}
+	if cfg.Renderer == nil {
+		return nil, fmt.Errorf("auth: Renderer is required")
+	}
+	if cfg.AdminUsers == nil {
+		return nil, fmt.Errorf("auth: AdminUsers (AdminStore) is required")
+	}
+	if cfg.AdminRenderer == nil {
+		return nil, fmt.Errorf("auth: AdminRenderer is required")
+	}
+	if config.EmailTOTP.Enabled && cfg.TokenCodec == nil {
+		return nil, fmt.Errorf("auth: TokenCodec is required when email TOTP is enabled")
+	}
+	if config.Passkey.Enabled && cfg.Credentials == nil {
+		return nil, fmt.Errorf("auth: Credentials (CredentialStore) is required when passkeys are enabled")
+	}
 
 	authSvc := NewAuthService(AuthServiceConfig{
 		Users:      cfg.Users,

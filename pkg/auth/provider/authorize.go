@@ -90,20 +90,19 @@ func (h *AuthorizeHandler) Submit(c *web.Context) (web.Response, error) {
 	if err != nil || !ok {
 		return web.Response{}, web.ErrBadRequest("No authorization request in progress")
 	}
-	sess.Unset(authzParamsSessionKey)
 
 	var input struct {
-		Action string `form:"action"` // "approve" or "deny"
+		Action string `form:"action" validate:"required,oneof=approve deny"`
 	}
-	// Ignore bind errors — default to approve if action field is absent.
-	_ = validate.Bind(h.validator, c.Request, &input)
-	if input.Action == "" {
-		input.Action = "approve"
+	if err := validate.Bind(h.validator, c.Request, &input); err != nil {
+		return web.Response{}, err
 	}
 
 	if input.Action != "approve" {
+		sess.Unset(authzParamsSessionKey)
 		return redirectError(storedParams.RedirectURI, storedParams.State, "access_denied", "User denied the request")
 	}
+	sess.Unset(authzParamsSessionKey)
 
 	// Save consent for future requests.
 	if err := h.consents.SaveConsent(c.Context(), Consent{
