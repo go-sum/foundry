@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -18,7 +19,7 @@ func main() {
 	}
 }
 
-func run(ctx context.Context) error {
+func run(ctx context.Context) (err error) {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -26,5 +27,14 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("startup: %w", err)
 	}
+	defer func() {
+		if closeErr := a.Close(); closeErr != nil {
+			if err == nil {
+				err = closeErr
+				return
+			}
+			err = errors.Join(err, fmt.Errorf("shutdown: %w", closeErr))
+		}
+	}()
 	return a.Run(ctx)
 }

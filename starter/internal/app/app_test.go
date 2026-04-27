@@ -6,9 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/go-sum/foundry/pkg/web/serve"
+	"github.com/go-sum/foundry/pkg/web/session"
 )
 
 const (
@@ -37,7 +40,32 @@ func mustNew(t *testing.T) *App {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
+	t.Cleanup(func() {
+		if err := a.Close(); err != nil {
+			t.Errorf("App.Close() error = %v", err)
+		}
+	})
 	return a
+}
+
+type stubSessionStore struct {
+	stopCount int
+}
+
+func (s *stubSessionStore) Read(context.Context, string) ([]byte, int64, error) {
+	return nil, 0, session.ErrSessionNotFound
+}
+
+func (s *stubSessionStore) Save(context.Context, string, []byte, time.Time, time.Duration, int64) (string, error) {
+	return "", nil
+}
+
+func (s *stubSessionStore) Delete(context.Context, string) error {
+	return nil
+}
+
+func (s *stubSessionStore) Stop() {
+	s.stopCount++
 }
 
 func TestApp_Healthz_Returns200(t *testing.T) {
@@ -148,5 +176,37 @@ func TestApp_GET_SetsSecurityHeaders(t *testing.T) {
 
 	if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
 		t.Errorf("X-Content-Type-Options = %q, want %q", got, "nosniff")
+	}
+}
+
+func TestAppClose_StopsSessionStore(t *testing.T) {
+	store := &stubSessionStore{}
+	a := &App{sessionStore: store}
+
+	if err := a.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if store.stopCount != 1 {
+		t.Fatalf("stopCount = %d, want 1", store.stopCount)
+	}
+}
+
+// TestNew_CleansUpSessionStoreOnRouteRegistrationError must not run in parallel:
+// it swaps the package-level newMemorySessionStore var, which is not goroutine-safe.
+func TestNew_CleansUpSessionStoreOnRouteRegistrationError(t *testing.T) {
+	setupTestEnv(t)
+	t.Setenv("TEST_STATIC_DIR", filepath.Join(t.TempDir(), "missing"))
+
+	store := &stubSessionStore{}
+	prev := newMemorySessionStore
+	newMemorySessionStore = func() session.Store { return store }
+	t.Cleanup(func() { newMemorySessionStore = prev })
+
+	_, err := New(context.Background())
+	if err == nil {
+		t.Fatal("New() error = nil, want non-nil")
+	}
+	if store.stopCount != 1 {
+		t.Fatalf("stopCount = %d, want 1", store.stopCount)
 	}
 }

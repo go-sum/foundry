@@ -54,6 +54,9 @@ func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 	if store == nil {
 		t.Fatal("store = nil, want memory store")
 	}
+	if stoppable, ok := store.(interface{ Stop() }); ok {
+		t.Cleanup(stoppable.Stop)
+	}
 	if got, want := sec.CSP.CSPTemplate, "default-src 'self'"; got != want {
 		t.Fatalf("CSPTemplate = %q, want %q", got, want)
 	}

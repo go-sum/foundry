@@ -140,6 +140,12 @@ func TestMemoryStore_NotFound(t *testing.T) {
 	}
 }
 
+func TestMemoryStore_Stop_Idempotent(t *testing.T) {
+	store := NewMemoryStore()
+	store.Stop()
+	store.Stop()
+}
+
 func TestP0_05_Session_ConcurrentSet_RaceClean(t *testing.T) {
 	s := newSession()
 	done := make(chan struct{})

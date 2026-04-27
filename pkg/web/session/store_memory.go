@@ -33,9 +33,10 @@ func (e memEntry) expired() bool {
 // MemoryStore is an in-memory Store for single-process deployments and tests.
 // A background goroutine sweeps expired entries every minute; call Stop to drain it.
 type MemoryStore struct {
-	mu      sync.RWMutex
-	entries map[string]memEntry
-	stopCh  chan struct{}
+	mu       sync.RWMutex
+	entries  map[string]memEntry
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // NewMemoryStore creates a MemoryStore and starts its background sweep goroutine.
@@ -50,7 +51,9 @@ func NewMemoryStore() *MemoryStore {
 
 // Stop shuts down the background sweep goroutine.
 func (m *MemoryStore) Stop() {
-	close(m.stopCh)
+	m.stopOnce.Do(func() {
+		close(m.stopCh)
+	})
 }
 
 func (m *MemoryStore) sweep() {

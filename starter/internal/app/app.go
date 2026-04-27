@@ -41,6 +41,10 @@ type App struct {
 	sessionStore session.Store
 }
 
+type stoppableSessionStore interface {
+	Stop()
+}
+
 // Runtime holds cross-cutting infrastructure dependencies.
 type Runtime struct {
 	Config *config.Config
@@ -59,15 +63,15 @@ type Security struct {
 
 // Services holds application-level service instances.
 type Services struct {
-	DBPool         *pgxpool.Pool
-	KVStore        kv.Store
-	Queue          *queue.Dispatcher
-	Processor      *queue.Processor
-	Notifier       *notification.Dispatcher
-	Contact        *contact.Module
-	Auth           *auth.Module
+	DBPool    *pgxpool.Pool
+	KVStore   kv.Store
+	Queue     *queue.Dispatcher
+	Processor *queue.Processor
+	Notifier  *notification.Dispatcher
+	Contact   *contact.Module
+	Auth      *auth.Module
 	// OAuthProvider is the built-in OAuth 2.0 Authorization Server.
-	OAuthProvider  *provider.ProviderModule
+	OAuthProvider *provider.ProviderModule
 	// OAuthClient is the first-party OAuth 2.1 client handler.
 	OAuthClient    *oauthclient.Handler
 	SchemaRegistry *db.Registry
@@ -98,9 +102,21 @@ func (s Services) Close() error {
 	return errors.Join(errs...)
 }
 
+// Close shuts down background services and stops any stoppable session store.
+func (a *App) Close() error {
+	var errs []error
+	if err := a.Services.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("services: %w", err))
+	}
+	if store, ok := a.sessionStore.(stoppableSessionStore); ok {
+		store.Stop()
+	}
+	return errors.Join(errs...)
+}
+
 // New builds and wires the complete application. Returns an error on any
 // configuration or infrastructure failure — never calls os.Exit.
-func New(ctx context.Context) (*App, error) {
+func New(ctx context.Context) (_ *App, err error) {
 	runtime, err := provideRuntime(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("runtime: %w", err)
@@ -124,6 +140,21 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("security: %w", err)
 	}
 
+	app := &App{
+		Runtime:      runtime,
+		Security:     security,
+		router:       routing,
+		sessionStore: store,
+	}
+	defer func() {
+		if err == nil {
+			return
+		}
+		if closeErr := app.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("cleanup: %w", closeErr))
+		}
+	}()
+
 	routing.Use(
 		web.AsyncContext(),
 		otelweb.Middleware(runtime.Tracer),
@@ -142,6 +173,7 @@ func New(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("services: %w", err)
 	}
+	app.Services = services
 
 	s := site.New(runtime.Config.Site)
 	if err := RegisterRoutes(routing, security, services, runtime.Config.Assets, runtime.Config.PublicDir, s, pres); err != nil {
@@ -149,13 +181,7 @@ func New(ctx context.Context) (*App, error) {
 	}
 	routing.Freeze()
 
-	return &App{
-		Runtime:      runtime,
-		Security:     security,
-		Services:     services,
-		router:       routing,
-		sessionStore: store,
-	}, nil
+	return app, nil
 }
 
 // Run starts the HTTP server, waits for ctx to be cancelled, then gracefully

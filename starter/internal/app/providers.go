@@ -13,7 +13,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/assets/publish"
 	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/auth/authui"
@@ -22,6 +21,7 @@ import (
 	providerpgstore "github.com/go-sum/foundry/pkg/auth/provider/pgstore"
 	"github.com/go-sum/foundry/pkg/componentry/assets/iconset"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv/redisstore"
 	"github.com/go-sum/foundry/pkg/notification"
@@ -99,6 +99,10 @@ func provideSecurity(_ context.Context, runtime Runtime) (Security, session.Stor
 	return sec, store, nil
 }
 
+var newMemorySessionStore = func() session.Store {
+	return session.NewMemoryStore()
+}
+
 func provideSession(runtime Runtime) (session.Config, session.Store, error) {
 	var store session.Store
 	switch runtime.Config.SessionStore {
@@ -121,7 +125,7 @@ func provideSession(runtime Runtime) (session.Config, session.Store, error) {
 		}
 		store = session.NewCookieStore(codec)
 	default: // "memory"
-		store = session.NewMemoryStore()
+		store = newMemorySessionStore()
 	}
 	return session.NewConfig(runtime.Config.Session, store), store, nil
 }
@@ -342,10 +346,10 @@ func provideAuth(
 		Config: provider.Config{
 			Issuer: cfg.Auth.Provider.Issuer,
 		},
-		Clients:         providerStore,
-		Codes:           providerStore,
-		Tokens:          providerStore,
-		Consents:        providerStore,
+		Clients:  providerStore,
+		Codes:    providerStore,
+		Tokens:   providerStore,
+		Consents: providerStore,
 		// Users feeds the /oauth/userinfo endpoint with identity claims.
 		Users:           authStore,
 		ConsentRenderer: stubConsentRenderer{},
