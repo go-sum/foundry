@@ -40,7 +40,7 @@ func Discover(ctx context.Context, client *http.Client, issuer string) (Discover
 	if err != nil {
 		return DiscoveryDocument{}, fmt.Errorf("oauth: discovery request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return DiscoveryDocument{}, fmt.Errorf("oauth: discovery endpoint returned status %d", resp.StatusCode)

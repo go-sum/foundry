@@ -10,7 +10,6 @@ import (
 // GuardConfig configures the Guard middleware.
 type GuardConfig struct {
 	// Check tests whether the session is authenticated.
-	// Defaults to sess.Has("authed").
 	Check func(*Session) bool
 
 	// RedirectPath is the URL for unauthenticated full-page requests.
@@ -34,7 +33,7 @@ func DefaultGuardConfig() GuardConfig {
 func Guard(cfg GuardConfig) web.Middleware {
 	check := cfg.Check
 	if check == nil {
-		check = func(s *Session) bool { return s.Has("authed") }
+		panic("web/session: Guard requires GuardConfig.Check")
 	}
 
 	redirectPath := cmp.Or(cfg.RedirectPath, "/signin")

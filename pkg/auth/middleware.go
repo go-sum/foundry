@@ -6,26 +6,11 @@ import (
 	"strings"
 
 	"github.com/go-sum/foundry/pkg/web"
+	webauth "github.com/go-sum/foundry/pkg/web/auth"
 	"github.com/go-sum/foundry/pkg/web/htmx"
 	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/google/uuid"
 )
-
-// sanitizeReturnTo validates a return-to URL and returns it if safe, or "/".
-// A safe URL must be relative (starts with "/"), not protocol-relative ("//"),
-// and must not contain newlines (header injection guard).
-func sanitizeReturnTo(returnTo string) string {
-	if !strings.HasPrefix(returnTo, "/") {
-		return "/"
-	}
-	if strings.HasPrefix(returnTo, "//") {
-		return "/"
-	}
-	if strings.ContainsAny(returnTo, "\r\n") {
-		return "/"
-	}
-	return returnTo
-}
 
 // LoadSession reads user identity from the session and sets context values.
 // It is non-destructive: if no session or no user ID is present, the request
@@ -37,15 +22,7 @@ func LoadSession() web.Middleware {
 			if !ok {
 				return next(c)
 			}
-			if userID, ok := getUserID(sess); ok {
-				SetUserID(c, userID)
-				name, _ := getDisplayName(sess)
-				SetIdentity(c, Identity{
-					IsAuthenticated: true,
-					IsVerified:      getVerified(sess),
-					DisplayName:     name,
-				})
-			}
+			ensureIdentityFromSession(c, sess)
 			return next(c)
 		}
 	}
@@ -58,9 +35,13 @@ func LoadSession() web.Middleware {
 func RequireAuth(signinPath func() string) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
-			if UserID(c) == "" {
+			sess, ok := session.FromContext(c)
+			if !ok {
+				panic("auth: RequireAuth called without session middleware")
+			}
+			if !IsAuthenticated(sess) {
 				path := signinPath()
-				returnTo := c.URL().RequestURI()
+				returnTo := webauth.SanitizeReturnTo(c.URL().RequestURI())
 				sep := "?"
 				if strings.Contains(path, "?") {
 					sep = "&"
@@ -73,6 +54,7 @@ func RequireAuth(signinPath func() string) web.Middleware {
 				}
 				return web.SeeOther(path), nil
 			}
+			ensureIdentityFromSession(c, sess)
 			return next(c)
 		}
 	}
@@ -114,4 +96,29 @@ func RequireAdmin() web.Middleware {
 			return next(c)
 		}
 	}
+}
+
+func ensureIdentityFromSession(c *web.Context, sess *session.Session) bool {
+	userID, ok := getUserID(sess)
+	if !ok {
+		return false
+	}
+
+	name, _ := getDisplayName(sess)
+	verified := getVerified(sess)
+	identity := GetIdentity(c)
+	if UserID(c) == userID &&
+		identity.IsAuthenticated &&
+		identity.IsVerified == verified &&
+		identity.DisplayName == name {
+		return false
+	}
+
+	SetUserID(c, userID)
+	SetIdentity(c, Identity{
+		IsAuthenticated: true,
+		IsVerified:      verified,
+		DisplayName:     name,
+	})
+	return true
 }

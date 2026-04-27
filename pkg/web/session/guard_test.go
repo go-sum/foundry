@@ -10,6 +10,12 @@ import (
 	"github.com/go-sum/foundry/pkg/web"
 )
 
+func guardConfig() GuardConfig {
+	cfg := DefaultGuardConfig()
+	cfg.Check = func(s *Session) bool { return s.Has("authed") }
+	return cfg
+}
+
 func runGuardRequest(t *testing.T, sessionMW web.Middleware, handler web.Handler, extraHeaders map[string]string) (web.Response, error) {
 	t.Helper()
 	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/protected"})
@@ -27,15 +33,26 @@ func TestGuard_PanicsWithoutSessionMiddleware(t *testing.T) {
 	}()
 	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/protected"})
 	c := web.NewContext(context.Background(), req)
-	handler := Guard(DefaultGuardConfig())(func(_ *web.Context) (web.Response, error) {
+	handler := Guard(guardConfig())(func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
 	})
 	_, _ = handler(c)
 }
 
+func TestGuard_PanicsWithoutCheck(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic, got none")
+		}
+	}()
+	_ = Guard(DefaultGuardConfig())(func(_ *web.Context) (web.Response, error) {
+		return web.Respond(http.StatusOK), nil
+	})
+}
+
 func TestGuard_UnauthenticatedFullPage_RedirectsToSignin(t *testing.T) {
 	sessionMW := Middleware(testMemoryConfig(t))
-	guard := Guard(DefaultGuardConfig())
+	guard := Guard(guardConfig())
 
 	called := false
 	resp, err := runGuardRequest(t, sessionMW, guard(func(_ *web.Context) (web.Response, error) {
@@ -59,7 +76,7 @@ func TestGuard_UnauthenticatedFullPage_RedirectsToSignin(t *testing.T) {
 
 func TestGuard_UnauthenticatedHTMX_Returns401(t *testing.T) {
 	sessionMW := Middleware(testMemoryConfig(t))
-	guard := Guard(DefaultGuardConfig())
+	guard := Guard(guardConfig())
 
 	called := false
 	_, err := runGuardRequest(t, sessionMW, guard(func(_ *web.Context) (web.Response, error) {
@@ -84,7 +101,7 @@ func TestGuard_UnauthenticatedHTMX_Returns401(t *testing.T) {
 
 func TestGuard_Authenticated_PassesThrough(t *testing.T) {
 	sessionMW := Middleware(testMemoryConfig(t))
-	guard := Guard(DefaultGuardConfig())
+	guard := Guard(guardConfig())
 
 	called := false
 	inner := guard(func(_ *web.Context) (web.Response, error) {
@@ -114,7 +131,10 @@ func TestGuard_Authenticated_PassesThrough(t *testing.T) {
 
 func TestGuard_CustomRedirectPath(t *testing.T) {
 	sessionMW := Middleware(testMemoryConfig(t))
-	guard := Guard(GuardConfig{RedirectPath: "/login"})
+	guard := Guard(GuardConfig{
+		RedirectPath: "/login",
+		Check:        func(s *Session) bool { return s.Has("authed") },
+	})
 
 	resp, err := runGuardRequest(t, sessionMW, guard(func(_ *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusOK), nil
@@ -184,6 +204,7 @@ func TestGuard_CustomOnUnauthenticated(t *testing.T) {
 	sessionMW := Middleware(testMemoryConfig(t))
 	customCalled := false
 	guard := Guard(GuardConfig{
+		Check: func(s *Session) bool { return s.Has("authed") },
 		OnUnauthenticated: func(_ *web.Context) (web.Response, error) {
 			customCalled = true
 			return web.Respond(http.StatusForbidden), nil

@@ -34,7 +34,7 @@ func FetchUserinfo(ctx context.Context, client *http.Client, endpoint, accessTok
 	if err != nil {
 		return UserinfoClaims{}, fmt.Errorf("oauth: userinfo request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return UserinfoClaims{}, fmt.Errorf("oauth: userinfo endpoint returned status %d", resp.StatusCode)

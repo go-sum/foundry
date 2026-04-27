@@ -79,7 +79,7 @@ func ExchangeCode(ctx context.Context, client *http.Client, params ExchangeParam
 	if err != nil {
 		return TokenResponse{}, fmt.Errorf("oauth: token request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

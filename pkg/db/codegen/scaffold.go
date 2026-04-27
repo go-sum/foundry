@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 )
 
@@ -237,23 +236,6 @@ func pluralPascal(tableName string) string {
 // singularPascal returns the PascalCase form of the singularized table name.
 func singularPascal(tableName string) string {
 	return toPascalCase(singularize(tableName))
-}
-
-// colsKey returns a deduplication key for a set of columns (sorted, comma-joined).
-func colsKey(cols []string) string {
-	sorted := make([]string, len(cols))
-	copy(sorted, cols)
-	sort.Strings(sorted)
-	return strings.Join(sorted, ",")
-}
-
-// colsPascal joins PascalCase column names with "And".
-func colsPascal(cols []string) string {
-	parts := make([]string, len(cols))
-	for i, c := range cols {
-		parts[i] = toPascalCase(c)
-	}
-	return strings.Join(parts, "And")
 }
 
 // goType maps a SQL type string to its Go equivalent.

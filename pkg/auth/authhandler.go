@@ -2,6 +2,7 @@ package auth
 
 import (
 	"github.com/go-sum/foundry/pkg/web"
+	webauth "github.com/go-sum/foundry/pkg/web/auth"
 	"github.com/go-sum/foundry/pkg/web/htmx"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/session"
@@ -62,7 +63,7 @@ type AuthHandler struct {
 
 // ShowSignin renders the signin form.
 func (h *AuthHandler) ShowSignin(c *web.Context) (web.Response, error) {
-	returnTo := sanitizeReturnTo(c.URL().Query().Get("return_to"))
+	returnTo := webauth.SanitizeReturnTo(c.URL().Query().Get("return_to"))
 	return h.renderer.SigninPage(c, SigninPageData{Config: h.config, ReturnTo: returnTo})
 }
 
@@ -76,11 +77,11 @@ func (h *AuthHandler) BeginSignin(c *web.Context) (web.Response, error) {
 			Input:      input,
 			FormErrors: []string{"Please enter a valid email address."},
 			Config:     h.config,
-			ReturnTo:   sanitizeReturnTo(input.ReturnTo),
+			ReturnTo:   webauth.SanitizeReturnTo(input.ReturnTo),
 		})
 	}
 
-	returnTo := sanitizeReturnTo(input.ReturnTo)
+	returnTo := webauth.SanitizeReturnTo(input.ReturnTo)
 	verifyPath := h.router.MustReverse(RouteVerifyShow, nil)
 	flow, err := h.svc.BeginSignin(c.Context(), input, verifyPath)
 	if err != nil {
@@ -98,7 +99,7 @@ func (h *AuthHandler) BeginSignin(c *web.Context) (web.Response, error) {
 
 // ShowSignup renders the signup form.
 func (h *AuthHandler) ShowSignup(c *web.Context) (web.Response, error) {
-	returnTo := sanitizeReturnTo(c.URL().Query().Get("return_to"))
+	returnTo := webauth.SanitizeReturnTo(c.URL().Query().Get("return_to"))
 	return h.renderer.SignupPage(c, SignupPageData{Config: h.config, ReturnTo: returnTo})
 }
 
@@ -112,11 +113,11 @@ func (h *AuthHandler) BeginSignup(c *web.Context) (web.Response, error) {
 			Input:      input,
 			FormErrors: []string{"Please correct the errors below."},
 			Config:     h.config,
-			ReturnTo:   sanitizeReturnTo(input.ReturnTo),
+			ReturnTo:   webauth.SanitizeReturnTo(input.ReturnTo),
 		})
 	}
 
-	returnTo := sanitizeReturnTo(input.ReturnTo)
+	returnTo := webauth.SanitizeReturnTo(input.ReturnTo)
 	verifyPath := h.router.MustReverse(RouteVerifyShow, nil)
 	flow, err := h.svc.BeginSignup(c.Context(), input, verifyPath)
 	if err != nil {

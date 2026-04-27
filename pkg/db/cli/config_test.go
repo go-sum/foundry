@@ -9,8 +9,6 @@ import (
 	"github.com/go-sum/foundry/pkg/db"
 )
 
-func boolPtr(b bool) *bool { return &b }
-
 // --- expandEnvWithDefaults ---
 
 func TestExpandEnvWithDefaults_PlainVar(t *testing.T) {
@@ -95,14 +93,14 @@ func TestShouldScaffold_NilIsTrue(t *testing.T) {
 }
 
 func TestShouldScaffold_ExplicitFalse(t *testing.T) {
-	e := schemaEntry{Scaffold: boolPtr(false)}
+	e := schemaEntry{Scaffold: new(false)}
 	if e.shouldScaffold() {
 		t.Fatal("shouldScaffold() = true for Scaffold=false, want false")
 	}
 }
 
 func TestShouldScaffold_ExplicitTrue(t *testing.T) {
-	e := schemaEntry{Scaffold: boolPtr(true)}
+	e := schemaEntry{Scaffold: new(true)}
 	if !e.shouldScaffold() {
 		t.Fatal("shouldScaffold() = false for Scaffold=true, want true")
 	}
@@ -120,7 +118,7 @@ func writeTempSQL(t *testing.T, content string) string {
 	if _, err := f.WriteString(content); err != nil {
 		t.Fatalf("write temp file: %v", err)
 	}
-	f.Close()
+	f.Close() //nolint:errcheck
 	return f.Name()
 }
 
