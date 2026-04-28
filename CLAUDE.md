@@ -18,8 +18,10 @@
 - ALWAYS trace ALL callers when refactoring Go config structs or YAML mappings
 - ALWAYS account for HTML-encoded entities in test assertions for HTML output
 - ALWAYS enforce exact-match test assertions — never substring matching
-- ALWAYS call `mcp__gomcp__ping` before any investigation to confirm MCP is available
-- ALWAYS use MCP tools ahead of Bash for all code navigation, file search, and content search — bash find/grep/cat are last resort only
+- ALWAYS use MCP LSP tools for Go symbol navigation and MCP decisions tools for governance docs
+- ALWAYS create config defaults and rules in owner packages apply default override values in config files
+- ALL features that are not absolutely unique to a single application, should be placed to the relevant package
+- Use native `rg` (ripgrep) for content search and `find` for file search
 - NEVER use bash `grep`, `find`, or `Read` on `.decisions/` files when MCP is available
 - NEVER load a full `.decisions/` file via `Read` — always use the section-aware tools below
 
@@ -29,17 +31,14 @@
 3. `mcp__gomcp__lsp_find_references` — find all callers / implementors
 4. `mcp__gomcp__lsp_file_symbols` — list all symbols in a specific file
 
-**File and content search:**
-- `mcp__gomcp__find_files` for file name lookup (never `find`)
-- `mcp__gomcp__grep` for content search — smart-case, regex-capable (never bash `grep`)
-- `mcp__gomcp__multi_grep` for OR-logic multi-pattern search in a single call
+**File and content search (native tools):**
+- `rg` (ripgrep) for content search — smart-case by default, regex-capable
+- `find` for file name lookup across the workspace
 
 **Governance docs — in order:**
 1. `mcp__gomcp__decisions_list` — discover docs and their section index
 2. `mcp__gomcp__decisions_search` — locate relevant sections by keyword
 3. `mcp__gomcp__decisions_read` — read a specific section: `section: "5a"` (not the full doc)
-
-- FALLBACK to bash grep/find only for non-code text or when `gomcp` MCP server is confirmed unavailable
 
 ---
 
@@ -66,7 +65,6 @@ Registered in `.mcp.json`. Available in all agents. Source lives in `starter/doc
 
 | Tool | Use |
 |------|-----|
-| `mcp__gomcp__ping` | Verify server availability |
 | `mcp__gomcp__lsp_workspace_symbols` | Find types, functions, interfaces by name (indexed, fast) |
 | `mcp__gomcp__lsp_find_references` | All callers / all implementors |
 | `mcp__gomcp__lsp_definition` | Jump to any symbol definition |
@@ -75,9 +73,6 @@ Registered in `.mcp.json`. Available in all agents. Source lives in `starter/doc
 | `mcp__gomcp__decisions_list` | List governing docs with section index — start here |
 | `mcp__gomcp__decisions_read` | Read a doc or a specific section (`section: "5a"`) |
 | `mcp__gomcp__decisions_search` | Search all governing docs by keyword |
-| `mcp__gomcp__find_files` | Fuzzy file name search across workspace |
-| `mcp__gomcp__grep` | Smart-case content search (lowercase = case-insensitive) |
-| `mcp__gomcp__multi_grep` | OR-logic multi-pattern content search |
 
 ---
 

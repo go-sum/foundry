@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -24,10 +23,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-const (
-	useWatcher    = true // true = fsnotify event-driven, false = TTL polling
-	grepChunkSize = 512  // files per parallel-grep chunk for inter-chunk early termination
-)
+const useWatcher = true // true = fsnotify event-driven, false = TTL polling
 
 // --- Parameter types ---------------------------------------------------------
 
@@ -69,26 +65,6 @@ type DecisionsSearchParams struct {
 	Workspace  string `json:"workspace"`
 	Query      string `json:"query"`
 	MaxResults int    `json:"max_results"`
-}
-
-type FindFilesParams struct {
-	Workspace  string `json:"workspace"`
-	Query      string `json:"query"`
-	MaxResults int    `json:"max_results"`
-}
-
-type GrepParams struct {
-	Workspace  string `json:"workspace"`
-	Query      string `json:"query"`
-	MaxResults int    `json:"max_results"`
-	Context    int    `json:"context"`
-}
-
-type MultiGrepParams struct {
-	Workspace  string   `json:"workspace"`
-	Patterns   []string `json:"patterns"`
-	MaxResults int      `json:"max_results"`
-	Context    int      `json:"context"`
 }
 
 // --- AST helpers -------------------------------------------------------------
@@ -224,7 +200,6 @@ func loadGitIgnore(workspace string) *gitignore.GitIgnore {
 
 type fileEntry struct {
 	RelPath string
-	Content string
 	Symbols []Symbol
 	Lines   []string
 	AST     *ast.File
@@ -237,7 +212,6 @@ type workspaceIndex struct {
 	entries      []fileEntry
 	bySymbol     map[string][]int // lowercase symbol name → indices into entries
 	identInFiles map[string][]int // lowercase ident name → file indices
-	bigramIdx    [65536][]int32   // case-insensitive content bigrams → sorted file indices
 	workspace    string
 	builtAt      time.Time
 	ttl          time.Duration
@@ -326,7 +300,6 @@ func (ws *workspaceIndex) rebuild() {
 			results[i] = parseResult{
 				entry: fileEntry{
 					RelPath: rel,
-					Content: string(content),
 					Symbols: syms,
 					Lines:   strings.Split(string(content), "\n"),
 					AST:     f,
@@ -375,25 +348,10 @@ func (ws *workspaceIndex) rebuild() {
 		})
 	}
 
-	// Build bigram inverted index for grep prefiltering.
-	var bigramIdx [65536][]int32
-	for fileIdx, entry := range entries {
-		lower := strings.ToLower(entry.Content)
-		seen := make(map[uint16]struct{}, 512)
-		for i := 0; i+1 < len(lower); i++ {
-			k := uint16(lower[i])<<8 | uint16(lower[i+1])
-			if _, exists := seen[k]; !exists {
-				seen[k] = struct{}{}
-				bigramIdx[k] = append(bigramIdx[k], int32(fileIdx))
-			}
-		}
-	}
-
 	ws.mu.Lock()
 	ws.entries = entries
 	ws.bySymbol = bySymbol
 	ws.identInFiles = identInFiles
-	ws.bigramIdx = bigramIdx
 	ws.builtAt = time.Now()
 	ws.mu.Unlock()
 
@@ -808,450 +766,6 @@ func loadDecisionDocs(workspace string) ([]DecisionDoc, error) {
 	return docs, nil
 }
 
-// --- File finding & grep -----------------------------------------------------
-
-var binaryExts = map[string]bool{
-	".exe": true, ".bin": true, ".so": true, ".dylib": true,
-	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".ico": true,
-	".woff": true, ".woff2": true, ".ttf": true, ".eot": true,
-	".pdf": true, ".zip": true, ".tar": true, ".gz": true, ".wasm": true,
-	".db": true, ".sqlite": true,
-}
-
-func isBinary(path string) bool {
-	return binaryExts[strings.ToLower(filepath.Ext(path))]
-}
-
-func findFiles(workspace, query string, max int) []string {
-	if max <= 0 {
-		max = 20
-	}
-	q := strings.ToLower(query)
-	var results []string
-
-	gi := loadGitIgnore(workspace)
-
-	_ = filepath.WalkDir(workspace, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if skipDir(d.Name()) {
-				return filepath.SkipDir
-			}
-			if gi != nil {
-				rel, _ := filepath.Rel(workspace, path)
-				if gi.MatchesPath(rel) {
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		}
-		rel, _ := filepath.Rel(workspace, path)
-		if gi != nil && gi.MatchesPath(rel) {
-			return nil
-		}
-		if q == "" || strings.Contains(strings.ToLower(rel), q) {
-			results = append(results, rel)
-		}
-		return nil
-	})
-
-	// Shallower paths rank first, then alphabetical.
-	sort.Slice(results, func(i, j int) bool {
-		di := strings.Count(results[i], string(filepath.Separator))
-		dj := strings.Count(results[j], string(filepath.Separator))
-		if di != dj {
-			return di < dj
-		}
-		return results[i] < results[j]
-	})
-
-	if len(results) > max {
-		results = results[:max]
-	}
-	return results
-}
-
-type grepResult struct {
-	File    string
-	Line    int
-	Text    string
-	Context []string
-	Pattern string // set by multi_grep
-}
-
-func isSmartCaseInsensitive(query string) bool {
-	return query == strings.ToLower(query)
-}
-
-// --- Bigram index helpers ----------------------------------------------------
-
-// queryBigrams extracts deduplicated consecutive bigrams from a (lowercased) query.
-// Returns nil if the query is too short.
-func queryBigrams(q string) []uint16 {
-	if len(q) < 2 {
-		return nil
-	}
-	seen := make(map[uint16]bool, len(q))
-	var out []uint16
-	for i := 0; i+1 < len(q); i++ {
-		k := uint16(q[i])<<8 | uint16(q[i+1])
-		if !seen[k] {
-			seen[k] = true
-			out = append(out, k)
-		}
-	}
-	return out
-}
-
-// intersectSorted returns the sorted intersection of two sorted int32 slices.
-func intersectSorted(a, b []int32) []int32 {
-	out := make([]int32, 0, min(len(a), len(b)))
-	i, j := 0, 0
-	for i < len(a) && j < len(b) {
-		switch {
-		case a[i] == b[j]:
-			out = append(out, a[i])
-			i++
-			j++
-		case a[i] < b[j]:
-			i++
-		default:
-			j++
-		}
-	}
-	return out
-}
-
-// bigramCandidates intersects posting lists for all query bigrams.
-// Returns nil if any bigram has an empty posting list (no possible matches).
-func bigramCandidates(idx *[65536][]int32, bigrams []uint16) []int32 {
-	if len(bigrams) == 0 {
-		return nil
-	}
-	// Collect and sort posting lists by length (smallest first for fastest pruning).
-	lists := make([][]int32, 0, len(bigrams))
-	for _, bg := range bigrams {
-		list := idx[bg]
-		if len(list) == 0 {
-			return nil // No file contains this bigram — impossible to match.
-		}
-		lists = append(lists, list)
-	}
-	sort.Slice(lists, func(i, j int) bool { return len(lists[i]) < len(lists[j]) })
-	result := lists[0]
-	for _, list := range lists[1:] {
-		result = intersectSorted(result, list)
-		if len(result) == 0 {
-			return nil
-		}
-	}
-	return result
-}
-
-// grepFromIndex searches indexed .go files using bigram prefiltering and cached content.
-// Called only for case-insensitive, non-regex queries.
-func grepFromIndex(queryLow string, max, contextLines int, idx *workspaceIndex) []grepResult {
-	bigrams := queryBigrams(queryLow)
-
-	idx.mu.RLock()
-	var candidateEntries []fileEntry
-	if bigrams != nil {
-		candidates := bigramCandidates(&idx.bigramIdx, bigrams)
-		candidateEntries = make([]fileEntry, len(candidates))
-		for i, fi := range candidates {
-			candidateEntries[i] = idx.entries[fi]
-		}
-	} else {
-		// Query too short for bigrams — scan all indexed entries.
-		candidateEntries = make([]fileEntry, len(idx.entries))
-		copy(candidateEntries, idx.entries)
-	}
-	idx.mu.RUnlock()
-
-	var results []grepResult
-	for _, entry := range candidateEntries {
-		for i, line := range entry.Lines {
-			if !strings.Contains(strings.ToLower(line), queryLow) {
-				continue
-			}
-			gr := grepResult{File: entry.RelPath, Line: i + 1, Text: strings.TrimSpace(line)}
-			if contextLines > 0 {
-				ctxStart := i - contextLines
-				if ctxStart < 0 {
-					ctxStart = 0
-				}
-				end := min(i+contextLines+1, len(entry.Lines))
-				for j := ctxStart; j < end; j++ {
-					if j != i {
-						gr.Context = append(gr.Context, fmt.Sprintf("%d: %s", j+1, entry.Lines[j]))
-					}
-				}
-			}
-			results = append(results, gr)
-		}
-		if len(results) >= max {
-			break
-		}
-	}
-	return results
-}
-
-// grepPathsChunked searches paths in chunks of grepChunkSize, stopping between
-// chunks as soon as max results have been accumulated.
-func grepPathsChunked(workspace string, paths []string, queryLow, query string, re *regexp.Regexp, max, contextLines int, caseInsensitive, useRegex bool) []grepResult {
-	if max <= 0 {
-		max = 30
-	}
-
-	sem := make(chan struct{}, runtime.NumCPU())
-	var allResults []grepResult
-
-	for chunkStart := 0; chunkStart < len(paths) && len(allResults) < max; chunkStart += grepChunkSize {
-		end := chunkStart + grepChunkSize
-		if end > len(paths) {
-			end = len(paths)
-		}
-		chunk := paths[chunkStart:end]
-
-		type fileMatches struct{ results []grepResult }
-		ch := make(chan fileMatches, len(chunk))
-		var wg sync.WaitGroup
-
-		for _, p := range chunk {
-			wg.Add(1)
-			go func(p string) {
-				defer wg.Done()
-				sem <- struct{}{}
-				defer func() { <-sem }()
-
-				content, err := os.ReadFile(p)
-				if err != nil {
-					ch <- fileMatches{}
-					return
-				}
-				rel, _ := filepath.Rel(workspace, p)
-				lines := strings.Split(string(content), "\n")
-
-				var local []grepResult
-				for i, line := range lines {
-					var matched bool
-					if useRegex {
-						matched = re.MatchString(line)
-					} else if caseInsensitive {
-						matched = strings.Contains(strings.ToLower(line), queryLow)
-					} else {
-						matched = strings.Contains(line, query)
-					}
-					if !matched {
-						continue
-					}
-					gr := grepResult{File: rel, Line: i + 1, Text: strings.TrimSpace(line)}
-					if contextLines > 0 {
-						ctxStart := i - contextLines
-						if ctxStart < 0 {
-							ctxStart = 0
-						}
-						ctxEnd := min(i+contextLines+1, len(lines))
-						for j := ctxStart; j < ctxEnd; j++ {
-							if j != i {
-								gr.Context = append(gr.Context, fmt.Sprintf("%d: %s", j+1, lines[j]))
-							}
-						}
-					}
-					local = append(local, gr)
-				}
-				ch <- fileMatches{results: local}
-			}(p)
-		}
-
-		go func() { wg.Wait(); close(ch) }()
-
-		for fm := range ch {
-			allResults = append(allResults, fm.results...)
-		}
-		// Check after each chunk — stop launching next chunks if we have enough.
-	}
-
-	sort.Slice(allResults, func(i, j int) bool {
-		if allResults[i].File != allResults[j].File {
-			return allResults[i].File < allResults[j].File
-		}
-		return allResults[i].Line < allResults[j].Line
-	})
-	if len(allResults) > max {
-		allResults = allResults[:max]
-	}
-	return allResults
-}
-
-// grepNonGoFiles walks the filesystem but skips .go files (already handled by grepFromIndex).
-func grepNonGoFiles(workspace, queryLow, query string, re *regexp.Regexp, max, contextLines int, gi *gitignore.GitIgnore, caseInsensitive bool) []grepResult {
-	var paths []string
-	_ = filepath.WalkDir(workspace, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if skipDir(d.Name()) {
-				return filepath.SkipDir
-			}
-			if gi != nil {
-				rel, _ := filepath.Rel(workspace, path)
-				if gi.MatchesPath(rel) {
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		}
-		if strings.HasSuffix(path, ".go") || isBinary(path) {
-			return nil // .go files handled by bigram index; skip binaries
-		}
-		if gi != nil {
-			rel, _ := filepath.Rel(workspace, path)
-			if gi.MatchesPath(rel) {
-				return nil
-			}
-		}
-		paths = append(paths, path)
-		return nil
-	})
-	return grepPathsChunked(workspace, paths, queryLow, query, nil, max, contextLines, caseInsensitive, false)
-}
-
-// grepAllFiles is the fallback for all files (regex or case-sensitive), chunked.
-func grepAllFiles(workspace, query, queryLow string, re *regexp.Regexp, max, contextLines int, gi *gitignore.GitIgnore, caseInsensitive, useRegex bool) []grepResult {
-	var paths []string
-	_ = filepath.WalkDir(workspace, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if skipDir(d.Name()) {
-				return filepath.SkipDir
-			}
-			if gi != nil {
-				rel, _ := filepath.Rel(workspace, path)
-				if gi.MatchesPath(rel) {
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		}
-		if isBinary(path) {
-			return nil
-		}
-		if gi != nil {
-			rel, _ := filepath.Rel(workspace, path)
-			if gi.MatchesPath(rel) {
-				return nil
-			}
-		}
-		paths = append(paths, path)
-		return nil
-	})
-	return grepPathsChunked(workspace, paths, queryLow, query, re, max, contextLines, caseInsensitive, useRegex)
-}
-
-func grepFiles(workspace, query string, max, contextLines int, idx *workspaceIndex) []grepResult {
-	if max <= 0 {
-		max = 30
-	}
-
-	gi := loadGitIgnore(workspace)
-	caseInsensitive := isSmartCaseInsensitive(query)
-	queryLow := strings.ToLower(query)
-
-	hasMetachar := strings.ContainsAny(query, `\.+*?^$()[]{}|`)
-	var re *regexp.Regexp
-	useRegex := false
-	if hasMetachar {
-		flags := ""
-		if caseInsensitive {
-			flags = "(?i)"
-		}
-		if compiled, err := regexp.Compile(flags + query); err == nil {
-			re = compiled
-			useRegex = true
-		}
-	}
-
-	// Fast path: bigram index + cached content for .go files.
-	if !useRegex && caseInsensitive && idx != nil {
-		indexedResults := grepFromIndex(queryLow, max, contextLines, idx)
-		if len(indexedResults) >= max {
-			sort.Slice(indexedResults, func(i, j int) bool {
-				if indexedResults[i].File != indexedResults[j].File {
-					return indexedResults[i].File < indexedResults[j].File
-				}
-				return indexedResults[i].Line < indexedResults[j].Line
-			})
-			return indexedResults[:max]
-		}
-		nonGoResults := grepNonGoFiles(workspace, queryLow, "", nil, max-len(indexedResults), contextLines, gi, caseInsensitive)
-		all := append(indexedResults, nonGoResults...)
-		sort.Slice(all, func(i, j int) bool {
-			if all[i].File != all[j].File {
-				return all[i].File < all[j].File
-			}
-			return all[i].Line < all[j].Line
-		})
-		if len(all) > max {
-			all = all[:max]
-		}
-		return all
-	}
-
-	// Fallback: chunked parallel walk of all non-binary files (for regex or case-sensitive queries).
-	return grepAllFiles(workspace, query, queryLow, re, max, contextLines, gi, caseInsensitive, useRegex)
-}
-
-func multiGrep(workspace string, patterns []string, max, contextLines int, idx *workspaceIndex) []grepResult {
-	if max <= 0 {
-		max = 30
-	}
-	type matchKey struct {
-		file string
-		line int
-	}
-	seen := make(map[matchKey]bool)
-	var results []grepResult
-
-	for _, pattern := range patterns {
-		if len(results) >= max {
-			break
-		}
-		for _, h := range grepFiles(workspace, pattern, max-len(results), contextLines, idx) {
-			key := matchKey{h.File, h.Line}
-			if !seen[key] {
-				seen[key] = true
-				h.Pattern = pattern
-				results = append(results, h)
-			}
-		}
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		if results[i].File != results[j].File {
-			return results[i].File < results[j].File
-		}
-		return results[i].Line < results[j].Line
-	})
-	return results
-}
-
-func formatGrepResults(results []grepResult) string {
-	var sb strings.Builder
-	for _, r := range results {
-		fmt.Fprintf(&sb, "%s:%d\t%s\n", r.File, r.Line, r.Text)
-		for _, ctx := range r.Context {
-			sb.WriteString("  " + ctx + "\n")
-		}
-	}
-	return sb.String()
-}
-
 // --- Response helpers --------------------------------------------------------
 
 func toolText(text string) *mcp.CallToolResult {
@@ -1510,13 +1024,6 @@ func main() {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "gosdk", Version: "v2.0.0"}, nil)
 
 	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "ping",
-		Description: "Health check — returns pong",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		return toolText("pong"), nil, nil
-	})
-
-	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "lsp_document_symbols",
 		Description: "List all symbols in a Go source file. Pass the full file content as `content`. Use lsp_file_symbols instead when working with workspace files.",
 	}, func(_ context.Context, _ *mcp.CallToolRequest, p DocumentSymbolParams) (*mcp.CallToolResult, any, error) {
@@ -1618,48 +1125,6 @@ func main() {
 		Name:        "decisions_search",
 		Description: "Search all governing documents by keyword. Returns scored section matches with content preview. Use to find relevant guidance without knowing which document to consult.",
 	}, handleDecisionsSearch(docs))
-
-	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "find_files",
-		Description: "Fuzzy file name search across the workspace. Matches query against relative file paths. Results ranked by directory depth (shallower first).",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, p FindFilesParams) (*mcp.CallToolResult, any, error) {
-		ws := resolveWorkspace(p.Workspace)
-		files := findFiles(ws, p.Query, p.MaxResults)
-		if len(files) == 0 {
-			return toolText(fmt.Sprintf("no files found matching %q", p.Query)), nil, nil
-		}
-		return toolText(strings.Join(files, "\n")), nil, nil
-	})
-
-	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "grep",
-		Description: "Smart-case text search across all non-binary workspace files. All-lowercase query = case-insensitive; any uppercase letter = case-sensitive. Set `context` for surrounding lines.",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, p GrepParams) (*mcp.CallToolResult, any, error) {
-		if p.Query == "" {
-			return toolError("query is required"), nil, nil
-		}
-		ws := resolveWorkspace(p.Workspace)
-		results := grepFiles(ws, p.Query, p.MaxResults, p.Context, idx)
-		if len(results) == 0 {
-			return toolText(fmt.Sprintf("no matches for %q", p.Query)), nil, nil
-		}
-		return toolText(formatGrepResults(results)), nil, nil
-	})
-
-	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "multi_grep",
-		Description: "OR-logic multi-pattern search across all non-binary workspace files. Searches multiple patterns, deduplicates results at the same file:line, sorts by file and line.",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, p MultiGrepParams) (*mcp.CallToolResult, any, error) {
-		if len(p.Patterns) == 0 {
-			return toolError("patterns is required"), nil, nil
-		}
-		ws := resolveWorkspace(p.Workspace)
-		results := multiGrep(ws, p.Patterns, p.MaxResults, p.Context, idx)
-		if len(results) == 0 {
-			return toolText("no matches found"), nil, nil
-		}
-		return toolText(formatGrepResults(results)), nil, nil
-	})
 
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv }, nil)
 	mux := http.NewServeMux()
