@@ -28,7 +28,7 @@ weight: 15
 
 ## 0. Quick Reference
 
-- §1 Core principles: standard library first, DI over globals, explicit over magic, small interfaces
+- §1 Core principles: standard library first, DI over globals, explicit over magic, small interfaces, prod-faithful dev
 - §2/2a Project structure: flat vs modular layout, migration signals, technology stack
 - §3 Server struct: single struct owns all dependencies, middleware wrapping
 - §4 Routing: Go 1.22+ method-based routing, path params, wildcard matching, precedence
@@ -83,6 +83,19 @@ type UserFinder interface {
 ```
 
 This keeps coupling minimal and testability high without premature abstraction.
+
+### 1e. Production-Faithful Dev Environment over Simplified Scaffolding
+
+The development environment is a fully configured production environment with
+hot reload, not a stripped-down setup that only handles simple scenarios. Every
+service, middleware chain, and configuration value present in production must be
+present in development. If a code path will not run in production, it does not
+belong in the development configuration.
+
+Tests are the sole exception. Tests may substitute in-memory stores, shorter
+timeouts, or deterministic clocks for performance, memory efficiency, and
+repeatability. This exception is valid only when corresponding tests exist to
+exercise all behaviors the substitution replaces.
 
 ---
 

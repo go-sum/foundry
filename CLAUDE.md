@@ -15,6 +15,7 @@
 - ALWAYS validate user input at system boundaries; sanitize file paths (prevent `../` traversal)
 - ALWAYS ensure implementations leverage the project's shared security module
 - ALWAYS run tests after making code changes
+- NEVER add dev-only shortcuts that bypass production behavior (disabled auth, mock services, skipped middleware) — dev mirrors production; see ARCHITECTURE_GUIDE.md §1e
 - ALWAYS trace ALL callers when refactoring Go config structs or YAML mappings
 - ALWAYS account for HTML-encoded entities in test assertions for HTML output
 - ALWAYS enforce exact-match test assertions — never substring matching
