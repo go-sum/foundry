@@ -64,9 +64,10 @@ const (
 	CodeUnavailable       Code = "service_unavailable"
 	CodeTooManyRequests   Code = "too_many_requests"
 	CodeBadGateway        Code = "bad_gateway"
-	CodeMethodNotAllowed  Code = "method_not_allowed"
-	CodePayloadTooLarge   Code = "payload_too_large"
-	CodeUnsupportedMedia  Code = "unsupported_media_type"
+	CodeMethodNotAllowed    Code = "method_not_allowed"
+	CodePayloadTooLarge     Code = "payload_too_large"
+	CodeUnsupportedMedia    Code = "unsupported_media_type"
+	CodeMisdirectedRequest  Code = "misdirected_request"
 )
 
 // DefaultTypeBase is the RFC 7807 "type" URI used when no TypeURI is set on an Error.
@@ -238,6 +239,11 @@ func ErrPayloadTooLarge(msg string) *Error {
 // ErrUnsupportedMedia returns a 415 Unsupported Media Type error.
 func ErrUnsupportedMedia(msg string) *Error {
 	return NewError(http.StatusUnsupportedMediaType, CodeUnsupportedMedia, "Unsupported Media Type", msg, nil)
+}
+
+// ErrMisdirectedRequest returns a 421 Misdirected Request error.
+func ErrMisdirectedRequest(message string) *Error {
+	return NewError(http.StatusMisdirectedRequest, CodeMisdirectedRequest, "Misdirected Request", message, nil)
 }
 
 // Classify maps a generic error to an *Error. The mapping order is:

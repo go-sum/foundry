@@ -43,3 +43,33 @@ func TestNew_PanicsOnInvalidBaseURL(t *testing.T) {
 	}()
 	New(Config{BaseURL: "://bad-url"})
 }
+
+func TestBuildAllowedHosts(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseURL string
+		extra   string
+		want    []string
+	}{
+		{"base URL only", "https://example.com", "", []string{"example.com"}},
+		{"base URL with port", "https://example.com:8443/path", "", []string{"example.com"}},
+		{"extra hosts only", "", "www.example.com, cdn.example.com", []string{"www.example.com", "cdn.example.com"}},
+		{"base URL and extra", "https://example.com", "www.example.com", []string{"example.com", "www.example.com"}},
+		{"empty inputs", "", "", nil},
+		{"unparseable base URL", "://bad", "", nil},
+		{"extra with empty entries", "https://example.com", " , ,alias.example.com", []string{"example.com", "alias.example.com"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildAllowedHosts(tt.baseURL, tt.extra)
+			if len(got) != len(tt.want) {
+				t.Fatalf("BuildAllowedHosts() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("BuildAllowedHosts()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}

@@ -52,6 +52,14 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	if cfg.Env == Production && cfg.Site.BaseURL == "" {
+		return nil, ErrBaseURLMissing
+	}
+
+	if cfg.Env == Production && len(cfg.Site.AllowedHosts) == 0 {
+		return nil, ErrAllowedHostsEmpty
+	}
+
 	if err := cfgpkg.Validate(cfg); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
@@ -63,6 +71,10 @@ func defaultProduction() (Config, error) {
 	csrf, err := defaultCSRF()
 	if err != nil {
 		return Config{}, fmt.Errorf("config: security: %w", err)
+	}
+	serverCfg, err := serve.DefaultServerConfigFromEnv()
+	if err != nil {
+		return Config{}, err
 	}
 	authCfg, err := DefaultAuth(siteBaseURL)
 	if err != nil {
@@ -82,18 +94,21 @@ func defaultProduction() (Config, error) {
 			RateLimit:  3,
 			RateWindow: time.Hour,
 		},
-		CSP:     secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash),
-		CSRF:    csrf,
-		Env:     Production,
-		Headers: secure.DefaultHeadersConfig(),
+		CSP:          secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash),
+		CSRF:         csrf,
+		Env:          Production,
+		Headers:      secure.DefaultHeadersConfig(),
 		KV: KVConfig{
 			Addr:     cfgpkg.ExpandEnv("KV_HOST", "localhost") + ":" + cfgpkg.ExpandEnv("KV_PORT", "6379"),
 			Password: cfgpkg.ExpandSecret("KV_PASSWORD"),
 		},
 		RateLimit:    secure.DefaultRateLimitProfile(),
-		Server:       serve.DefaultServerConfig(),
+		Server:       serverCfg,
 		Session:      session.DefaultSettings(),
 		SessionStore: cfgpkg.ExpandEnv("SESSION_STORE", "memory"),
-		Site:         site.Config{BaseURL: siteBaseURL},
+		Site: site.Config{
+			BaseURL:      siteBaseURL,
+			AllowedHosts: site.BuildAllowedHosts(siteBaseURL, cfgpkg.ExpandEnv("SITE_ALLOWED_HOSTS", "")),
+		},
 	}, nil
 }

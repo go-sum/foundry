@@ -13,8 +13,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-const versionAEAD byte = 0x82
-const versionAEAD2 byte = 0x83
+const versionAEAD byte = 0x83
 
 func serializeAEAD(name string, secret []byte, value string, exp time.Time) (string, error) {
 	key, err := deriveAEADKey(secret)
@@ -42,14 +41,14 @@ func serializeAEAD(name string, secret []byte, value string, exp time.Time) (str
 	binary.BigEndian.PutUint64(iatExp[8:16], uint64(expUnix))
 
 	// AAD binds name + version + iat + exp
-	aad := buildAEADAAD(name, versionAEAD2, iatExp[:])
+	aad := buildAEADAAD(name, versionAEAD, iatExp[:])
 
 	plaintext := []byte(value)
 	ciphertext := aead.Seal(nil, nonce[:], plaintext, aad)
 
 	// blob = version(1) || nonce(24) || iat_int64(8) || exp_int64(8) || ciphertext+tag
 	blob := make([]byte, 1+len(nonce)+16+len(ciphertext))
-	blob[0] = versionAEAD2
+	blob[0] = versionAEAD
 	copy(blob[1:], nonce[:])
 	copy(blob[1+len(nonce):], iatExp[:])
 	copy(blob[1+len(nonce)+16:], ciphertext)
@@ -72,16 +71,11 @@ func parseAEAD(name string, secrets [][]byte, encoded string) (string, error) {
 	}
 
 	version := blob[0]
-	if version != versionAEAD && version != versionAEAD2 {
+	if version != versionAEAD {
 		return "", ErrInvalid
 	}
 
-	var iatExpSize int
-	if version == versionAEAD {
-		iatExpSize = 8 // two uint32 fields
-	} else {
-		iatExpSize = 16 // two int64 fields
-	}
+	const iatExpSize = 16 // two int64 fields
 
 	minLen := 1 + nonceSize + iatExpSize + 16 // version + nonce + iat+exp + poly1305 tag
 	if len(blob) < minLen {
@@ -92,12 +86,7 @@ func parseAEAD(name string, secrets [][]byte, encoded string) (string, error) {
 	iatExp := blob[1+nonceSize : 1+nonceSize+iatExpSize]
 	ciphertext := blob[1+nonceSize+iatExpSize:]
 
-	var expUnix int64
-	if version == versionAEAD {
-		expUnix = int64(binary.BigEndian.Uint32(iatExp[4:8]))
-	} else {
-		expUnix = int64(binary.BigEndian.Uint64(iatExp[8:16]))
-	}
+	expUnix := int64(binary.BigEndian.Uint64(iatExp[8:16]))
 
 	aad := buildAEADAAD(name, version, iatExp)
 
@@ -123,8 +112,14 @@ func parseAEAD(name string, secrets [][]byte, encoded string) (string, error) {
 	return "", ErrInvalid
 }
 
+// hkdfSalt is a fixed, non-secret domain-separation salt for HKDF extraction.
+// A named salt strengthens the PRK derivation when input key material has low
+// entropy and ensures this HKDF invocation is distinct from any other consumer
+// of the same key material. Never change this value after deployment.
+const hkdfSalt = "github.com/go-sum/foundry/pkg/web/cookiecodec"
+
 func deriveAEADKey(secret []byte) ([]byte, error) {
-	r := hkdf.New(sha256.New, secret, nil, []byte("web/cookiecodec/v2/aead"))
+	r := hkdf.New(sha256.New, secret, []byte(hkdfSalt), []byte("web/cookiecodec/v2/aead"))
 	key := make([]byte, chacha20poly1305.KeySize)
 	if _, err := io.ReadFull(r, key); err != nil {
 		return nil, err

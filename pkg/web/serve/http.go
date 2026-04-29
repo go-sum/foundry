@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -30,6 +31,11 @@ type Config struct {
 	// OnError is called when writing the response body fails. Defaults to
 	// logging the error at ERROR level via slog.Default().
 	OnError func(err error)
+
+	// TrustedProxies lists parsed CIDR ranges whose X-Forwarded-Proto header
+	// is accepted for scheme detection. When empty, scheme is inferred from
+	// TLS state only. Build this slice via ParseTrustedProxies.
+	TrustedProxies []*net.IPNet
 }
 
 // ToHTTPHandler wraps a web.Handler as an http.Handler with default config.
@@ -62,7 +68,7 @@ func acquireContextWithConfig(w http.ResponseWriter, r *http.Request, cfg Config
 		limit := cmp.Or(cfg.MaxRequestBodyBytes, defaultMaxRequestBodyBytes)
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
 	}
-	req := FromHTTPRequest(r)
+	req := fromHTTPRequestWithConfig(r, cfg)
 	return web.AcquireContext(r.Context(), req)
 }
 
@@ -70,10 +76,23 @@ func acquireContextWithConfig(w http.ResponseWriter, r *http.Request, cfg Config
 //
 // Unlike outbound requests, net/http server requests have a path-only r.URL —
 // Scheme and Host are always empty. This function builds an absolute URL so
-// that middleware (CSRF, OriginGuard) can perform same-origin comparisons without
-// relying on X-Forwarded-Proto alone. Scheme precedence: r.TLS (direct TLS)
-// → X-Forwarded-Proto header → "http".
+// that middleware (CSRF, OriginGuard) can perform same-origin comparisons.
+// Scheme precedence: r.TLS (direct TLS) → "http". X-Forwarded-Proto is never
+// trusted here; use ToHTTPHandlerWithConfig with Config.TrustedProxies to
+// accept forwarded-proto from known proxy peers.
 func FromHTTPRequest(r *http.Request) web.Request {
+	return buildWebRequest(r, nil)
+}
+
+// fromHTTPRequestWithConfig is like FromHTTPRequest but gates X-Forwarded-Proto
+// trust on cfg.TrustedProxies.
+func fromHTTPRequestWithConfig(r *http.Request, cfg Config) web.Request {
+	return buildWebRequest(r, cfg.TrustedProxies)
+}
+
+// buildWebRequest is the shared implementation behind FromHTTPRequest and
+// fromHTTPRequestWithConfig.
+func buildWebRequest(r *http.Request, trusted []*net.IPNet) web.Request {
 	headers := web.NewHeaders()
 	for name, values := range r.Header {
 		for _, v := range values {
@@ -93,12 +112,7 @@ func FromHTTPRequest(r *http.Request) web.Request {
 		abs.Host = r.Host
 	}
 	if abs.Scheme == "" {
-		switch {
-		case r.TLS != nil, strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https"):
-			abs.Scheme = "https"
-		default:
-			abs.Scheme = "http"
-		}
+		abs.Scheme = resolveScheme(r, trusted)
 	}
 
 	req := web.NewRequest(r.Method, &abs)
@@ -107,6 +121,87 @@ func FromHTTPRequest(r *http.Request) web.Request {
 	req.SetHost(r.Host)
 	req.SetRemoteAddr(r.RemoteAddr)
 	return req
+}
+
+// resolveScheme determines the request scheme. Direct TLS always wins. When
+// TLS is absent, X-Forwarded-Proto is accepted only from a trusted peer and
+// only when the header is present exactly once, contains no commas, and is
+// exactly "http" or "https". Duplicate, comma-separated, or malformed values
+// are ignored and the default "http" is returned.
+func resolveScheme(r *http.Request, trusted []*net.IPNet) string {
+	if r.TLS != nil {
+		return "https"
+	}
+	if !IsTrustedProxy(r.RemoteAddr, trusted) {
+		return "http"
+	}
+	vals := r.Header.Values("X-Forwarded-Proto")
+	if len(vals) != 1 {
+		return "http"
+	}
+	if strings.Contains(vals[0], ",") {
+		return "http"
+	}
+	p := strings.ToLower(strings.TrimSpace(vals[0]))
+	if p == "http" || p == "https" {
+		return p
+	}
+	return "http"
+}
+
+// NormalizeProxyIP canonicalizes an IP token from RemoteAddr, X-Forwarded-For,
+// or Forwarded. Accepts bare IPs, bracketed IPv6 literals, and host:port forms.
+// Returns the canonical Go net.IP string and true on success.
+func NormalizeProxyIP(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+	if parsed := net.ParseIP(strings.Trim(raw, "[]")); parsed != nil {
+		return parsed.String(), true
+	}
+	if splitHost, _, err := net.SplitHostPort(raw); err == nil {
+		raw = splitHost
+	}
+	raw = strings.Trim(strings.TrimSpace(raw), "[]")
+	parsed := net.ParseIP(raw)
+	if parsed == nil {
+		return "", false
+	}
+	return parsed.String(), true
+}
+
+// IsTrustedProxy reports whether remoteAddr falls within any of the trusted CIDRs.
+// It accepts bare IPs, bracketed IPv6, host:port, and IPv4-mapped IPv6 forms.
+func IsTrustedProxy(remoteAddr string, trusted []*net.IPNet) bool {
+	if len(trusted) == 0 {
+		return false
+	}
+	normalized, ok := NormalizeProxyIP(remoteAddr)
+	if !ok {
+		return false
+	}
+	ip := net.ParseIP(normalized)
+	for _, cidr := range trusted {
+		if cidr.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// ParseTrustedProxies parses CIDR strings into []*net.IPNet for use in
+// Config.TrustedProxies. Returns an error for the first unparseable entry.
+func ParseTrustedProxies(cidrs []string) ([]*net.IPNet, error) {
+	out := make([]*net.IPNet, 0, len(cidrs))
+	for _, s := range cidrs {
+		_, ipnet, err := net.ParseCIDR(s)
+		if err != nil {
+			return nil, fmt.Errorf("web/serve: invalid trusted proxy CIDR %q: %w", s, err)
+		}
+		out = append(out, ipnet)
+	}
+	return out, nil
 }
 
 // NewContext converts an *http.Request into a *web.Context without adapter config.
@@ -120,7 +215,7 @@ func NewContextWithConfig(w http.ResponseWriter, r *http.Request, cfg Config) *w
 		limit := cmp.Or(cfg.MaxRequestBodyBytes, defaultMaxRequestBodyBytes)
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
 	}
-	return NewContext(r)
+	return web.NewContext(r.Context(), fromHTTPRequestWithConfig(r, cfg))
 }
 
 // WriteHTTPResponse writes a web.Response back to net/http.

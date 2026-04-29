@@ -52,9 +52,15 @@ func (s *Store) GetCode(ctx context.Context, code string) (provider.Authorizatio
 
 // MarkCodeUsed implements provider.CodeStore.
 func (s *Store) MarkCodeUsed(ctx context.Context, code string) error {
-	const q = `UPDATE oauth_authorization_codes SET used = true WHERE code = $1`
-	_, err := s.pool.Exec(ctx, q, code)
-	return err
+	const q = `UPDATE oauth_authorization_codes SET used = true WHERE code = $1 AND used = false`
+	result, err := s.pool.Exec(ctx, q, code)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return provider.ErrCodeUsed
+	}
+	return nil
 }
 
 // DeleteExpiredCodes implements provider.CodeStore.

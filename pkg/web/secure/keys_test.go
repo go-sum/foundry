@@ -43,38 +43,6 @@ func TestDecodeHexKey_TrimsWhitespace(t *testing.T) {
 	}
 }
 
-func TestDecodeHexKeys_MultiValue(t *testing.T) {
-	hexA := strings.Repeat("aa", 32)
-	hexB := strings.Repeat("bb", 32)
-	keys, err := decodeHexKeys(hexA + "," + hexB)
-	if err != nil {
-		t.Fatalf("decodeHexKeys() error = %v", err)
-	}
-	if len(keys) != 2 {
-		t.Fatalf("len(keys) = %d, want 2", len(keys))
-	}
-}
-
-func TestDecodeHexKeys_SkipEmpty(t *testing.T) {
-	hexA := strings.Repeat("aa", 32)
-	hexB := strings.Repeat("bb", 32)
-	keys, err := decodeHexKeys(hexA + ",," + hexB)
-	if err != nil {
-		t.Fatalf("decodeHexKeys() error = %v", err)
-	}
-	if len(keys) != 2 {
-		t.Fatalf("len(keys) = %d, want 2 (empty entry skipped)", len(keys))
-	}
-}
-
-func TestDecodeHexKeys_InvalidEntry(t *testing.T) {
-	hexA := strings.Repeat("aa", 32)
-	_, err := decodeHexKeys(hexA + ",not-hex")
-	if err == nil {
-		t.Fatal("expected error when one entry is invalid, got nil")
-	}
-}
-
 func TestGenerateKeyHex_Shape(t *testing.T) {
 	s, err := GenerateKeyHex()
 	if err != nil {

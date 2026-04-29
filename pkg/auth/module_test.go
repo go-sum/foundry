@@ -171,6 +171,14 @@ func TestNewModule_ValidatesRequiredDependencies(t *testing.T) {
 			wantErr: "auth: TokenCodec is required when email TOTP is enabled",
 		},
 		{
+			name: "email totp enabled without token nonce store",
+			mutate: func(cfg *ModuleConfig) {
+				cfg.Config.EmailTOTP.Enabled = true
+				cfg.TokenCodec = stubTokenCodec{}
+			},
+			wantErr: "auth: TokenNonceStore is required when email TOTP is enabled",
+		},
+		{
 			name: "passkeys enabled without credentials",
 			mutate: func(cfg *ModuleConfig) {
 				cfg.Config.Passkey.Enabled = true

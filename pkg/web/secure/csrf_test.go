@@ -24,10 +24,11 @@ func testCSRFKey() []byte {
 }
 
 func testCSRFConfig() CSRFConfig {
-	return CSRFConfig{
-		Key:      testCSRFKey(),
-		TokenTTL: time.Hour,
-	}
+	cfg := DefaultCSRFConfig()
+	cfg.Key = testCSRFKey()
+	cfg.TokenTTL = time.Hour
+	cfg.AllowMissingOrigin = true // token-focused tests; origin tests use explicit configs
+	return cfg
 }
 
 // assertForbidden asserts that err is a *web.Error with status 403 and the given message.
@@ -79,6 +80,26 @@ func TestCSRF_GET_StoresTokenInContext(t *testing.T) {
 	}
 }
 
+func TestSameOriginBase_UsesNormalizedRequestURLScheme(t *testing.T) {
+	req := web.NewRequest(http.MethodPost, &url.URL{Scheme: "https", Host: "example.com", Path: "/submit"})
+
+	got := sameOriginBase(web.NewContext(context.Background(), req))
+	if got != "https://example.com" {
+		t.Fatalf("sameOriginBase() = %q, want %q", got, "https://example.com")
+	}
+}
+
+func TestSameOriginBase_IgnoresRawXForwardedProto(t *testing.T) {
+	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/submit"})
+	req.SetHost("example.com")
+	req.Headers.Set("X-Forwarded-Proto", "https")
+
+	got := sameOriginBase(web.NewContext(context.Background(), req))
+	if got != "http://example.com" {
+		t.Fatalf("sameOriginBase() = %q, want %q", got, "http://example.com")
+	}
+}
+
 func TestCSRF_POST_MissingToken_Returns403(t *testing.T) {
 	mw := CSRF(testCSRFConfig())
 	called := false
@@ -122,47 +143,6 @@ func TestCSRF_POST_ValidTokenInHeader_PassesThrough(t *testing.T) {
 	}
 	if !called {
 		t.Error("next handler was not called despite valid CSRF token")
-	}
-}
-
-func TestCSRF_POST_ValidTokenInXXSRFHeader_PassesThrough(t *testing.T) {
-	cfg := testCSRFConfig()
-	mw := CSRF(cfg)
-
-	tok, err := IssueToken(cfg.Key, "csrf", cfg.TokenTTL)
-	if err != nil {
-		t.Fatalf("IssueToken: %v", err)
-	}
-
-	handler := mw(func(c *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil })
-
-	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/test"})
-	req.Headers.Set("X-XSRF-Token", tok)
-	req.Headers.Set("Cookie", "csrf="+tok)
-
-	resp, _ := handler(web.NewContext(context.Background(), req))
-	if resp.Status != http.StatusOK {
-		t.Fatalf("X-XSRF-Token: status = %d, want %d", resp.Status, http.StatusOK)
-	}
-}
-
-func TestCSRF_POST_ValidTokenInQueryParam_PassesThrough(t *testing.T) {
-	cfg := testCSRFConfig()
-	mw := CSRF(cfg)
-
-	tok, err := IssueToken(cfg.Key, "csrf", cfg.TokenTTL)
-	if err != nil {
-		t.Fatalf("IssueToken: %v", err)
-	}
-
-	handler := mw(func(c *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil })
-
-	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/test", RawQuery: "_csrf=" + tok})
-	req.Headers.Set("Cookie", "csrf="+tok)
-
-	resp, _ := handler(web.NewContext(context.Background(), req))
-	if resp.Status != http.StatusOK {
-		t.Fatalf("query param: status = %d, want %d", resp.Status, http.StatusOK)
 	}
 }
 
@@ -294,12 +274,12 @@ func TestCSRF_POST_ExpiredToken_Returns403(t *testing.T) {
 	cfg := testCSRFConfig()
 	mw := CSRF(cfg)
 
-	tok, err := IssueToken(cfg.Key, "csrf", time.Millisecond)
+	tok, err := IssueToken(cfg.Key, "csrf", time.Nanosecond)
 	if err != nil {
 		t.Fatalf("IssueToken: %v", err)
 	}
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Millisecond) // 1ns TTL is always expired after 1ms
 
 	called := false
 	handler := mw(func(c *web.Context) (web.Response, error) {
@@ -641,113 +621,6 @@ func TestCSRF_SecFetchSite_CrossSite_Blocks(t *testing.T) {
 	}
 }
 
-func testAltCSRFKey() []byte {
-	key := make([]byte, 32)
-	for i := range key {
-		key[i] = byte(i + 100)
-	}
-	return key
-}
-
-func TestCSRF_RotatedKey_AcceptsTokenFromPreviousKey(t *testing.T) {
-	keyA := testCSRFKey()
-	keyB := testAltCSRFKey()
-
-	tok, err := IssueToken(keyA, "csrf", time.Hour)
-	if err != nil {
-		t.Fatalf("IssueToken: %v", err)
-	}
-
-	cfg := CSRFConfig{
-		Key:          keyB,
-		PreviousKeys: [][]byte{keyA},
-		TokenTTL:     time.Hour,
-	}
-	mw := CSRF(cfg)
-
-	called := false
-	handler := mw(func(c *web.Context) (web.Response, error) {
-		called = true
-		return web.Respond(http.StatusOK), nil
-	})
-
-	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/test"})
-	req.Headers.Set("X-CSRF-Token", tok)
-	req.Headers.Set("Cookie", "csrf="+tok)
-
-	resp, _ := handler(web.NewContext(context.Background(), req))
-	if resp.Status != http.StatusOK {
-		t.Fatalf("status = %d, want 200; token from previous key must be accepted", resp.Status)
-	}
-	if !called {
-		t.Error("next handler was not called")
-	}
-}
-
-func TestCSRF_RotatedKey_RejectsTokenFromRetiredKey(t *testing.T) {
-	keyA := testCSRFKey()
-	keyB := testAltCSRFKey()
-
-	tok, err := IssueToken(keyA, "csrf", time.Hour)
-	if err != nil {
-		t.Fatalf("IssueToken: %v", err)
-	}
-
-	// keyA is no longer in PreviousKeys.
-	cfg := CSRFConfig{
-		Key:      keyB,
-		TokenTTL: time.Hour,
-	}
-	mw := CSRF(cfg)
-
-	handler := mw(func(c *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil })
-
-	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/test"})
-	req.Headers.Set("X-CSRF-Token", tok)
-	req.Headers.Set("Cookie", "csrf="+tok)
-
-	_, err = handler(web.NewContext(context.Background(), req))
-
-	var webErr *web.Error
-	if !errors.As(err, &webErr) {
-		t.Fatalf("expected *web.Error, got %T: %v", err, err)
-	}
-	if webErr.Status != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403; retired key must be rejected", webErr.Status)
-	}
-}
-
-func TestCSRF_RotatedKey_IssuesWithPrimaryOnly(t *testing.T) {
-	keyA := testCSRFKey()
-	keyB := testAltCSRFKey()
-
-	cfg := CSRFConfig{
-		Key:          keyB,
-		PreviousKeys: [][]byte{keyA},
-		TokenTTL:     time.Hour,
-	}
-	mw := CSRF(cfg)
-
-	var contextToken string
-	handler := mw(func(c *web.Context) (web.Response, error) {
-		contextToken = CSRFToken(c)
-		return web.Respond(http.StatusOK), nil
-	})
-
-	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/test"})
-	resp, _ := handler(web.NewContext(context.Background(), req))
-	if resp.Status != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.Status)
-	}
-
-	if err := VerifyToken(keyB, "csrf", contextToken); err != nil {
-		t.Errorf("issued token not valid under primary key B: %v", err)
-	}
-	if err := VerifyToken(keyA, "csrf", contextToken); err == nil {
-		t.Error("issued token must not be valid under retired key A")
-	}
-}
-
 func TestCSRFToken_BackwardCompat(t *testing.T) {
 	cfg := testCSRFConfig()
 	mw := CSRF(cfg)
@@ -823,53 +696,6 @@ func TestCSRFToken_NoTokenInContext_ReturnsEmptyViaNewAccessors(t *testing.T) {
 	}
 }
 
-func TestCSRF_PanicsOnShortPreviousKey(t *testing.T) {
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("expected panic for short PreviousKey, got none")
-		}
-	}()
-	CSRF(CSRFConfig{
-		Key:          testCSRFKey(),
-		PreviousKeys: [][]byte{[]byte("short")},
-	})
-}
-
-func TestCSRF_ExpiredTokenAcrossAllKeys_Returns403(t *testing.T) {
-	keyA := testCSRFKey()
-	keyB := testAltCSRFKey()
-
-	tok, err := IssueToken(keyA, "csrf", time.Millisecond)
-	if err != nil {
-		t.Fatalf("IssueToken: %v", err)
-	}
-	time.Sleep(10 * time.Millisecond)
-
-	cfg := CSRFConfig{
-		Key:          keyB,
-		PreviousKeys: [][]byte{keyA},
-		TokenTTL:     time.Hour,
-	}
-	mw := CSRF(cfg)
-
-	handler := mw(func(c *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil })
-
-	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/test"})
-	req.Headers.Set("X-CSRF-Token", tok)
-	req.Headers.Set("Cookie", "csrf="+tok)
-
-	_, err = handler(web.NewContext(context.Background(), req))
-
-	var webErr *web.Error
-	if !errors.As(err, &webErr) {
-		t.Fatalf("expected *web.Error, got %T: %v", err, err)
-	}
-	if webErr.Status != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403; expired token under A with Key=B must be rejected", webErr.Status)
-	}
-}
-
 func TestCSRF_UsesSessionBackedTokensWhenSessionMiddlewarePresent(t *testing.T) {
 	codec, err := cookiecodec.New(cookiecodec.Config{
 		Name:    "session",
@@ -912,5 +738,182 @@ func TestCSRF_UsesSessionBackedTokensWhenSessionMiddlewarePresent(t *testing.T) 
 	}
 	if strings.Count(resp.Headers.Get("Set-Cookie"), "csrf=") != 0 {
 		t.Fatalf("session-backed CSRF should not emit standalone csrf cookie, got %q", resp.Headers.Get("Set-Cookie"))
+	}
+}
+
+func TestCSRF_AllowMissingOrigin_False_BlocksUnsafeRequest(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.AllowMissingOrigin = false
+	mw := CSRF(cfg)
+
+	tok, _ := IssueToken(cfg.Key, "csrf", cfg.TokenTTL)
+	handler := mw(func(c *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil })
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/test"})
+	req.Headers.Set("X-CSRF-Token", tok)
+	req.Headers.Set("Cookie", "csrf="+tok)
+	// No Origin or Referer — must be rejected when AllowMissingOrigin is false.
+
+	_, err := handler(web.NewContext(context.Background(), req))
+	assertForbidden(t, err, "CSRF origin invalid")
+}
+
+func TestCSRF_AllowMissingOrigin_True_AllowsUnsafeRequestWithoutOrigin(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.AllowMissingOrigin = true
+	mw := CSRF(cfg)
+
+	tok, _ := IssueToken(cfg.Key, "csrf", cfg.TokenTTL)
+	handler := mw(func(c *web.Context) (web.Response, error) { return web.Respond(http.StatusOK), nil })
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/test"})
+	req.Headers.Set("X-CSRF-Token", tok)
+	req.Headers.Set("Cookie", "csrf="+tok)
+	// No Origin or Referer — must pass when AllowMissingOrigin is true.
+
+	resp, _ := handler(web.NewContext(context.Background(), req))
+	if resp.Status != http.StatusOK {
+		t.Fatalf("AllowMissingOrigin=true: status = %d, want 200", resp.Status)
+	}
+}
+
+func TestCSRF_CustomHeaderName_IsValidatedOnSubmission(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.HeaderName = "X-Custom-Token"
+	mw := CSRF(cfg)
+
+	tok, err := IssueToken(cfg.Key, "csrf", cfg.TokenTTL)
+	if err != nil {
+		t.Fatalf("IssueToken: %v", err)
+	}
+
+	called := false
+	handler := mw(func(c *web.Context) (web.Response, error) {
+		called = true
+		return web.Respond(http.StatusOK), nil
+	})
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/test"})
+	req.Headers.Set("X-Custom-Token", tok)
+	req.Headers.Set("Cookie", "csrf="+tok)
+
+	resp, _ := handler(web.NewContext(context.Background(), req))
+	if resp.Status != http.StatusOK {
+		t.Fatalf("custom HeaderName: status = %d, want 200; token submitted via advertised header must be accepted", resp.Status)
+	}
+	if !called {
+		t.Error("next handler was not called")
+	}
+}
+
+func TestValidOrigin_UsesServerOriginOverHostHeader(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.ServerOrigin = "https://legit.example.com"
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Scheme: "https", Host: "attacker.example.com", Path: "/submit"})
+	req.Headers.Set("Origin", "https://legit.example.com")
+
+	c := web.NewContext(context.Background(), req)
+	got := validOrigin(c, cfg)
+	if !got {
+		t.Fatal("validOrigin() = false, want true: ServerOrigin should match Origin even with spoofed Host")
+	}
+}
+
+func TestValidOrigin_ServerOriginRejectsMismatch(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.ServerOrigin = "https://legit.example.com"
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Scheme: "https", Host: "attacker.example.com", Path: "/submit"})
+	req.Headers.Set("Origin", "https://attacker.example.com")
+
+	c := web.NewContext(context.Background(), req)
+	got := validOrigin(c, cfg)
+	if got {
+		t.Fatal("validOrigin() = true, want false: Origin matching spoofed Host should be rejected when ServerOrigin differs")
+	}
+}
+
+// TestSameOrigin_DefaultPortNotCanonicalized documents that sameOrigin performs
+// strict string comparison on the Host field (including port). "https://example.com"
+// and "https://example.com:443" are intentionally treated as distinct — port
+// canonicalization would require tracking default ports per scheme. Change this
+// test if that behavior is intentionally updated in the future.
+func TestSameOrigin_DefaultPortNotCanonicalized(t *testing.T) {
+	if sameOrigin("https://example.com", "https://example.com:443") {
+		t.Error("sameOrigin matched default port — strict host comparison is expected; update this test if port canonicalization is added")
+	}
+}
+
+func TestCSRF_AllowedOriginFunc_ReturnsTrue_Passes(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.AllowMissingOrigin = false
+	cfg.AllowedOriginFunc = func(origin string, _ *web.Context) bool {
+		return origin == "http://dynamic.example.com"
+	}
+	mw := CSRF(cfg)
+
+	tok, err := IssueToken(cfg.Key, "csrf", cfg.TokenTTL)
+	if err != nil {
+		t.Fatalf("IssueToken: %v", err)
+	}
+
+	called := false
+	handler := mw(func(c *web.Context) (web.Response, error) {
+		called = true
+		return web.Respond(http.StatusOK), nil
+	})
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/submit"})
+	req.Headers.Set("Origin", "http://dynamic.example.com")
+	req.Headers.Set(cfg.HeaderName, tok)
+	req.Headers.Set("Cookie", cfg.CookieName+"="+tok)
+
+	resp, err := handler(web.NewContext(context.Background(), req))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Status != http.StatusOK {
+		t.Fatalf("status = %d, want %d: AllowedOriginFunc returned true so request should pass", resp.Status, http.StatusOK)
+	}
+	if !called {
+		t.Error("next handler was not called when AllowedOriginFunc returned true")
+	}
+}
+
+func TestCSRF_AllowedOriginFunc_ReturnsFalse_Returns403(t *testing.T) {
+	cfg := testCSRFConfig()
+	cfg.AllowMissingOrigin = false
+	cfg.AllowedOriginFunc = func(_ string, _ *web.Context) bool {
+		return false
+	}
+	mw := CSRF(cfg)
+
+	tok, err := IssueToken(cfg.Key, "csrf", cfg.TokenTTL)
+	if err != nil {
+		t.Fatalf("IssueToken: %v", err)
+	}
+
+	called := false
+	handler := mw(func(c *web.Context) (web.Response, error) {
+		called = true
+		return web.Respond(http.StatusOK), nil
+	})
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Path: "/submit"})
+	req.Headers.Set("Origin", "http://untrusted.example.com")
+	req.Headers.Set(cfg.HeaderName, tok)
+	req.Headers.Set("Cookie", cfg.CookieName+"="+tok)
+
+	_, err = handler(web.NewContext(context.Background(), req))
+	var webErr *web.Error
+	if !errors.As(err, &webErr) {
+		t.Fatalf("expected *web.Error when AllowedOriginFunc returns false, got %T: %v", err, err)
+	}
+	if webErr.Status != http.StatusForbidden {
+		t.Errorf("status = %d, want %d", webErr.Status, http.StatusForbidden)
+	}
+	if called {
+		t.Error("next handler was called when AllowedOriginFunc returned false")
 	}
 }

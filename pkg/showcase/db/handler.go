@@ -1,7 +1,7 @@
 package db
 
 import (
-	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/showcase/base"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/htmx"
 	"github.com/go-sum/foundry/pkg/web/render"
@@ -44,7 +44,7 @@ func (h *handler) Table(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	pg := showcase.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
+	pg := base.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
 	td, err := queryTableData(c.Context(), h.cfg.Pool, h.cfg.Schema, tableName, pg.Limit(), pg.Offset())
 	if err != nil {
 		return web.Response{}, web.ErrInternal(err)
@@ -69,7 +69,7 @@ func (h *handler) TableData(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrNotFound("table not found")
 	}
 
-	pg := showcase.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
+	pg := base.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
 	td, err := queryTableData(c.Context(), h.cfg.Pool, h.cfg.Schema, tableName, pg.Limit(), pg.Offset())
 	if err != nil {
 		return web.Response{}, web.ErrInternal(err)

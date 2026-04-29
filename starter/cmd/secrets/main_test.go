@@ -15,6 +15,15 @@ secrets:
   DB_PASSWORD:
   APP_SECRET:
 `
+	composeWithDatabaseURL := `
+secrets:
+  DATABASE_URL:
+`
+	composeWithPGSecrets := `
+secrets:
+  PGUSER:
+  PGPASSWORD:
+`
 	composeNoSecrets := `
 services:
   app:
@@ -87,6 +96,58 @@ secrets:
 				"APP_SECRET":     "tok",
 				"REDIS_PASSWORD": "red",
 			},
+		},
+		{
+			name:         "PGUSER and PGPASSWORD extracted from DATABASE_URL",
+			composeFiles: []string{"docker-compose.data.yml", "docker-compose.yml"},
+			composeData:  []string{composeWithPGSecrets, composeWithDatabaseURL},
+			envContent:   "DATABASE_URL=postgres://app:secret@db:5432/foundry?sslmode=disable\n",
+			wantFiles: map[string]string{
+				"DATABASE_URL": "postgres://app:secret@db:5432/foundry?sslmode=disable",
+				"PGUSER":       "app",
+				"PGPASSWORD":   "secret",
+			},
+		},
+		{
+			name:         "explicit PGUSER and PGPASSWORD in .env take precedence over DATABASE_URL",
+			composeFiles: []string{"docker-compose.data.yml", "docker-compose.yml"},
+			composeData:  []string{composeWithPGSecrets, composeWithDatabaseURL},
+			envContent:   "DATABASE_URL=postgres://dsn-user:dsn-pass@db:5432/foundry?sslmode=disable\nPGUSER=override-user\nPGPASSWORD=override-pass\n",
+			wantFiles: map[string]string{
+				"DATABASE_URL": "postgres://dsn-user:dsn-pass@db:5432/foundry?sslmode=disable",
+				"PGUSER":       "override-user",
+				"PGPASSWORD":   "override-pass",
+			},
+		},
+		{
+			name:         "URL-encoded special characters in password are decoded",
+			composeFiles: []string{"docker-compose.data.yml", "docker-compose.yml"},
+			composeData:  []string{composeWithPGSecrets, composeWithDatabaseURL},
+			// password is p@ss!word — encoded as p%40ss%21word in the DSN
+			envContent: "DATABASE_URL=postgres://user:p%40ss%21word@db:5432/foundry?sslmode=disable\n",
+			wantFiles: map[string]string{
+				"DATABASE_URL": "postgres://user:p%40ss%21word@db:5432/foundry?sslmode=disable",
+				"PGUSER":       "user",
+				"PGPASSWORD":   "p@ss!word",
+			},
+		},
+		{
+			name:         "PGPASSWORD not extracted when DATABASE_URL has no password",
+			composeFiles: []string{"docker-compose.data.yml"},
+			composeData:  []string{composeWithPGSecrets},
+			envContent:   "DATABASE_URL=postgres://user@db:5432/foundry\nPGUSER=user\n",
+			wantErr:      true, // PGPASSWORD declared as secret but not available
+			wantFiles: map[string]string{
+				"PGUSER": "user",
+			},
+		},
+		{
+			name:         "no DATABASE_URL: extraction is a no-op, missing secrets reported",
+			composeFiles: []string{"docker-compose.data.yml"},
+			composeData:  []string{composeWithPGSecrets},
+			envContent:   "UNRELATED=value\n",
+			wantErr:      true, // PGUSER and PGPASSWORD declared but not available
+			wantFiles:    map[string]string{},
 		},
 		{
 			name:         "compose file with no secrets key is skipped without error",

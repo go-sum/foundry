@@ -67,9 +67,15 @@ func (s *Store) GetTokenByHash(ctx context.Context, hash string) (provider.OAuth
 
 // RevokeToken implements provider.TokenStore.
 func (s *Store) RevokeToken(ctx context.Context, id uuid.UUID) error {
-	const q = `UPDATE oauth_tokens SET revoked = true WHERE id = $1`
-	_, err := s.pool.Exec(ctx, q, id)
-	return err
+	const q = `UPDATE oauth_tokens SET revoked = true WHERE id = $1 AND revoked = false`
+	result, err := s.pool.Exec(ctx, q, id)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return provider.ErrTokenRevoked
+	}
+	return nil
 }
 
 // RevokeTokensByUserAndClient implements provider.TokenStore.

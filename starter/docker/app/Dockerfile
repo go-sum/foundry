@@ -81,6 +81,7 @@ RUN --mount=type=secret,id=github_token \
 COPY cmd/ ./cmd/
 COPY config/ ./config/
 RUN rm -f config/*.development.yaml
+COPY db/ ./db/
 COPY internal/ ./internal/
 COPY static/ ./static/
 ARG APP_VERSION

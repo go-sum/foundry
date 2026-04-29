@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
@@ -13,11 +12,8 @@ func defaultCSRF() (secure.CSRFConfig, error) {
 	if keyHex == "" {
 		return secure.CSRFConfig{}, fmt.Errorf("%w: set SECURITY_CSRF_KEY environment variable", ErrCSRFKeyMissing)
 	}
-	csrf, err := secure.NewCSRFConfigFromHex(keyHex, cfgpkg.ExpandSecret("SECURITY_CSRF_KEY_PREVIOUS"))
+	csrf, err := secure.NewCSRFConfigFromHex(keyHex)
 	if err != nil {
-		if errors.Is(err, secure.ErrCSRFPreviousKeys) {
-			return secure.CSRFConfig{}, fmt.Errorf("%w: %w", ErrCSRFPrevKeysInvalid, err)
-		}
 		return secure.CSRFConfig{}, fmt.Errorf("%w: %w", ErrCSRFKeyInvalid, err)
 	}
 	csrf.CookieSecure = true

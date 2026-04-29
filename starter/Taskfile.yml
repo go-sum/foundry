@@ -21,13 +21,11 @@ vars:
     /app/{{.PROJECT_NAME}} tools"
   TOOLS_IMAGE: "{{.PROJECT_NAME}}-tools"
   TOOLS_DEV: "{{.TOOLS_IMAGE}}:dev"
-  TOOLS_PROD: "{{.TOOLS_IMAGE}}:prod"
 
 env:
   APP_NAME: "{{.APP_NAME}}"
   PROJECT_NAME: "{{.PROJECT_NAME}}"
   TOOLS_DEV: "{{.TOOLS_DEV}}"
-  TOOLS_PROD: "{{.TOOLS_PROD}}"
 
 tasks:
   # default, test, test:race are omitted — they conflict when this file is
@@ -160,35 +158,6 @@ tasks:
         /app/docker/caddy/certs/local.pem -key-file
         /app/docker/caddy/certs/local-key.pem {{.DEV_DOMAIN}}
         "*.{{.DEV_DOMAIN}}" localhost 127.0.0.1'
-
-  # ── Production ────────────────────────────────────────────────────────────────
-
-  prod:build:
-    desc: "Build production Docker image"
-    preconditions:
-      - sh: test -f go.prod.mod
-        msg: "go.prod.mod not found — run 'task ws:sync' first to generate it"
-    cmd: |
-      GITHUB_ACCESS_TOKEN="${GITHUB_ACCESS_TOKEN:-$(grep '^GITHUB_ACCESS_TOKEN=' .env 2>/dev/null | cut -d= -f2-)}"
-      export GITHUB_ACCESS_TOKEN
-      docker build --target production_target \
-        --file docker/app/Dockerfile \
-        --build-arg GO_VERSION={{.GO_VERSION}} \
-        --build-arg HTMX_VERSION={{.HTMX_VERSION}} \
-        --build-arg TAILWIND_VERSION={{.TAILWIND_VERSION}} \
-        --build-arg APP_VERSION={{.APP_VERSION}} \
-        --build-arg TOOLS_PROD_IMAGE={{.TOOLS_PROD}} \
-        --secret id=github_token,env=GITHUB_ACCESS_TOKEN \
-        -t {{.PROJECT_NAME}}:latest .
-
-  prod:
-    desc: "Build production image and start the production stack"
-    deps:
-      - prod:build
-      - task: _caddy:config
-        vars: {DOMAIN: "{{.PROD_DOMAIN}}", TLS_CONFIG: "tls"}
-    cmd: "docker compose -f docker-compose.data.yml -f docker-compose.yml -f
-      docker-compose.caddy.yml up -d"
 
   # ── Helpers ───────────────────────────────────────────────────────────────────
 

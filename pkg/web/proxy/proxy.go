@@ -10,21 +10,20 @@ import (
 	"time"
 
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/headers"
+	"github.com/go-sum/foundry/pkg/web/serve"
 )
 
-// defaultClient is a production-safe HTTP client used when Options.Client is nil.
-// It has bounded timeouts and connection pool settings. Callers may provide their
-// own client via Options.Client to override.
-var defaultClient = &http.Client{
-	Timeout: 30 * time.Second,
-	Transport: &http.Transport{
-		ResponseHeaderTimeout: 10 * time.Second,
-		IdleConnTimeout:       90 * time.Second,
-		MaxIdleConnsPerHost:   32,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		MaxIdleConns:          128,
-	},
+// defaultTransport is the shared, concurrent-safe transport for upstream requests.
+// It is intentionally package-level so all Reverse instances without a custom
+// client share one connection pool.
+var defaultTransport = &http.Transport{
+	ResponseHeaderTimeout: 10 * time.Second,
+	IdleConnTimeout:       90 * time.Second,
+	MaxIdleConnsPerHost:   32,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+	MaxIdleConns:          128,
 }
 
 // hopByHopHeaders are the static hop-by-hop headers defined by RFC 7230 6.1
@@ -38,6 +37,17 @@ var hopByHopHeaders = map[string]bool{
 	"trailers":            true,
 	"transfer-encoding":   true,
 	"upgrade":             true,
+}
+
+// strippedClientHeaders lists forwarding headers that are always stripped from
+// inbound requests and rebuilt from server-known connection metadata. Clients
+// must never be allowed to supply these values because upstream services use
+// them for IP-based rate limiting, ACLs, and audit trails.
+var strippedClientHeaders = map[string]bool{
+	"forwarded":         true,
+	"x-forwarded-for":   true,
+	"x-forwarded-host":  true,
+	"x-forwarded-proto": true,
 }
 
 // dynamicHopHeaders returns the set of header names listed in a Connection
@@ -75,17 +85,26 @@ type Options struct {
 	// the upstream are rewritten so that cookies set with absolute paths
 	// (e.g. Path=/) remain valid under the prefix (e.g. Path=/app).
 	PathPrefix string
-	// ForwardProto, when true, sets the X-Forwarded-Proto request header to
-	// the scheme of the incoming request before forwarding. This allows
-	// upstream applications to construct correct absolute URLs and redirects.
-	// The header is only set when not already present.
-	ForwardProto bool
+	// TrustedProxies lists parsed CIDR ranges of trusted upstream proxies. When
+	// the incoming connection's RemoteAddr falls within one of these ranges, the
+	// proxy extends the existing X-Forwarded-For and Forwarded chains instead of
+	// replacing them. This allows end-user IPs to propagate correctly when this
+	// proxy sits behind a trusted load balancer or CDN. Build this slice via
+	// serve.ParseTrustedProxies or net.ParseCIDR directly.
+	TrustedProxies []*net.IPNet
+	// Authority is the canonical public hostname used for outbound forwarding
+	// headers and cookie domain rewriting. When set, it replaces c.Request.Host()
+	// in X-Forwarded-Host, Forwarded host=, and Set-Cookie Domain rewrites.
+	// Callers that validate the inbound Host header via AllowedHosts middleware
+	// may leave this empty — the validated request host is used instead.
+	Authority string
 }
 
 // resolveClient returns the HTTP client to use for upstream requests.
-// It returns opts.Client when provided. When MaxResponseHeaderBytes is set it
-// builds a fresh client with the same transport settings as defaultClient but
-// with the custom header size limit applied. Otherwise it returns defaultClient.
+// A new *http.Client value is always returned; when MaxResponseHeaderBytes is
+// not set the shared defaultTransport is used so all instances pool connections.
+// When MaxResponseHeaderBytes is set a dedicated transport is created so the
+// header limit does not affect other proxy instances.
 func resolveClient(opts Options) *http.Client {
 	if opts.Client != nil {
 		return opts.Client
@@ -104,7 +123,10 @@ func resolveClient(opts Options) *http.Client {
 			},
 		}
 	}
-	return defaultClient
+	return &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: defaultTransport,
+	}
 }
 
 // quoteForwardedNode formats an IP address for use as a Forwarded header
@@ -118,11 +140,65 @@ func quoteForwardedNode(ip string) string {
 	return ip
 }
 
+
+func sanitizedXForwardedForChain(raw string) ([]string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, false
+	}
+
+	parts := strings.Split(raw, ",")
+	chain := make([]string, 0, len(parts))
+	for _, part := range parts {
+		ip, ok := serve.NormalizeProxyIP(part)
+		if !ok {
+			return nil, false
+		}
+		chain = append(chain, ip)
+	}
+	return chain, true
+}
+
+func sanitizedForwardedChain(raw string) ([]string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, false
+	}
+
+	elements, err := headers.ParseForwarded(raw)
+	if err != nil || len(elements) == 0 {
+		return nil, false
+	}
+
+	out := make([]string, 0, len(elements))
+	for _, element := range elements {
+		ip, ok := serve.NormalizeProxyIP(element.For)
+		if !ok {
+			return nil, false
+		}
+
+		parts := []string{"for=" + quoteForwardedNode(ip)}
+		if element.By != "" {
+			parts = append(parts, "by="+element.By)
+		}
+		if element.Host != "" {
+			parts = append(parts, "host="+element.Host)
+		}
+		if element.Proto != "" {
+			parts = append(parts, "proto="+element.Proto)
+		}
+		out = append(out, strings.Join(parts, ";"))
+	}
+	return out, true
+}
+
 // Reverse returns a web.Handler that proxies every request to target.
 //
 // It:
 //   - Copies the incoming method, URL (path + query), headers, and body to a new upstream request.
-//   - Appends X-Forwarded-For and X-Forwarded-Host headers (does not overwrite if already set).
+//   - Strips client-supplied X-Forwarded-For, Forwarded, X-Forwarded-Host, and X-Forwarded-Proto headers.
+//   - Rebuilds X-Forwarded-Host and X-Forwarded-Proto from server-resolved state (inbound values are never passed through).
+//   - Preserves and extends inbound X-Forwarded-For / Forwarded chains only when the immediate peer is trusted and the inbound chain validates.
 //   - Rewrites Set-Cookie Domain to match the incoming request host (public-facing origin).
 //   - Returns the upstream status, headers, and body verbatim.
 //   - Removes hop-by-hop headers (Connection, Upgrade, Transfer-Encoding, etc.) from both directions.
@@ -141,12 +217,17 @@ func Reverse(target *url.URL, opts Options) web.Handler {
 			return web.Response{}, web.ErrBadGateway(err)
 		}
 
+		// Capture forwarding chain from inbound headers before the copy loop strips
+		// them. Used below to extend or preserve the chain when the peer is trusted.
+		inboundXFF := c.Request.Headers.Get("X-Forwarded-For")
+		inboundForwarded := c.Request.Headers.Get("Forwarded")
+
 		// Copy incoming headers, skipping static and dynamic hop-by-hop headers.
 		// RFC 7230 6.1: strip any header named in the Connection field.
 		dynamicReq := dynamicHopHeaders(c.Request.Headers.Get("Connection"))
 		c.Request.Headers.ForEach(func(name string, values []string) {
 			lower := strings.ToLower(name)
-			if hopByHopHeaders[lower] || dynamicReq[lower] {
+			if hopByHopHeaders[lower] || dynamicReq[lower] || strippedClientHeaders[lower] {
 				return
 			}
 			for _, v := range values {
@@ -154,61 +235,67 @@ func Reverse(target *url.URL, opts Options) web.Handler {
 			}
 		})
 
-		// Set X-Forwarded-Host from the incoming request Host.
-		if upstreamReq.Header.Get("X-Forwarded-Host") == "" {
-			host := c.Request.Host()
-			if host != "" {
-				upstreamReq.Header.Set("X-Forwarded-Host", host)
-			}
+		// Resolve the immediate peer IP from RemoteAddr.
+		clientIP, _ := serve.NormalizeProxyIP(c.Request.RemoteAddr())
+		trusted := serve.IsTrustedProxy(clientIP, opts.TrustedProxies)
+
+		// resolvedHost is the canonical public hostname for outbound headers.
+		// Authority takes precedence when set; otherwise the validated request host.
+		resolvedHost := c.Request.Host()
+		if opts.Authority != "" {
+			resolvedHost = opts.Authority
 		}
 
-		// Set X-Forwarded-Proto from the incoming request scheme when enabled.
-		if opts.ForwardProto && upstreamReq.Header.Get("X-Forwarded-Proto") == "" {
-			scheme := "http"
-			if c.URL() != nil && c.URL().Scheme != "" {
-				scheme = c.URL().Scheme
-			} else if proto := c.Request.Headers.Get("X-Forwarded-Proto"); proto != "" {
-				scheme = strings.ToLower(strings.TrimSpace(proto))
-			}
-			upstreamReq.Header.Set("X-Forwarded-Proto", scheme)
+		// Set X-Forwarded-Host from the resolved public host.
+		// Inbound X-Forwarded-Host is never preserved — always rebuild to prevent host-header injection.
+		if resolvedHost != "" {
+			upstreamReq.Header.Set("X-Forwarded-Host", resolvedHost)
 		}
 
-		// Set or append X-Forwarded-For with the client IP from RemoteAddr.
-		remoteAddr := c.Request.RemoteAddr()
-		clientIP := ""
-		if remoteAddr != "" {
-			if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
-				clientIP = host
-			}
+		// Set X-Forwarded-Proto from the server-resolved scheme.
+		// Always rebuilt from server-known state — inbound values are never passed through.
+		scheme := "http"
+		if c.URL() != nil && c.URL().Scheme != "" {
+			scheme = c.URL().Scheme
 		}
-		if existing := c.Request.Headers.Get("X-Forwarded-For"); existing != "" {
-			if clientIP != "" {
-				upstreamReq.Header.Set("X-Forwarded-For", existing+", "+clientIP)
-			} else {
-				upstreamReq.Header.Set("X-Forwarded-For", existing)
+		upstreamReq.Header.Set("X-Forwarded-Proto", scheme)
+
+		// Set X-Forwarded-For: extend the inbound chain when the peer is a trusted
+		// proxy (so end-user IPs survive a CDN/LB hop); start fresh otherwise.
+		// Client-supplied X-Forwarded-For is stripped in the copy loop above.
+		if clientIP != "" {
+			chain := []string{clientIP}
+			if trusted {
+				if forwardedChain, ok := sanitizedXForwardedForChain(inboundXFF); ok {
+					chain = append(forwardedChain, clientIP)
+				}
 			}
-		} else if clientIP != "" {
-			upstreamReq.Header.Set("X-Forwarded-For", clientIP)
+			upstreamReq.Header.Set("X-Forwarded-For", strings.Join(chain, ", "))
 		}
 
-		// Emit RFC 7239 Forwarded header alongside X-Forwarded-* for load
-		// balancers and proxies that prefer the standardised format.
-		// Append to any existing Forwarded value rather than replacing it.
+		// Emit RFC 7239 Forwarded header. Extend the inbound chain when trusted.
+		// Client-supplied Forwarded is stripped in the copy loop above.
 		if clientIP != "" {
 			forwardedProto := "http"
 			if c.URL() != nil && c.URL().Scheme != "" {
 				forwardedProto = c.URL().Scheme
-			} else if proto := c.Request.Headers.Get("X-Forwarded-Proto"); proto != "" {
-				forwardedProto = strings.ToLower(strings.TrimSpace(proto))
 			}
-			forwardedHost := c.Request.Host()
-			forwardedValue := fmt.Sprintf("for=%s;host=%s;proto=%s",
-				quoteForwardedNode(clientIP), forwardedHost, forwardedProto)
-			if existing := c.Request.Headers.Get("Forwarded"); existing != "" {
-				upstreamReq.Header.Set("Forwarded", existing+", "+forwardedValue)
+			forwardedHost := resolvedHost
+			var thisHop string
+			if forwardedHost != "" {
+				thisHop = fmt.Sprintf("for=%s;host=%s;proto=%s",
+					quoteForwardedNode(clientIP), forwardedHost, forwardedProto)
 			} else {
-				upstreamReq.Header.Set("Forwarded", forwardedValue)
+				thisHop = fmt.Sprintf("for=%s;proto=%s",
+					quoteForwardedNode(clientIP), forwardedProto)
 			}
+			chain := []string{thisHop}
+			if trusted {
+				if forwardedChain, ok := sanitizedForwardedChain(inboundForwarded); ok {
+					chain = append(forwardedChain, thisHop)
+				}
+			}
+			upstreamReq.Header.Set("Forwarded", strings.Join(chain, ", "))
 		}
 
 		if opts.ModifyRequest != nil {
@@ -236,7 +323,7 @@ func Reverse(target *url.URL, opts Options) web.Handler {
 			}
 			if lower == "set-cookie" {
 				for _, v := range values {
-					outHeaders.Append(name, rewriteSetCookie(v, c.Request.Host(), opts.PathPrefix))
+					outHeaders.Append(name, rewriteSetCookie(v, resolvedHost, opts.PathPrefix))
 				}
 				continue
 			}
@@ -287,9 +374,10 @@ func buildUpstreamURL(target *url.URL, req web.Request) *url.URL {
 //     pathPrefix="/app" becomes Path=/app.
 func rewriteSetCookie(setCookie, targetHost, pathPrefix string) string {
 	// Strip port from targetHost for the Domain value.
+	// Use SplitHostPort to correctly handle IPv6 addresses like [::1]:8080.
 	host := targetHost
-	if idx := strings.LastIndex(host, ":"); idx != -1 {
-		host = host[:idx]
+	if h, _, err := net.SplitHostPort(targetHost); err == nil {
+		host = h
 	}
 
 	parts := strings.Split(setCookie, ";")

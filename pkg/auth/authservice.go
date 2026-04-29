@@ -42,17 +42,19 @@ type AuthService struct {
 	users      UserWriter
 	notifier   Notifier
 	tokenCodec TokenCodec
+	nonceStore TokenNonceStore
 	config     EmailTOTPConfig
 	clock      func() time.Time
 }
 
 // AuthServiceConfig configures an AuthService.
 type AuthServiceConfig struct {
-	Users      UserWriter
-	Notifier   Notifier
-	TokenCodec TokenCodec
-	EmailTOTP  EmailTOTPConfig
-	Clock      func() time.Time
+	Users       UserWriter
+	Notifier    Notifier
+	TokenCodec  TokenCodec
+	NonceStore  TokenNonceStore
+	EmailTOTP   EmailTOTPConfig
+	Clock       func() time.Time
 }
 
 // NewAuthService returns a new AuthService.
@@ -69,6 +71,7 @@ func NewAuthService(cfg AuthServiceConfig) *AuthService {
 		users:      cfg.Users,
 		notifier:   notifier,
 		tokenCodec: cfg.TokenCodec,
+		nonceStore: cfg.NonceStore,
 		config:     cfg.EmailTOTP,
 		clock:      clock,
 	}
@@ -129,9 +132,9 @@ func (s *AuthService) BeginSignin(ctx context.Context, input BeginSigninInput, v
 			return PendingFlow{}, err
 		}
 	case err == nil:
-		slog.DebugContext(ctx, "auth: signin suppressed for unverified account", "email", input.Email)
+		slog.DebugContext(ctx, "auth: signin suppressed (anti-enumeration)")
 	case errors.Is(err, ErrUserNotFound):
-		slog.DebugContext(ctx, "auth: signin for unknown email (anti-enumeration)", "email", input.Email)
+		slog.DebugContext(ctx, "auth: signin suppressed (anti-enumeration)")
 	case err != nil:
 		return PendingFlow{}, fmt.Errorf("lookup signin email: %w", err)
 	}
@@ -213,9 +216,31 @@ func (s *AuthService) VerifyToken(ctx context.Context, token string, input Verif
 	if err != nil {
 		return VerifyResult{}, err
 	}
+
+	nonceKey := tokenNonceKey(token)
+	if s.nonceStore != nil {
+		consumed, err := s.nonceStore.HasConsumed(ctx, nonceKey)
+		if err != nil {
+			return VerifyResult{}, fmt.Errorf("check token nonce: %w", err)
+		}
+		if consumed {
+			return VerifyResult{}, ErrTokenConsumed
+		}
+	}
+
 	if err := validateTOTPCode(payload.Secret, payload.IssuedAt, payload.ExpiresAt, input.Code, s.config.PeriodSeconds, s.clock()); err != nil {
 		return VerifyResult{}, err
 	}
+
+	if s.nonceStore != nil {
+		ttl := payload.ExpiresAt.Sub(s.clock())
+		if ttl > 0 {
+			if err := s.nonceStore.MarkConsumed(ctx, nonceKey, ttl); err != nil {
+				return VerifyResult{}, fmt.Errorf("mark token consumed: %w", err)
+			}
+		}
+	}
+
 	return s.finishVerification(ctx, pendingFlowFromToken(payload))
 }
 

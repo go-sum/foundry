@@ -8,8 +8,7 @@ import (
 	"time"
 )
 
-const versionSigned byte = 0x02
-const versionSigned2 byte = 0x03
+const versionSigned byte = 0x03
 
 func serializeSigned(name string, secret []byte, value string, exp time.Time) (string, error) {
 	payload := []byte(value)
@@ -21,7 +20,7 @@ func serializeSigned(name string, secret []byte, value string, exp time.Time) (s
 
 	// Build blob (without MAC): version(1) | iat_int64(8) | exp_int64(8) | payload
 	blob := make([]byte, 17+len(payload))
-	blob[0] = versionSigned2
+	blob[0] = versionSigned
 	binary.BigEndian.PutUint64(blob[1:9], uint64(iat))
 	binary.BigEndian.PutUint64(blob[9:17], uint64(expUnix))
 	copy(blob[17:], payload)
@@ -46,16 +45,11 @@ func parseSigned(name string, secrets [][]byte, encoded string) (string, error) 
 	}
 
 	version := blob[0]
-	if version != versionSigned && version != versionSigned2 {
+	if version != versionSigned {
 		return "", ErrInvalid
 	}
 
-	var headerSize int
-	if version == versionSigned {
-		headerSize = 9 // version(1) + iat_uint32(4) + exp_uint32(4)
-	} else {
-		headerSize = 17 // version(1) + iat_int64(8) + exp_int64(8)
-	}
+	const headerSize = 17 // version(1) + iat_int64(8) + exp_int64(8)
 
 	if len(blob) < headerSize+sha256.Size {
 		return "", ErrInvalid
@@ -78,24 +72,13 @@ func parseSigned(name string, secrets [][]byte, encoded string) (string, error) 
 		return "", ErrInvalid
 	}
 
-	var expUnix int64
-	if version == versionSigned {
-		expUnix = int64(binary.BigEndian.Uint32(msg[5:9]))
-	} else {
-		expUnix = int64(binary.BigEndian.Uint64(msg[9:17]))
-	}
+	expUnix := int64(binary.BigEndian.Uint64(msg[9:17]))
 
 	if expUnix != 0 && time.Now().Unix() > expUnix {
 		return "", ErrExpired
 	}
 
-	var payload string
-	if version == versionSigned {
-		payload = string(msg[9:])
-	} else {
-		payload = string(msg[17:])
-	}
-	return payload, nil
+	return string(msg[17:]), nil
 }
 
 func computeSignedMAC(secret, msg []byte, name string) []byte {

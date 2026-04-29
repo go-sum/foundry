@@ -1,32 +1,53 @@
 package showcase
 
 import (
-	"strconv"
-
-	"github.com/go-sum/foundry/pkg/componentry/patterns/pager"
-	"github.com/go-sum/foundry/pkg/web"
-	g "maragu.dev/gomponents"
+	"github.com/go-sum/foundry/pkg/componentry/icons"
+	kvstore "github.com/go-sum/foundry/pkg/kv"
+	"github.com/go-sum/foundry/pkg/showcase/base"
+	"github.com/go-sum/foundry/pkg/showcase/componentry"
+	showcasedb "github.com/go-sum/foundry/pkg/showcase/db"
+	showcasekv "github.com/go-sum/foundry/pkg/showcase/kv"
+	showcasequeue "github.com/go-sum/foundry/pkg/showcase/queue"
+	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// PageFunc renders a full HTML page within the host application's layout.
-// Each showcase subpackage accepts a PageFunc in its Config so that the
-// package stays decoupled from starter/internal/view.
-type PageFunc func(c *web.Context, title string, content g.Node) (web.Response, error)
+type PageFunc = base.PageFunc
 
-// ParsePager reads page and per_page query params from c and returns a Pager
-// configured with defaultPerPage and maxPerPage.
-func ParsePager(c *web.Context, defaultPerPage, maxPerPage int) pager.Pager {
-	q := c.URL().Query()
-	page := 1
-	if p, err := strconv.Atoi(q.Get("page")); err == nil && p > 0 {
-		page = p
+// Config configures the full showcase route tree.
+type Config struct {
+	Icons *icons.Registry
+	DB    *pgxpool.Pool
+	KV    kvstore.Store
+	Page  PageFunc
+}
+
+// Routes returns the package-owned showcase route tree.
+func Routes(cfg Config) []router.Node {
+	componentryCfg := componentry.DefaultConfig()
+	componentryCfg.Icons = cfg.Icons
+	componentryCfg.Page = cfg.Page
+
+	nodes := componentry.Routes(componentryCfg)
+
+	if cfg.DB != nil {
+		dbCfg := showcasedb.DefaultConfig()
+		dbCfg.Pool = cfg.DB
+		dbCfg.Page = cfg.Page
+		nodes = append(nodes, showcasedb.Routes(dbCfg)...)
+
+		queueCfg := showcasequeue.DefaultConfig()
+		queueCfg.Pool = cfg.DB
+		queueCfg.Page = cfg.Page
+		nodes = append(nodes, showcasequeue.Routes(queueCfg)...)
 	}
-	perPage := defaultPerPage
-	if pp, err := strconv.Atoi(q.Get("per_page")); err == nil && pp > 0 {
-		perPage = pp
+
+	if cfg.KV != nil {
+		kvCfg := showcasekv.DefaultConfig()
+		kvCfg.Store = cfg.KV
+		kvCfg.Page = cfg.Page
+		nodes = append(nodes, showcasekv.Routes(kvCfg)...)
 	}
-	if maxPerPage > 0 && perPage > maxPerPage {
-		perPage = maxPerPage
-	}
-	return pager.Pager{Page: page, PerPage: perPage}
+
+	return nodes
 }

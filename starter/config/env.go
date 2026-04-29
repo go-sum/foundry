@@ -4,6 +4,7 @@ import (
 	"os"
 
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
+	"github.com/go-sum/foundry/pkg/web/site"
 )
 
 type Env string
@@ -40,15 +41,21 @@ func LoadEnv() (Config, error) {
 const airProxyCSPHash = "'sha256-y933zYNvpVe5f9j5A+OKECUXiWo8bKB5Yp5sLDD3d0I='"
 
 func overlayDevelopment(cfg *Config) {
-	cfg.Site.BaseURL = "http://forge.test"
+	if cfg.Site.BaseURL == "" {
+		// Caddy serves the dev domain over HTTPS (tls internal / mkcert).
+		cfg.Site.BaseURL = "https://foundry.test"
+		// BaseURL changed after defaultProduction built AllowedHosts; rebuild.
+		cfg.Site.AllowedHosts = site.BuildAllowedHosts(cfg.Site.BaseURL, "")
+	}
 	cfg.Auth.Provider.Issuer = cfg.Site.BaseURL
-	cfg.CSRF.CookieSecure = false
-	cfg.Session.CookieSecure = false
-	cfg.Headers.StrictTransportSecurity = ""
+	// Air's built-in reverse proxy rewrites Host to localhost:<app_port>.
+	// Allow loopback so AllowedHosts validation passes for dev requests.
+	cfg.Site.AllowedHosts = append(cfg.Site.AllowedHosts, "localhost", "127.0.0.1")
 	// COEP/COOP enable cross-origin isolation, which causes Chrome to enforce
 	// CORS on the service worker's same-origin SSE fetch to Air's proxy. Air
 	// does not set Access-Control-Allow-Origin, so the browser drops the
-	// connection immediately. These headers are not needed in development.
+	// connection immediately. Clear only these two headers; all other security
+	// settings remain at production defaults.
 	cfg.Headers.CrossOriginEmbedderPolicy = ""
 	cfg.Headers.CrossOriginOpenerPolicy = ""
 	cfg.Server.Addr = ":3000"
@@ -58,6 +65,7 @@ func overlayDevelopment(cfg *Config) {
 func overlayTesting(cfg *Config) {
 	cfg.Site.BaseURL = "http://test.local"
 	cfg.Auth.Provider.Issuer = cfg.Site.BaseURL
+	cfg.CSRF.AllowMissingOrigin = true
 	cfg.CSRF.CookieSecure = false
 	cfg.Session.CookieSecure = false
 	if dir := os.Getenv("TEST_STATIC_DIR"); dir != "" {

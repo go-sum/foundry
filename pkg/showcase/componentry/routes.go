@@ -2,7 +2,7 @@ package componentry
 
 import (
 	"github.com/go-sum/foundry/pkg/componentry/icons"
-	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/showcase/base"
 	"github.com/go-sum/foundry/pkg/web/router"
 )
 
@@ -10,7 +10,7 @@ import (
 type Config struct {
 	BasePath string
 	Icons    *icons.Registry
-	Page     showcase.PageFunc
+	Page     base.PageFunc
 }
 
 // DefaultConfig returns a Config with sensible defaults.

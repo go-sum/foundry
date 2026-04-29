@@ -1,12 +1,15 @@
 package provider
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/go-sum/foundry/pkg/web"
 	webauth "github.com/go-sum/foundry/pkg/web/auth"
@@ -39,6 +42,7 @@ type tokenExchangeInput struct {
 	Code         string `form:"code"`
 	RedirectURI  string `form:"redirect_uri"`
 	ClientID     string `form:"client_id"`
+	ClientSecret string `form:"client_secret"`
 	CodeVerifier string `form:"code_verifier"`
 	RefreshToken string `form:"refresh_token"`
 }
@@ -54,12 +58,38 @@ func (h *TokenHandler) Exchange(c *web.Context) (web.Response, error) {
 
 	switch input.GrantType {
 	case "authorization_code":
+		if err := h.authenticateClient(c.Context(), input.ClientID, input.ClientSecret); err != nil {
+			return web.JSON(401, oauthErrorJSON("invalid_client", "client authentication failed")), nil
+		}
 		return h.handleAuthorizationCode(c, input.Code, input.RedirectURI, input.ClientID, input.CodeVerifier)
 	case "refresh_token":
+		if err := h.authenticateClient(c.Context(), input.ClientID, input.ClientSecret); err != nil {
+			return web.JSON(401, oauthErrorJSON("invalid_client", "client authentication failed")), nil
+		}
 		return h.handleRefreshToken(c, input.RefreshToken, input.ClientID)
 	default:
 		return web.JSON(400, oauthErrorJSON("unsupported_grant_type", fmt.Sprintf("unsupported grant_type: %s", input.GrantType))), nil
 	}
+}
+
+// authenticateClient verifies client credentials per RFC 6749 §2.3.
+// Public clients are accepted without a secret; confidential clients
+// must provide a valid client_secret (client_secret_post method).
+func (h *TokenHandler) authenticateClient(ctx context.Context, clientID, clientSecret string) error {
+	client, err := h.clients.GetClientByClientID(ctx, clientID)
+	if err != nil {
+		return fmt.Errorf("unknown client")
+	}
+	if client.Public {
+		return nil
+	}
+	if clientSecret == "" {
+		return fmt.Errorf("missing client_secret")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(client.ClientSecret), []byte(clientSecret)); err != nil {
+		return fmt.Errorf("invalid credentials")
+	}
+	return nil
 }
 
 func (h *TokenHandler) handleAuthorizationCode(c *web.Context, codeValue, redirectURI, clientID, codeVerifier string) (web.Response, error) {
@@ -70,9 +100,6 @@ func (h *TokenHandler) handleAuthorizationCode(c *web.Context, codeValue, redire
 	code, err := h.codes.GetCode(c.Context(), codeValue)
 	if err != nil {
 		return web.JSON(400, oauthErrorJSON("invalid_grant", "authorization code not found")), nil
-	}
-	if code.Used {
-		return web.JSON(400, oauthErrorJSON("invalid_grant", "authorization code already used")), nil
 	}
 	if time.Now().UTC().After(code.ExpiresAt) {
 		return web.JSON(400, oauthErrorJSON("invalid_grant", "authorization code expired")), nil
@@ -94,8 +121,11 @@ func (h *TokenHandler) handleAuthorizationCode(c *web.Context, codeValue, redire
 		}
 	}
 
-	// Mark code as used (single-use enforcement).
+	// Mark code as used (single-use enforcement, atomic at the database level).
 	if err := h.codes.MarkCodeUsed(c.Context(), codeValue); err != nil {
+		if errors.Is(err, ErrCodeUsed) {
+			return web.JSON(400, oauthErrorJSON("invalid_grant", "authorization code already used")), nil
+		}
 		return web.Response{}, web.ErrInternal(err)
 	}
 
@@ -115,9 +145,6 @@ func (h *TokenHandler) handleRefreshToken(c *web.Context, refreshTokenValue, cli
 	if token.TokenType != "refresh" {
 		return web.JSON(400, oauthErrorJSON("invalid_grant", "not a refresh token")), nil
 	}
-	if token.Revoked {
-		return web.JSON(400, oauthErrorJSON("invalid_grant", "refresh token revoked")), nil
-	}
 	if time.Now().UTC().After(token.ExpiresAt) {
 		return web.JSON(400, oauthErrorJSON("invalid_grant", "refresh token expired")), nil
 	}
@@ -125,8 +152,11 @@ func (h *TokenHandler) handleRefreshToken(c *web.Context, refreshTokenValue, cli
 		return web.JSON(400, oauthErrorJSON("invalid_grant", "client_id mismatch")), nil
 	}
 
-	// Revoke the old refresh token (rotation).
+	// Revoke the old refresh token (rotation, atomic at the database level).
 	if err := h.tokens.RevokeToken(c.Context(), token.ID); err != nil {
+		if errors.Is(err, ErrTokenRevoked) {
+			return web.JSON(400, oauthErrorJSON("invalid_grant", "refresh token revoked")), nil
+		}
 		return web.Response{}, web.ErrInternal(err)
 	}
 

@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +26,10 @@ func TestNewServer_DefaultTimeouts(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	srv := NewServer(handler, ServerConfig{})
+	srv, err := NewServer(handler, ServerConfig{})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
 
 	if srv.Addr != ":8080" {
 		t.Errorf("Addr = %q, want %q", srv.Addr, ":8080")
@@ -61,7 +65,10 @@ func TestNewServer_CustomTimeouts(t *testing.T) {
 		MaxHeaderBytes:    512 * 1024,
 	}
 
-	srv := NewServer(handler, cfg)
+	srv, err := NewServer(handler, cfg)
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
 
 	if srv.Addr != ":9090" {
 		t.Errorf("Addr = %q, want %q", srv.Addr, ":9090")
@@ -88,7 +95,10 @@ func TestNewServer_HandlerNotNil(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	srv := NewServer(handler, ServerConfig{})
+	srv, err := NewServer(handler, ServerConfig{})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
 	if srv.Handler == nil {
 		t.Error("Handler = nil, want non-nil http.Handler")
 	}
@@ -99,8 +109,11 @@ func TestShutdown_NotListening(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	srv := NewServer(handler, ServerConfig{})
-	err := Shutdown(context.Background(), srv)
+	srv, err := NewServer(handler, ServerConfig{})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	err = Shutdown(context.Background(), srv)
 	if err != nil {
 		t.Errorf("Shutdown returned error for non-listening server: %v", err)
 	}
@@ -348,8 +361,14 @@ func TestNewServer_H2C_Handler(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 
-	srvWithout := NewServer(handler, ServerConfig{})
-	srvWith := NewServer(handler, ServerConfig{H2C: true})
+	srvWithout, err := NewServer(handler, ServerConfig{})
+	if err != nil {
+		t.Fatalf("NewServer without H2C: %v", err)
+	}
+	srvWith, err := NewServer(handler, ServerConfig{H2C: true})
+	if err != nil {
+		t.Fatalf("NewServer with H2C: %v", err)
+	}
 
 	// Both must have a non-nil handler; the h2c-wrapped one is a distinct type.
 	if srvWithout.Handler == nil {
@@ -434,13 +453,85 @@ func TestNewServer_TLSConfig(t *testing.T) {
 		return web.Text(http.StatusOK, "ok"), nil
 	}
 	input := &tls.Config{MinVersion: tls.VersionTLS13}
-	srv := NewServer(handler, ServerConfig{TLSConfig: input})
+	srv, err := NewServer(handler, ServerConfig{TLSConfig: input})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
 	if srv.TLSConfig == nil {
 		t.Fatal("TLSConfig not set on http.Server")
 	}
 	if srv.TLSConfig == input {
 		t.Error("TLSConfig should be a clone, not the same pointer")
 	}
+}
+
+func TestNewServer_InvalidTrustedProxyCIDR_ReturnsError(t *testing.T) {
+	handler := func(_ *web.Context) (web.Response, error) {
+		return web.Text(http.StatusOK, "ok"), nil
+	}
+	_, err := NewServer(handler, ServerConfig{TrustedProxies: []string{"not-a-cidr"}})
+	if err == nil {
+		t.Fatal("NewServer returned nil error for invalid TrustedProxies CIDR")
+	}
+	if !strings.Contains(err.Error(), "invalid trusted proxy CIDR") {
+		t.Errorf("error = %q, want message containing 'invalid trusted proxy CIDR'", err)
+	}
+}
+
+func TestListenAndServe_InvalidTrustedProxyCIDR_ReturnsError(t *testing.T) {
+	handler := func(_ *web.Context) (web.Response, error) {
+		return web.Text(http.StatusOK, "ok"), nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := ListenAndServe(ctx, handler, ServerConfig{TrustedProxies: []string{"not-a-cidr"}})
+	if err == nil {
+		t.Fatal("ListenAndServe returned nil error for invalid TrustedProxies CIDR")
+	}
+	if !strings.Contains(err.Error(), "invalid trusted proxy CIDR") {
+		t.Errorf("error = %q, want message containing 'invalid trusted proxy CIDR'", err)
+	}
+}
+
+// TestNewServer_TrustedProxies_WiredToAdapter verifies end-to-end that
+// X-Forwarded-Proto is accepted for a trusted peer and rejected for an
+// untrusted one via the full NewServer → handler path.
+func TestNewServer_TrustedProxies_WiredToAdapter(t *testing.T) {
+	var capturedScheme string
+	handler := func(c *web.Context) (web.Response, error) {
+		capturedScheme = c.URL().Scheme
+		return web.Text(http.StatusOK, "ok"), nil
+	}
+
+	srv, err := NewServer(handler, ServerConfig{
+		TrustedProxies: []string{"192.0.2.0/24"}, // httptest uses 192.0.2.1
+	})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+
+	t.Run("trusted peer X-Forwarded-Proto https accepted", func(t *testing.T) {
+		capturedScheme = ""
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Forwarded-Proto", "https")
+		srv.Handler.ServeHTTP(rec, req)
+		if capturedScheme != "https" {
+			t.Errorf("scheme = %q, want %q", capturedScheme, "https")
+		}
+	})
+
+	t.Run("untrusted peer X-Forwarded-Proto rejected", func(t *testing.T) {
+		capturedScheme = ""
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.RemoteAddr = "203.0.113.9:4321" // outside 192.0.2.0/24
+		req.Header.Set("X-Forwarded-Proto", "https")
+		srv.Handler.ServeHTTP(rec, req)
+		if capturedScheme != "http" {
+			t.Errorf("scheme = %q, want %q (untrusted peer must be rejected)", capturedScheme, "http")
+		}
+	})
 }
 
 func TestListenAndServe_H2C_TLS_MutuallyExclusive(t *testing.T) {
@@ -458,5 +549,47 @@ func TestListenAndServe_H2C_TLS_MutuallyExclusive(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "mutually exclusive") {
 		t.Errorf("error = %q, want substring 'mutually exclusive'", err)
+	}
+}
+
+func TestDefaultServerConfigFromEnv_NoEnv_ReturnDefaults(t *testing.T) {
+	t.Setenv("SERVER_TRUSTED_PROXIES", "")
+	cfg, err := DefaultServerConfigFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Addr != ":8080" {
+		t.Errorf("Addr = %q, want %q", cfg.Addr, ":8080")
+	}
+	if len(cfg.TrustedProxies) != 0 {
+		t.Errorf("TrustedProxies = %v, want nil", cfg.TrustedProxies)
+	}
+}
+
+func TestDefaultServerConfigFromEnv_ValidCIDRs_ParsedCorrectly(t *testing.T) {
+	t.Setenv("SERVER_TRUSTED_PROXIES", " 192.0.2.0/24 , 10.0.0.0/8 ,, ")
+	cfg, err := DefaultServerConfigFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, want := len(cfg.TrustedProxies), 2; got != want {
+		t.Fatalf("TrustedProxies length = %d, want %d", got, want)
+	}
+	if cfg.TrustedProxies[0] != "192.0.2.0/24" {
+		t.Errorf("TrustedProxies[0] = %q, want %q", cfg.TrustedProxies[0], "192.0.2.0/24")
+	}
+	if cfg.TrustedProxies[1] != "10.0.0.0/8" {
+		t.Errorf("TrustedProxies[1] = %q, want %q", cfg.TrustedProxies[1], "10.0.0.0/8")
+	}
+}
+
+func TestDefaultServerConfigFromEnv_InvalidCIDR_ReturnsError(t *testing.T) {
+	t.Setenv("SERVER_TRUSTED_PROXIES", "192.0.2.0/24,not-a-cidr")
+	_, err := DefaultServerConfigFromEnv()
+	if err == nil {
+		t.Fatal("expected error for invalid CIDR, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid trusted proxy CIDR") {
+		t.Errorf("error = %q, want message containing 'invalid trusted proxy CIDR'", err)
 	}
 }

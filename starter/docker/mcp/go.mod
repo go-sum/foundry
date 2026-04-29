@@ -1,4 +1,4 @@
-module github.com/go-sum/forge/mcp
+module github.com/go-sum/foundry/mcp
 
 go 1.26.0
 

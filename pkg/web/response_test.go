@@ -192,31 +192,6 @@ func TestJSON(t *testing.T) {
 	})
 }
 
-func TestStreamJSON(t *testing.T) {
-	t.Run("valid struct encodes with trailing newline", func(t *testing.T) {
-		type payload struct {
-			Name string `json:"name"`
-			Age  int    `json:"age"`
-		}
-		resp := StreamJSON(http.StatusOK, payload{Name: "Alice", Age: 30})
-
-		if resp.Status != http.StatusOK {
-			t.Errorf("Status = %d, want %d", resp.Status, http.StatusOK)
-		}
-		if got := resp.Headers.Get("Content-Type"); got != "application/json" {
-			t.Errorf("Content-Type = %q, want %q", got, "application/json")
-		}
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("reading body: %v", err)
-		}
-		want := "{\"name\":\"Alice\",\"age\":30}\n"
-		if string(body) != want {
-			t.Errorf("Body = %q, want %q", string(body), want)
-		}
-	})
-}
-
 func TestProblem(t *testing.T) {
 	readDoc := func(t *testing.T, resp Response) map[string]any {
 		t.Helper()

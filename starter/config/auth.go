@@ -51,22 +51,26 @@ type FirstPartyConfig struct {
 // from environment variables. The siteBaseURL is used as the default OAuth
 // issuer when AUTH_ISSUER is not explicitly set.
 func DefaultAuth(siteBaseURL string) (AuthConfig, error) {
-	tokenKeys, err := auth.ParseTokenKeys(cfgpkg.ExpandSecret("SECURITY_AUTH_TOKEN_KEY"))
+	masterKeys, err := auth.ParseTokenKeys(cfgpkg.ExpandSecret("SECURITY_AUTH_TOKEN_KEY"))
 	if err != nil {
 		if errors.Is(err, auth.ErrTokenKeyMissing) {
 			return AuthConfig{}, fmt.Errorf("%w: set SECURITY_AUTH_TOKEN_KEY environment variable", ErrAuthTokenKeyMissing)
 		}
 		return AuthConfig{}, fmt.Errorf("%w", ErrAuthTokenKeyInvalid)
 	}
+	verifyKeys, identityKeys, err := auth.DeriveTokenSubkeys(masterKeys)
+	if err != nil {
+		return AuthConfig{}, fmt.Errorf("%w: %w", ErrAuthTokenKeyInvalid, err)
+	}
 	return AuthConfig{
-		TokenKeys: tokenKeys,
+		TokenKeys: verifyKeys,
 		Identity: auth.Config{
 			EmailTOTP: auth.EmailTOTPConfig{
 				Enabled:       true,
 				PeriodSeconds: 300,
 			},
 			Token: auth.TokenConfig{
-				Secrets: tokenKeys,
+				Secrets: identityKeys,
 			},
 		},
 		Provider: ProviderAuthConfig{

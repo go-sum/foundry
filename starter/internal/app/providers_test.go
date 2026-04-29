@@ -47,7 +47,7 @@ func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 		},
 	}
 
-	sec, store, err := provideSecurity(context.Background(), Runtime{Config: cfg})
+	sec, store, err := provideSecurity(context.Background(), Runtime{Config: cfg}, nil)
 	if err != nil {
 		t.Fatalf("provideSecurity() error = %v", err)
 	}

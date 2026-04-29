@@ -20,26 +20,6 @@ func decodeHexKey(s string) ([]byte, error) {
 	return raw, nil
 }
 
-// decodeHexKeys splits a comma-separated string of hex-encoded keys and
-// decodes each one via decodeHexKey. Empty entries are skipped. Returns
-// nil, nil if all entries are empty.
-func decodeHexKeys(csv string) ([][]byte, error) {
-	parts := strings.Split(csv, ",")
-	var out [][]byte
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			continue
-		}
-		key, err := decodeHexKey(p)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, key)
-	}
-	return out, nil
-}
-
 // GenerateKeyHex generates a random 32-byte key and returns it as a 64-char
 // hex string suitable for use as SECURITY_CSRF_KEY.
 func GenerateKeyHex() (string, error) {

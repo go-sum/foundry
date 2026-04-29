@@ -6,7 +6,7 @@ x-logging: &default-logging
 
 services:
   app:
-    image: foundry:latest
+    image: ${APP_IMAGE:-foundry:latest}
     read_only: true
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
@@ -19,10 +19,13 @@ services:
     pids_limit: 128
     env_file:
       - .env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      SERVER_TRUSTED_PROXIES: ${SERVER_TRUSTED_PROXIES:-}
     secrets:
       - DATABASE_URL
       - SECURITY_CSRF_KEY
-      - SECURITY_CSRF_KEY_PREVIOUS
+      - SECURITY_AUTH_TOKEN_KEY
       - KV_PASSWORD
     depends_on:
       db:
@@ -46,8 +49,8 @@ secrets:
     file: .secrets/DATABASE_URL
   SECURITY_CSRF_KEY:
     file: .secrets/SECURITY_CSRF_KEY
-  SECURITY_CSRF_KEY_PREVIOUS:
-    file: .secrets/SECURITY_CSRF_KEY_PREVIOUS
+  SECURITY_AUTH_TOKEN_KEY:
+    file: .secrets/SECURITY_AUTH_TOKEN_KEY
 
 networks:
   app_net:

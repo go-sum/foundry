@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -175,11 +176,11 @@ func TestReverse_SetsXForwardedFor(t *testing.T) {
 			wantXFF:    "192.168.1.1",
 		},
 		{
-			name:        "append to existing XFF",
+			name:        "client-supplied XFF stripped, only remote IP forwarded",
 			host:        "ignored.example.com",
 			remoteAddr:  "10.0.0.2:9999",
 			incomingXFF: "203.0.113.5",
-			wantXFF:     "203.0.113.5, 10.0.0.2",
+			wantXFF:     "10.0.0.2",
 		},
 		{
 			name:             "RemoteAddr empty",
@@ -188,10 +189,10 @@ func TestReverse_SetsXForwardedFor(t *testing.T) {
 			wantHeaderAbsent: true,
 		},
 		{
-			name:             "RemoteAddr no port SplitHostPort fails",
-			host:             "ignored.example.com",
-			remoteAddr:       "192.168.1.1",
-			wantHeaderAbsent: true,
+			name:       "RemoteAddr bare IP is accepted",
+			host:       "ignored.example.com",
+			remoteAddr: "192.168.1.1",
+			wantXFF:    "192.168.1.1",
 		},
 		{
 			name:       "Host header is not used for XFF",
@@ -432,8 +433,8 @@ func TestReverse_ForwardProto(t *testing.T) {
 
 	target, _ := url.Parse(upstream.URL)
 
-	t.Run("ForwardProto true sets header from URL scheme", func(t *testing.T) {
-		h := Reverse(target, Options{ForwardProto: true})
+	t.Run("sets header from URL scheme", func(t *testing.T) {
+		h := Reverse(target, Options{})
 		c := newTestContext(http.MethodGet, "/")
 		// Simulate an HTTPS request by setting URL.Scheme on the context.
 		c.Request.URL.Scheme = "https"
@@ -449,11 +450,11 @@ func TestReverse_ForwardProto(t *testing.T) {
 		}
 	})
 
-	t.Run("ForwardProto false does not set header", func(t *testing.T) {
+	t.Run("strips client header and sets from connection", func(t *testing.T) {
 		gotProto = ""
-		h := Reverse(target, Options{ForwardProto: false})
+		h := Reverse(target, Options{})
 		c := newTestContext(http.MethodGet, "/")
-		c.Request.URL.Scheme = "https"
+		c.Request.Headers.Set("X-Forwarded-Proto", "https") // client injection attempt
 
 		resp, _ := h(c)
 		if resp.Body != nil {
@@ -461,25 +462,9 @@ func TestReverse_ForwardProto(t *testing.T) {
 			_ = resp.Body.Close()
 		}
 
-		if gotProto != "" {
-			t.Errorf("X-Forwarded-Proto = %q, want empty when ForwardProto=false", gotProto)
-		}
-	})
-
-	t.Run("ForwardProto true does not overwrite existing header", func(t *testing.T) {
-		gotProto = ""
-		h := Reverse(target, Options{ForwardProto: true})
-		c := newTestContext(http.MethodGet, "/")
-		c.Request.Headers.Set("X-Forwarded-Proto", "https") // pre-existing from upstream proxy
-
-		resp, _ := h(c)
-		if resp.Body != nil {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-		}
-
-		if gotProto != "https" {
-			t.Errorf("X-Forwarded-Proto = %q, want %q (pre-existing value preserved)", gotProto, "https")
+		// Client-supplied value must be rejected; connection has no scheme so defaults to http.
+		if gotProto != "http" {
+			t.Errorf("X-Forwarded-Proto = %q, want %q (client injection rejected)", gotProto, "http")
 		}
 	})
 }
@@ -698,6 +683,52 @@ func TestReverse_EmitsForwardedHeader_IPv6(t *testing.T) {
 	}
 }
 
+// TestReverse_ClientForwardingHeaders_Stripped ensures that a client cannot inject
+// fake forwarding metadata that would be trusted by upstream services.
+func TestReverse_ClientForwardingHeaders_Stripped(t *testing.T) {
+	cases := []struct {
+		name   string
+		header string
+		value  string
+	}{
+		{"X-Forwarded-For injection", "X-Forwarded-For", "1.2.3.4"},
+		{"Forwarded injection", "Forwarded", "for=1.2.3.4"},
+		{"X-Forwarded-Host injection", "X-Forwarded-Host", "evil.example.com"},
+		{"X-Forwarded-Proto injection", "X-Forwarded-Proto", "https"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotValue string
+			var headerPresent bool
+
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotValue = r.Header.Get(tc.header)
+				_, headerPresent = r.Header[http.CanonicalHeaderKey(tc.header)]
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer upstream.Close()
+
+			target, _ := url.Parse(upstream.URL)
+			h := Reverse(target, Options{})
+			// RemoteAddr is empty so X-Forwarded-For and Forwarded will be absent;
+			// what matters is the client-injected value does not reach upstream.
+			c := newTestContextFull(http.MethodGet, "/", "", "", map[string]string{
+				tc.header: tc.value,
+			})
+			resp, _ := h(c)
+			if resp.Body != nil {
+				_, _ = io.Copy(io.Discard, resp.Body)
+				_ = resp.Body.Close()
+			}
+
+			if headerPresent && gotValue == tc.value {
+				t.Errorf("%s client-injected value %q reached upstream unchanged; want stripped", tc.header, tc.value)
+			}
+		})
+	}
+}
+
 func TestReverse_HopByHopHeaders_Stripped(t *testing.T) {
 	var gotHeaders http.Header
 
@@ -728,4 +759,433 @@ func TestReverse_HopByHopHeaders_Stripped(t *testing.T) {
 	if gotHeaders.Get("X-App-Header") != "should-pass" {
 		t.Errorf("X-App-Header = %q, want %q", gotHeaders.Get("X-App-Header"), "should-pass")
 	}
+}
+
+func TestReverse_TrustedProxy_ExtendsXFFChain(t *testing.T) {
+	var gotXFF string
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotXFF = r.Header.Get("X-Forwarded-For")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatalf("parse upstream URL: %v", err)
+	}
+
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+	// RemoteAddr is in the trusted range; the LB already set X-Forwarded-For
+	// for the end user. The proxy must extend the chain, not replace it.
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "10.0.0.1:1234", map[string]string{
+		"X-Forwarded-For": "203.0.113.5",
+	})
+	resp, rerr := h(c)
+	if rerr != nil {
+		t.Fatalf("Reverse returned error: %v", rerr)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	want := "203.0.113.5, 10.0.0.1"
+	if gotXFF != want {
+		t.Errorf("X-Forwarded-For = %q, want %q", gotXFF, want)
+	}
+}
+
+func TestReverse_UntrustedPeer_StartsXFFFresh(t *testing.T) {
+	var gotXFF string
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotXFF = r.Header.Get("X-Forwarded-For")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatalf("parse upstream URL: %v", err)
+	}
+
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+	// RemoteAddr is 192.168.1.1 — NOT in 10.0.0.0/8. The inbound XFF must be
+	// discarded and the chain must start fresh from RemoteAddr.
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "192.168.1.1:1234", map[string]string{
+		"X-Forwarded-For": "203.0.113.5",
+	})
+	resp, rerr := h(c)
+	if rerr != nil {
+		t.Fatalf("Reverse returned error: %v", rerr)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	want := "192.168.1.1"
+	if gotXFF != want {
+		t.Errorf("X-Forwarded-For = %q, want %q (untrusted peer must start chain fresh)", gotXFF, want)
+	}
+}
+
+func TestReverse_TrustedProxy_ExtendsForwardedChain(t *testing.T) {
+	var gotForwarded string
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotForwarded = r.Header.Get("Forwarded")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatalf("parse upstream URL: %v", err)
+	}
+
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "10.0.0.1:1234", map[string]string{
+		"Forwarded": "for=203.0.113.5;host=example.com;proto=https",
+	})
+	resp, rerr := h(c)
+	if rerr != nil {
+		t.Fatalf("Reverse returned error: %v", rerr)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if !strings.HasPrefix(gotForwarded, "for=203.0.113.5;host=example.com;proto=https, ") {
+		t.Errorf("Forwarded = %q, want inbound chain preserved as prefix", gotForwarded)
+	}
+	if !strings.Contains(gotForwarded, "for=10.0.0.1") {
+		t.Errorf("Forwarded = %q, want trusted peer hop appended", gotForwarded)
+	}
+}
+
+func TestReverse_TrustedProxy_InvalidXFFStartsFresh(t *testing.T) {
+	var gotXFF string
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotXFF = r.Header.Get("X-Forwarded-For")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatalf("parse upstream URL: %v", err)
+	}
+
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "10.0.0.1:1234", map[string]string{
+		"X-Forwarded-For": "203.0.113.5, definitely-not-an-ip",
+	})
+	resp, rerr := h(c)
+	if rerr != nil {
+		t.Fatalf("Reverse returned error: %v", rerr)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if gotXFF != "10.0.0.1" {
+		t.Errorf("X-Forwarded-For = %q, want %q when trusted peer supplies malformed chain", gotXFF, "10.0.0.1")
+	}
+}
+
+func TestReverse_TrustedProxy_InvalidForwardedStartsFresh(t *testing.T) {
+	var gotForwarded string
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotForwarded = r.Header.Get("Forwarded")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, err := url.Parse(upstream.URL)
+	if err != nil {
+		t.Fatalf("parse upstream URL: %v", err)
+	}
+
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "10.0.0.1:1234", map[string]string{
+		"Forwarded": "for=203.0.113.5;host=example.com;proto=https, nope",
+	})
+	resp, rerr := h(c)
+	if rerr != nil {
+		t.Fatalf("Reverse returned error: %v", rerr)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if strings.Contains(gotForwarded, "203.0.113.5") {
+		t.Errorf("Forwarded = %q, want malformed trusted chain dropped", gotForwarded)
+	}
+	if !strings.Contains(gotForwarded, "for=10.0.0.1") {
+		t.Errorf("Forwarded = %q, want fresh hop emitted", gotForwarded)
+	}
+}
+
+
+// --- X-Forwarded-Host trust-gated preservation ---
+
+func TestReverse_XForwardedHost_AlwaysRebuiltFromHost(t *testing.T) {
+	var gotXFH string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotXFH = r.Header.Get("X-Forwarded-Host")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, _ := url.Parse(upstream.URL)
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+	// Even a trusted peer supplying X-Forwarded-Host must be ignored.
+	// The outbound header must be built from c.Request.Host() (the actual Host header).
+	c := newTestContextFull(http.MethodGet, "/", "internal.svc:8080", "10.0.0.1:1234", map[string]string{
+		"X-Forwarded-Host": "public.example.com",
+	})
+	resp, err := h(c)
+	if err != nil {
+		t.Fatalf("Reverse error: %v", err)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if gotXFH != "internal.svc:8080" {
+		t.Errorf("X-Forwarded-Host = %q, want %q (inbound XFH must never be preserved; rebuild from Host)", gotXFH, "internal.svc:8080")
+	}
+}
+
+func TestReverse_UntrustedPeer_OverwritesXForwardedHost(t *testing.T) {
+	var gotXFH string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotXFH = r.Header.Get("X-Forwarded-Host")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, _ := url.Parse(upstream.URL)
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+	// RemoteAddr 192.168.1.1 is NOT in the trusted CIDR.
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "192.168.1.1:1234", map[string]string{
+		"X-Forwarded-Host": "evil.example.com",
+	})
+	resp, err := h(c)
+	if err != nil {
+		t.Fatalf("Reverse error: %v", err)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if gotXFH != "example.com" {
+		t.Errorf("X-Forwarded-Host = %q, want %q (untrusted peer injection must be replaced with Host)", gotXFH, "example.com")
+	}
+}
+
+func TestReverse_Authority_OverridesRequestHost(t *testing.T) {
+	var gotXFH, gotCookieDomain string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotXFH = r.Header.Get("X-Forwarded-Host")
+		// Respond with a Set-Cookie that has a Domain attribute so we can
+		// verify domain rewriting uses Authority, not the request Host.
+		w.Header().Set("Set-Cookie", "sess=abc; Domain=internal.svc; Path=/")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, _ := url.Parse(upstream.URL)
+	h := Reverse(target, Options{Authority: "public.example.com"})
+
+	// Request Host is an internal service name that should NOT appear in outbound headers.
+	c := newTestContextFull(http.MethodGet, "/", "internal.svc:8080", "10.0.0.1:1234", nil)
+	resp, err := h(c)
+	if err != nil {
+		t.Fatalf("Reverse error: %v", err)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if gotXFH != "public.example.com" {
+		t.Errorf("X-Forwarded-Host = %q, want %q", gotXFH, "public.example.com")
+	}
+	gotCookieDomain = resp.Headers.Get("Set-Cookie")
+	if !strings.Contains(gotCookieDomain, "Domain=public.example.com") {
+		t.Errorf("Set-Cookie = %q, want Domain=public.example.com", gotCookieDomain)
+	}
+}
+
+func TestReverse_TrustedProxy_NoInboundXFH_FallsBackToHost(t *testing.T) {
+	var gotXFH string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotXFH = r.Header.Get("X-Forwarded-Host")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, _ := url.Parse(upstream.URL)
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "10.0.0.1:1234", nil)
+	resp, err := h(c)
+	if err != nil {
+		t.Fatalf("Reverse error: %v", err)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if gotXFH != "example.com" {
+		t.Errorf("X-Forwarded-Host = %q, want %q (trusted peer with no inbound XFH must fall back to Host)", gotXFH, "example.com")
+	}
+}
+
+func TestReverse_NoTrustedProxies_XForwardedHostFromHost(t *testing.T) {
+	var gotXFH string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotXFH = r.Header.Get("X-Forwarded-Host")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, _ := url.Parse(upstream.URL)
+	h := Reverse(target, Options{}) // no TrustedProxies
+
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "10.0.0.1:1234", map[string]string{
+		"X-Forwarded-Host": "injected.example.com",
+	})
+	resp, err := h(c)
+	if err != nil {
+		t.Fatalf("Reverse error: %v", err)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if gotXFH != "example.com" {
+		t.Errorf("X-Forwarded-Host = %q, want %q (no trusted proxies configured, must use Host)", gotXFH, "example.com")
+	}
+}
+
+// --- X-Forwarded-Proto trust-gated passthrough ---
+
+func TestReverse_XForwardedProto_AlwaysRebuiltFromScheme(t *testing.T) {
+	var gotProto string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotProto = r.Header.Get("X-Forwarded-Proto")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	target, _ := url.Parse(upstream.URL)
+	_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+	h := Reverse(target, Options{
+		TrustedProxies: []*net.IPNet{trustedCIDR},
+	})
+
+	// Must use c.URL().Scheme, not inbound value, even from trusted peers.
+	// Context URL has no scheme set so it defaults to "http".
+	c := newTestContextFull(http.MethodGet, "/", "example.com", "10.0.0.1:1234", map[string]string{
+		"X-Forwarded-Proto": "https", // inbound from trusted peer — must be ignored
+	})
+	resp, err := h(c)
+	if err != nil {
+		t.Fatalf("Reverse error: %v", err)
+	}
+	if resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+
+	if gotProto != "http" {
+		t.Errorf("X-Forwarded-Proto = %q, want %q (must use connection scheme, not inbound)", gotProto, "http")
+	}
+}
+
+func TestReverse_XForwardedProto_AlwaysSet(t *testing.T) {
+	t.Run("trusted peer", func(t *testing.T) {
+		var gotProto string
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotProto = r.Header.Get("X-Forwarded-Proto")
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer upstream.Close()
+
+		target, _ := url.Parse(upstream.URL)
+		_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+		h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+		c := newTestContextFull(http.MethodGet, "/", "example.com", "10.0.0.1:1234", nil)
+		c.Request.URL.Scheme = "https"
+		resp, err := h(c)
+		if err != nil {
+			t.Fatalf("Reverse error: %v", err)
+		}
+		if resp.Body != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}
+
+		if gotProto != "https" {
+			t.Errorf("trusted peer: X-Forwarded-Proto = %q, want %q", gotProto, "https")
+		}
+	})
+
+	t.Run("untrusted peer", func(t *testing.T) {
+		var gotProto string
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotProto = r.Header.Get("X-Forwarded-Proto")
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer upstream.Close()
+
+		target, _ := url.Parse(upstream.URL)
+		_, trustedCIDR, _ := net.ParseCIDR("10.0.0.0/8")
+		h := Reverse(target, Options{TrustedProxies: []*net.IPNet{trustedCIDR}})
+
+		// RemoteAddr 192.168.1.1 is NOT in the trusted CIDR.
+		c := newTestContextFull(http.MethodGet, "/", "example.com", "192.168.1.1:1234", nil)
+		c.Request.URL.Scheme = "https"
+		resp, err := h(c)
+		if err != nil {
+			t.Fatalf("Reverse error: %v", err)
+		}
+		if resp.Body != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}
+
+		if gotProto != "https" {
+			t.Errorf("untrusted peer: X-Forwarded-Proto = %q, want %q", gotProto, "https")
+		}
+	})
 }

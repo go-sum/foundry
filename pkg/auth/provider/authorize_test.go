@@ -358,6 +358,85 @@ func TestAuthorizeSubmit_DenyRedirectsAndClearsSession(t *testing.T) {
 	assertSessionHasPendingParams(t, sess, false)
 }
 
+func authorizeQueryContext(params url.Values) *web.Context {
+	u, _ := url.Parse("/oauth/authorize")
+	u.RawQuery = params.Encode()
+	req := web.NewRequest(http.MethodGet, u)
+	return web.NewContext(context.Background(), req)
+}
+
+func newAuthorizeHandlerForParsing(clients ClientStore) *AuthorizeHandler {
+	return &AuthorizeHandler{
+		clients: clients,
+		config:  ApplyDefaults(Config{}),
+		logger:  slog.Default(),
+	}
+}
+
+func TestParseAndValidateAuthzParams_ScopeValidation(t *testing.T) {
+	baseParams := url.Values{
+		"client_id":             {"client-1"},
+		"redirect_uri":          {"https://app.example.com/callback"},
+		"response_type":         {"code"},
+		"code_challenge":        {"dGhpcyBpcyBhIHRlc3QgY2hhbGxlbmdl"},
+		"code_challenge_method": {"S256"},
+	}
+
+	cloneParams := func(extra url.Values) url.Values {
+		out := make(url.Values)
+		for k, v := range baseParams {
+			out[k] = v
+		}
+		for k, v := range extra {
+			out[k] = v
+		}
+		return out
+	}
+
+	tests := []struct {
+		name           string
+		clientScopes   []string
+		requestedScope string
+		wantErr        bool
+	}{
+		{"subset of client scopes succeeds", []string{"openid", "email"}, "openid", false},
+		{"all client scopes requested succeeds", []string{"openid", "email"}, "openid email", false},
+		{"scope not registered for client fails", []string{"openid", "email"}, "openid admin", true},
+		{"entirely unregistered scope fails", []string{"openid", "email"}, "profile", true},
+		{"empty scope defaults to openid, client allows it", []string{"openid", "email"}, "", false},
+		{"empty scope defaults to openid, client does not allow it", []string{"email"}, "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := OAuthClient{
+				ClientID:     "client-1",
+				RedirectURIs: []string{"https://app.example.com/callback"},
+				Scopes:       tt.clientScopes,
+				Public:       true,
+			}
+			clients := &fakeClientStore{
+				clients: map[string]OAuthClient{"client-1": client},
+			}
+			h := newAuthorizeHandlerForParsing(clients)
+
+			params := cloneParams(nil)
+			if tt.requestedScope != "" {
+				params.Set("scope", tt.requestedScope)
+			}
+
+			c := authorizeQueryContext(params)
+			_, _, err := h.parseAndValidateAuthzParams(c)
+			if tt.wantErr && err == nil {
+				t.Error("parseAndValidateAuthzParams error = nil, want error")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("parseAndValidateAuthzParams error = %v, want nil", err)
+			}
+		})
+	}
+}
+
 func TestAuthorizeSubmit_ApproveSavesConsentIssuesCodeAndClearsSession(t *testing.T) {
 	t.Parallel()
 

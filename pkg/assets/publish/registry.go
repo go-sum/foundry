@@ -1,6 +1,7 @@
 package publish
 
 import (
+	"maps"
 	"path"
 	"strings"
 	"sync"
@@ -12,9 +13,6 @@ type Registry struct {
 	spriteFiles map[string]string
 	resolvePath func(string) string
 }
-
-// DefaultRegistry is the package-level sprite registry.
-var DefaultRegistry = NewRegistry()
 
 // NewRegistry creates a new Registry with the default path resolver.
 func NewRegistry() *Registry {
@@ -35,9 +33,7 @@ func (r *Registry) RegisterSprite(name, relPath string) {
 func (r *Registry) RegisterSprites(sprites map[string]string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for name, relPath := range sprites {
-		r.spriteFiles[name] = relPath
-	}
+	maps.Copy(r.spriteFiles, sprites)
 }
 
 // SetPathFunc replaces the path resolution function.
@@ -63,24 +59,4 @@ func (r *Registry) SpritePath(name string) string {
 func PublicPath(rel string) string {
 	rel = strings.TrimPrefix(rel, "/")
 	return path.Join("/public", rel)
-}
-
-// RegisterSprite registers a sprite on the DefaultRegistry.
-func RegisterSprite(name, relPath string) {
-	DefaultRegistry.RegisterSprite(name, relPath)
-}
-
-// RegisterSprites registers sprites on the DefaultRegistry.
-func RegisterSprites(sprites map[string]string) {
-	DefaultRegistry.RegisterSprites(sprites)
-}
-
-// SetPathFunc sets the path function on the DefaultRegistry.
-func SetPathFunc(fn func(string) string) {
-	DefaultRegistry.SetPathFunc(fn)
-}
-
-// SpritePath resolves a sprite path from the DefaultRegistry.
-func SpritePath(name string) string {
-	return DefaultRegistry.SpritePath(name)
 }

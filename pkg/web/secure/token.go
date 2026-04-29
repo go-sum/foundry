@@ -78,23 +78,6 @@ func VerifyToken(key []byte, scope string, encoded string) error {
 	return nil
 }
 
-func verifyTokenAny(keys [][]byte, scope, encoded string) error {
-	var sawExpired bool
-	for _, k := range keys {
-		err := VerifyToken(k, scope, encoded)
-		if err == nil {
-			return nil
-		}
-		if errors.Is(err, ErrTokenExpired) {
-			sawExpired = true
-		}
-	}
-	if sawExpired {
-		return ErrTokenExpired
-	}
-	return ErrTokenInvalid
-}
-
 func computeMAC(key []byte, scope string, data []byte) []byte {
 	h := hmac.New(sha256.New, key)
 	h.Write([]byte(scope))

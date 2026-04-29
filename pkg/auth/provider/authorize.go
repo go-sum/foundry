@@ -153,6 +153,10 @@ func (h *AuthorizeHandler) parseAndValidateAuthzParams(c *web.Context) (Authoriz
 		scopes = []string{"openid"}
 	}
 
+	if !scopesGranted(client.Scopes, scopes) {
+		return AuthorizeParams{}, OAuthClient{}, web.ErrBadRequest("requested scope not allowed for this client")
+	}
+
 	return AuthorizeParams{
 		ClientID:      clientID,
 		RedirectURI:   redirectURI,

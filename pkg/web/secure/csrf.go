@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net/http"
 	neturl "net/url"
@@ -17,19 +16,10 @@ import (
 	websession "github.com/go-sum/foundry/pkg/web/session"
 )
 
-// ErrCSRFPreviousKeys is returned by NewCSRFConfigFromHex when the
-// comma-separated previous-keys hex string contains an invalid entry.
-// Callers can use errors.Is to distinguish this from a primary-key error.
-var ErrCSRFPreviousKeys = errors.New("secure: csrf previous keys invalid")
-
 // CSRFConfig configures CSRF protection middleware.
 type CSRFConfig struct {
 	// Key is the HMAC-SHA256 signing key for stateless fallback mode.
 	Key []byte `validate:"required,min=32" help:"set SECURITY_CSRF_KEY — generate with 'openssl rand -hex 32' and place in starter/.env"`
-
-	// PreviousKeys are additional HMAC keys accepted during verification only.
-	// During a key rotation, place the retiring key here for at least TokenTTL
-	PreviousKeys [][]byte `validate:"dive,min=32" help:"set SECURITY_CSRF_KEY_PREVIOUS (comma-separated hex) during rotation; keep for at least TokenTTL"`
 
 	// TokenTTL is the stateless token lifetime.
 	TokenTTL time.Duration
@@ -38,17 +28,9 @@ type CSRFConfig struct {
 	// Defaults to "csrf".
 	ContextKey string
 
-	// HeaderName is the legacy single header name checked for the token.
+	// HeaderName is the header name checked for the token.
 	// Defaults to "X-CSRF-Token".
 	HeaderName string
-
-	// HeaderNames is the ordered list of header names checked for the token.
-	// If empty, defaults to ["X-CSRF-Token", "X-XSRF-Token", "csrf-token"].
-	HeaderNames []string
-
-	// QueryField is the URL query parameter checked for the token.
-	// Defaults to "_csrf".
-	QueryField string
 
 	// FormField is the form body field checked for the token on
 	// application/x-www-form-urlencoded and multipart/form-data requests.
@@ -62,7 +44,9 @@ type CSRFConfig struct {
 	SafeMethods []string
 
 	// AllowMissingOrigin controls whether unsafe requests without Origin or
-	// Referer are allowed. Defaults to true.
+	// Referer are allowed. Defaults to false — requests that omit both headers
+	// are rejected. Set to true only in development or when clients are known
+	// to omit origin headers (e.g. some native HTTP clients).
 	AllowMissingOrigin bool
 
 	// AllowedOrigins are additional trusted origins for unsafe requests.
@@ -70,6 +54,11 @@ type CSRFConfig struct {
 
 	// AllowedOriginFunc performs dynamic origin checks for unsafe requests.
 	AllowedOriginFunc func(origin string, c *web.Context) bool
+
+	// ServerOrigin is the server-owned origin (e.g. "https://example.com")
+	// used for same-origin comparison instead of deriving it from the request
+	// Host header. When empty, falls back to the request-derived origin.
+	ServerOrigin string
 
 	// TokenLookup overrides default submitted-token extraction.
 	TokenLookup func(c *web.Context) string
@@ -130,12 +119,9 @@ func applyCSRFDefaults(c *CSRFConfig) {
 	c.TokenTTL = cmp.Or(c.TokenTTL, time.Hour)
 	c.ContextKey = cmp.Or(c.ContextKey, "csrf")
 	c.HeaderName = cmp.Or(c.HeaderName, "X-CSRF-Token")
-	c.QueryField = cmp.Or(c.QueryField, "_csrf")
 	c.FormField = cmp.Or(c.FormField, "_csrf")
 	c.CookieName = cmp.Or(c.CookieName, "csrf")
-	if len(c.HeaderNames) == 0 {
-		c.HeaderNames = []string{"X-CSRF-Token", "X-XSRF-Token", "csrf-token"}
-	}
+
 	if len(c.SafeMethods) == 0 {
 		c.SafeMethods = []string{http.MethodGet, http.MethodHead, http.MethodOptions}
 	}
@@ -143,6 +129,8 @@ func applyCSRFDefaults(c *CSRFConfig) {
 
 // DefaultCSRFConfig returns a CSRFConfig with all defaults applied.
 // Key is zero-length; the caller must supply a key before use.
+// AllowMissingOrigin defaults to false; set it to true in development overlays
+// or when clients are known to omit Origin/Referer headers.
 func DefaultCSRFConfig() CSRFConfig {
 	var c CSRFConfig
 	applyCSRFDefaults(&c)
@@ -150,12 +138,11 @@ func DefaultCSRFConfig() CSRFConfig {
 }
 
 // NewCSRFConfigFromHex returns a CSRFConfig populated with defaults plus the
-// supplied hex-encoded keys. An empty keyHex leaves Key zero-length (the
-// caller or validator decides whether that is acceptable). previousKeysHex is
-// a comma-separated list; empty entries are skipped; empty string is a no-op.
+// supplied hex-encoded key. An empty keyHex leaves Key zero-length (the
+// caller or validator decides whether that is acceptable).
 //
-// Errors are namespaced: "csrf key: ..." or "csrf previous keys: ...".
-func NewCSRFConfigFromHex(keyHex, previousKeysHex string) (CSRFConfig, error) {
+// Errors are namespaced: "csrf key: ...".
+func NewCSRFConfigFromHex(keyHex string) (CSRFConfig, error) {
 	cfg := DefaultCSRFConfig()
 	if keyHex != "" {
 		k, err := decodeHexKey(keyHex)
@@ -163,13 +150,6 @@ func NewCSRFConfigFromHex(keyHex, previousKeysHex string) (CSRFConfig, error) {
 			return CSRFConfig{}, fmt.Errorf("csrf key: %w", err)
 		}
 		cfg.Key = k
-	}
-	if previousKeysHex != "" {
-		keys, err := decodeHexKeys(previousKeysHex)
-		if err != nil {
-			return CSRFConfig{}, errors.Join(ErrCSRFPreviousKeys, fmt.Errorf("csrf previous keys: %w", err))
-		}
-		cfg.PreviousKeys = keys
 	}
 	return cfg, nil
 }
@@ -183,10 +163,6 @@ func CSRF(cfg CSRFConfig) web.Middleware {
 		panic(err)
 	}
 	applyCSRFDefaults(&cfg)
-
-	verifyKeys := make([][]byte, 0, 1+len(cfg.PreviousKeys))
-	verifyKeys = append(verifyKeys, cfg.Key)
-	verifyKeys = append(verifyKeys, cfg.PreviousKeys...)
 
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
@@ -214,7 +190,7 @@ func CSRF(cfg CSRFConfig) web.Middleware {
 						return web.Response{}, web.ErrForbidden("CSRF token invalid")
 					}
 				} else {
-					if err := verifyTokenAny(verifyKeys, cfg.ContextKey, submittedToken); err != nil {
+					if err := VerifyToken(cfg.Key, cfg.ContextKey, submittedToken); err != nil {
 						return web.Response{}, web.ErrForbidden("CSRF token invalid")
 					}
 					cookie, ok := web.GetCookie(c.Request, cfg.CookieName)
@@ -224,6 +200,10 @@ func CSRF(cfg CSRFConfig) web.Middleware {
 				}
 			}
 
+			// In stateless (cookie double-submit) mode, a fresh token is issued on
+			// every request. This is safe: verification is MAC-based so outstanding
+			// tokens remain valid for their full TTL even after rotation. Session-backed
+			// mode reuses the stable session token instead.
 			token := sessionToken
 			if !hasSession {
 				token, err = IssueToken(cfg.Key, cfg.ContextKey, cfg.TokenTTL)
@@ -232,10 +212,11 @@ func CSRF(cfg CSRFConfig) web.Middleware {
 				}
 			}
 
+			advertisedHeader := cfg.HeaderName
 			c.Set(csrfContextKey{}, csrfContextData{
 				token:      token,
 				fieldName:  cfg.FormField,
-				headerName: cfg.HeaderName,
+				headerName: advertisedHeader,
 			})
 			resp, herr := next(c)
 			if !hasSession {
@@ -291,8 +272,7 @@ func newSessionCSRFToken() (string, error) {
 // submittedCSRFToken extracts a CSRF token from the request. The lookup order is:
 //  1. TokenLookup override (if configured)
 //  2. Request headers (HeaderNames, in order)
-//  3. URL query parameter (QueryField)
-//  4. Form body field (FormField) — for application/x-www-form-urlencoded and
+//  3. Form body field (FormField) — for application/x-www-form-urlencoded and
 //     multipart/form-data. The body is cloned so the downstream handler still
 //     receives the full original body.
 func submittedCSRFToken(c *web.Context, cfg CSRFConfig) string {
@@ -300,16 +280,8 @@ func submittedCSRFToken(c *web.Context, cfg CSRFConfig) string {
 		return strings.TrimSpace(cfg.TokenLookup(c))
 	}
 
-	for _, headerName := range cfg.HeaderNames {
-		if token := strings.TrimSpace(c.Headers().Get(headerName)); token != "" {
-			return token
-		}
-	}
-
-	if c.URL() != nil {
-		if token := strings.TrimSpace(c.URL().Query().Get(cfg.QueryField)); token != "" {
-			return token
-		}
+	if token := strings.TrimSpace(c.Headers().Get(cfg.HeaderName)); token != "" {
+		return token
 	}
 
 	// Form body: only for urlencoded/multipart. Clone the body so the handler
@@ -335,12 +307,15 @@ func validOrigin(c *web.Context, cfg CSRFConfig) bool {
 		return false
 	}
 
-	requestOrigin := sameOriginBase(c)
+	requestOrigin := cfg.ServerOrigin
+	if requestOrigin == "" {
+		requestOrigin = sameOriginBase(c)
+	}
 	origin := strings.TrimSpace(c.Headers().Get("Origin"))
 	if origin == "" {
 		referer := strings.TrimSpace(c.Headers().Get("Referer"))
 		if referer == "" {
-			return true
+			return cfg.AllowMissingOrigin
 		}
 		parsed, err := neturl.Parse(referer)
 		if err != nil {
@@ -382,8 +357,6 @@ func sameOriginBase(c *web.Context) string {
 	scheme := "http"
 	if c.URL() != nil && c.URL().Scheme != "" {
 		scheme = c.URL().Scheme
-	} else if strings.EqualFold(c.Headers().Get("X-Forwarded-Proto"), "https") {
-		scheme = "https"
 	}
 	return scheme + "://" + host
 }

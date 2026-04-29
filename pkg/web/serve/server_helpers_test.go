@@ -19,14 +19,14 @@ func TestDefaultServerConfig(t *testing.T) {
 	if got.Addr != ":8080" {
 		t.Fatalf("Addr = %q, want %q", got.Addr, ":8080")
 	}
-	if got.ReadHeaderTimeout != 5*time.Second {
-		t.Fatalf("ReadHeaderTimeout = %v, want %v", got.ReadHeaderTimeout, 5*time.Second)
+	if got.ReadHeaderTimeout != 10*time.Second {
+		t.Fatalf("ReadHeaderTimeout = %v, want %v", got.ReadHeaderTimeout, 10*time.Second)
 	}
 	if got.ReadTimeout != 30*time.Second {
 		t.Fatalf("ReadTimeout = %v, want %v", got.ReadTimeout, 30*time.Second)
 	}
-	if got.WriteTimeout != 30*time.Second {
-		t.Fatalf("WriteTimeout = %v, want %v", got.WriteTimeout, 30*time.Second)
+	if got.WriteTimeout != 60*time.Second {
+		t.Fatalf("WriteTimeout = %v, want %v", got.WriteTimeout, 60*time.Second)
 	}
 	if got.IdleTimeout != 120*time.Second {
 		t.Fatalf("IdleTimeout = %v, want %v", got.IdleTimeout, 120*time.Second)

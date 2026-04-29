@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -487,5 +489,52 @@ func TestRealIPFromForwarded_EmptyTrustedList_AlwaysReturnsRemoteAddr(t *testing
 	got := fn(web.NewContext(context.Background(), req))
 	if got != "10.1.2.3:1234" {
 		t.Errorf("got %q, want %q", got, "10.1.2.3:1234")
+	}
+}
+
+// TestMemoryStore_ConcurrentAccess verifies that MemoryStore.Allow is safe for
+// concurrent callers. Run with -race to detect data races.
+func TestMemoryStore_ConcurrentAccess(t *testing.T) {
+	const burst = 50
+	store := NewMemoryStore(MemoryStoreConfig{
+		Rate:  1000, // replenishment is negligible during this test
+		Burst: burst,
+	})
+
+	const goroutines = 20
+	const callsEach = 10
+
+	var (
+		wg      sync.WaitGroup
+		allowed atomic.Int64
+		denied  atomic.Int64
+	)
+
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			for range callsEach {
+				ok, _, err := store.Allow("shared-client")
+				if err != nil {
+					t.Errorf("Allow: unexpected error: %v", err)
+					return
+				}
+				if ok {
+					allowed.Add(1)
+				} else {
+					denied.Add(1)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	total := int(allowed.Load() + denied.Load())
+	if want := goroutines * callsEach; total != want {
+		t.Errorf("total calls = %d, want %d", total, want)
+	}
+	if got := int(allowed.Load()); got != burst {
+		t.Errorf("allowed = %d, want %d (burst)", got, burst)
 	}
 }

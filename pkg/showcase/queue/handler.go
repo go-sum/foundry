@@ -1,7 +1,7 @@
 package queue
 
 import (
-	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/showcase/base"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/htmx"
 	"github.com/go-sum/foundry/pkg/web/render"
@@ -26,7 +26,7 @@ func (h *handler) Index(c *web.Context) (web.Response, error) {
 func (h *handler) Detail(c *web.Context) (web.Response, error) {
 	queueName := c.Param("queue")
 	status := c.URL().Query().Get("status")
-	pg := showcase.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
+	pg := base.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
 	jobs, total, err := listJobs(c.Context(), h.cfg.Pool, queueName, status, pg.Limit(), pg.Offset())
 	if err != nil {
 		return web.Response{}, web.ErrInternal(err)
@@ -46,7 +46,7 @@ func (h *handler) Detail(c *web.Context) (web.Response, error) {
 func (h *handler) Jobs(c *web.Context) (web.Response, error) {
 	queueName := c.Param("queue")
 	status := c.URL().Query().Get("status")
-	pg := showcase.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
+	pg := base.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
 	jobs, total, err := listJobs(c.Context(), h.cfg.Pool, queueName, status, pg.Limit(), pg.Offset())
 	if err != nil {
 		return web.Response{}, web.ErrInternal(err)

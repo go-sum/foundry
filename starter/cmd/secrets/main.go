@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -68,6 +69,7 @@ func run(composeFiles []string, envFile, outDir string) error {
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("read %s: %w", envFile, err)
 	}
+	cfgpkg.ExtractDSNComponents(env, seen)
 
 	if err := os.MkdirAll(outDir, 0700); err != nil {
 		return fmt.Errorf("mkdir %s: %w", outDir, err)

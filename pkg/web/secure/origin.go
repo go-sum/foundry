@@ -23,6 +23,11 @@ type OriginGuardConfig struct {
 	// for older browsers that do not send Fetch Metadata headers.
 	PermitUnknownOrigin bool
 
+	// ServerOrigin is the server-owned origin (e.g. "https://example.com")
+	// used for same-origin comparison instead of deriving it from the request
+	// Host header. When empty, falls back to the request-derived origin.
+	ServerOrigin string
+
 	// Skipper returns true to bypass origin validation for the request.
 	Skipper func(c *web.Context) bool
 }
@@ -54,8 +59,18 @@ func OriginGuard(cfg OriginGuardConfig) web.Middleware {
 			// Sec-Fetch-Site is the authoritative source in modern browsers.
 			fetchSite := strings.ToLower(strings.TrimSpace(c.Headers().Get("Sec-Fetch-Site")))
 			switch fetchSite {
-			case "same-origin", "same-site", "none":
+			case "same-origin", "none":
 				return next(c)
+			case "same-site":
+				// same-site includes all subdomains of the registrable domain.
+				// A subdomain takeover or wildcard DNS entry could issue cross-origin
+				// POSTs that the browser labels same-site. Validate the Origin header
+				// when present so subdomains must still be explicitly trusted.
+				origin := strings.TrimSpace(c.Headers().Get("Origin"))
+				if origin == "" || isSameOriginRequest(c, origin, cfg.ServerOrigin) || isTrustedOrigin(origin, cfg) {
+					return next(c)
+				}
+				return web.Response{}, web.ErrForbidden("cross-origin request blocked")
 			case "cross-site":
 				origin := strings.TrimSpace(c.Headers().Get("Origin"))
 				if isTrustedOrigin(origin, cfg) {
@@ -72,7 +87,7 @@ func OriginGuard(cfg OriginGuardConfig) web.Middleware {
 				}
 				return web.Response{}, web.ErrForbidden("cross-origin request blocked")
 			}
-			if isSameOriginRequest(c, origin) || isTrustedOrigin(origin, cfg) {
+			if isSameOriginRequest(c, origin, cfg.ServerOrigin) || isTrustedOrigin(origin, cfg) {
 				return next(c)
 			}
 			return web.Response{}, web.ErrForbidden("cross-origin request blocked")
@@ -92,8 +107,11 @@ func isTrustedOrigin(origin string, cfg OriginGuardConfig) bool {
 	return false
 }
 
-func isSameOriginRequest(c *web.Context, origin string) bool {
-	base := sameOriginBase(c)
+func isSameOriginRequest(c *web.Context, origin, serverOrigin string) bool {
+	base := serverOrigin
+	if base == "" {
+		base = sameOriginBase(c)
+	}
 	return base != "" && sameOrigin(origin, base)
 }
 

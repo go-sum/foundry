@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/go-sum/foundry/pkg/web"
 	webauth "github.com/go-sum/foundry/pkg/web/auth"
@@ -23,9 +25,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type fakeCodeStore struct {
-	codes  map[string]AuthorizationCode
-	marked []string
-	err    error
+	codes   map[string]AuthorizationCode
+	marked  []string
+	err     error
+	markErr error // injected only for MarkCodeUsed
 }
 
 func (f *fakeCodeStore) CreateCode(_ context.Context, code AuthorizationCode) error {
@@ -48,13 +51,25 @@ func (f *fakeCodeStore) GetCode(_ context.Context, code string) (AuthorizationCo
 }
 
 func (f *fakeCodeStore) MarkCodeUsed(_ context.Context, code string) error {
-	f.marked = append(f.marked, code)
+	if f.markErr != nil {
+		return f.markErr
+	}
+	if f.err != nil {
+		return f.err
+	}
 	if f.codes != nil {
-		c := f.codes[code]
+		c, ok := f.codes[code]
+		if !ok {
+			return ErrCodeNotFound
+		}
+		if c.Used {
+			return ErrCodeUsed
+		}
 		c.Used = true
 		f.codes[code] = c
 	}
-	return f.err
+	f.marked = append(f.marked, code)
+	return nil
 }
 
 func (f *fakeCodeStore) DeleteExpiredCodes(_ context.Context) error { return f.err }
@@ -95,11 +110,16 @@ func (f *fakeTokenStore) RevokeToken(_ context.Context, id uuid.UUID) error {
 	if f.err != nil {
 		return f.err
 	}
-	if t, ok := f.byID[id]; ok {
-		t.Revoked = true
-		f.byID[id] = t
-		f.tokens[t.TokenHash] = t
+	t, ok := f.byID[id]
+	if !ok {
+		return ErrTokenNotFound
 	}
+	if t.Revoked {
+		return ErrTokenRevoked
+	}
+	t.Revoked = true
+	f.byID[id] = t
+	f.tokens[t.TokenHash] = t
 	return nil
 }
 
@@ -510,6 +530,31 @@ func TestHandleAuthorizationCode_ScopesPropagatedToTokens(t *testing.T) {
 	}
 }
 
+func TestHandleAuthorizationCode_MarkCodeUsedInternalError(t *testing.T) {
+	code := validCode("client1", "https://app.example.com/cb", []string{"openid"})
+	codes := &fakeCodeStore{
+		codes: map[string]AuthorizationCode{"code1": code},
+	}
+	h := newTokenHandler(codes, &fakeTokenStore{})
+
+	// Inject an infrastructure error for MarkCodeUsed only; GetCode must still succeed.
+	codes.markErr = fmt.Errorf("database connection lost")
+
+	c := formContext(url.Values{})
+
+	_, err := h.handleAuthorizationCode(c, "code1", "https://app.example.com/cb", "client1", "")
+	if err == nil {
+		t.Fatal("handleAuthorizationCode error = nil, want web.Error")
+	}
+	var webErr *web.Error
+	if !errors.As(err, &webErr) {
+		t.Fatalf("error type = %T, want *web.Error", err)
+	}
+	if webErr.Status != 500 {
+		t.Errorf("error status = %d, want 500", webErr.Status)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // handleRefreshToken — direct invocation
 // ---------------------------------------------------------------------------
@@ -702,6 +747,162 @@ func TestHandleRefreshToken_WrongTokenType(t *testing.T) {
 	body := readJSON(t, resp)
 	if body["error"] != "invalid_grant" {
 		t.Errorf("error = %q, want invalid_grant", body["error"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// authenticateClient tests
+// ---------------------------------------------------------------------------
+
+func TestAuthenticateClient_PublicClient(t *testing.T) {
+	clients := &fakeClientStore{
+		clients: map[string]OAuthClient{
+			"pub": {ClientID: "pub", Public: true},
+		},
+	}
+	h := &TokenHandler{clients: clients}
+
+	if err := h.authenticateClient(context.Background(), "pub", ""); err != nil {
+		t.Fatalf("authenticateClient error = %v, want nil", err)
+	}
+}
+
+func TestAuthenticateClient_PublicClientIgnoresSecret(t *testing.T) {
+	clients := &fakeClientStore{
+		clients: map[string]OAuthClient{
+			"pub": {ClientID: "pub", Public: true},
+		},
+	}
+	h := &TokenHandler{clients: clients}
+
+	if err := h.authenticateClient(context.Background(), "pub", "some-secret"); err != nil {
+		t.Fatalf("authenticateClient error = %v, want nil", err)
+	}
+}
+
+func TestAuthenticateClient_ConfidentialClientValid(t *testing.T) {
+	secret := "correct-horse-battery-staple"
+	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("bcrypt.GenerateFromPassword: %v", err)
+	}
+	clients := &fakeClientStore{
+		clients: map[string]OAuthClient{
+			"conf": {ClientID: "conf", ClientSecret: string(hash), Public: false},
+		},
+	}
+	h := &TokenHandler{clients: clients}
+
+	if err := h.authenticateClient(context.Background(), "conf", secret); err != nil {
+		t.Fatalf("authenticateClient error = %v, want nil", err)
+	}
+}
+
+func TestAuthenticateClient_ConfidentialClientWrongSecret(t *testing.T) {
+	hash, _ := bcrypt.GenerateFromPassword([]byte("real-secret"), bcrypt.MinCost)
+	clients := &fakeClientStore{
+		clients: map[string]OAuthClient{
+			"conf": {ClientID: "conf", ClientSecret: string(hash), Public: false},
+		},
+	}
+	h := &TokenHandler{clients: clients}
+
+	if err := h.authenticateClient(context.Background(), "conf", "wrong-secret"); err == nil {
+		t.Fatal("authenticateClient error = nil, want error for wrong secret")
+	}
+}
+
+func TestAuthenticateClient_ConfidentialClientMissingSecret(t *testing.T) {
+	hash, _ := bcrypt.GenerateFromPassword([]byte("real-secret"), bcrypt.MinCost)
+	clients := &fakeClientStore{
+		clients: map[string]OAuthClient{
+			"conf": {ClientID: "conf", ClientSecret: string(hash), Public: false},
+		},
+	}
+	h := &TokenHandler{clients: clients}
+
+	if err := h.authenticateClient(context.Background(), "conf", ""); err == nil {
+		t.Fatal("authenticateClient error = nil, want error for missing secret")
+	}
+}
+
+func TestAuthenticateClient_UnknownClient(t *testing.T) {
+	clients := &fakeClientStore{clients: map[string]OAuthClient{}}
+	h := &TokenHandler{clients: clients}
+
+	if err := h.authenticateClient(context.Background(), "nonexistent", ""); err == nil {
+		t.Fatal("authenticateClient error = nil, want error for unknown client")
+	}
+}
+
+func TestExchange_ConfidentialClientWithoutSecret_Returns401(t *testing.T) {
+	hash, _ := bcrypt.GenerateFromPassword([]byte("real-secret"), bcrypt.MinCost)
+	clients := &fakeClientStore{
+		clients: map[string]OAuthClient{
+			"conf": {ClientID: "conf", ClientSecret: string(hash), Public: false},
+		},
+	}
+	h := &TokenHandler{
+		clients:   clients,
+		codes:     &fakeCodeStore{},
+		tokens:    &fakeTokenStore{},
+		config:    ApplyDefaults(Config{}),
+		validator: validate.New(),
+		logger:    slog.Default(),
+	}
+
+	c := formContext(url.Values{
+		"grant_type": {"authorization_code"},
+		"client_id":  {"conf"},
+		"code":       {"some-code"},
+	})
+
+	resp, err := h.Exchange(c)
+	if err != nil {
+		t.Fatalf("Exchange error: %v", err)
+	}
+	if resp.Status != 401 {
+		t.Fatalf("status = %d, want 401", resp.Status)
+	}
+	body := readJSON(t, resp)
+	if body["error"] != "invalid_client" {
+		t.Errorf("error = %q, want invalid_client", body["error"])
+	}
+}
+
+func TestExchange_ConfidentialClientWrongSecret_Returns401(t *testing.T) {
+	hash, _ := bcrypt.GenerateFromPassword([]byte("real-secret"), bcrypt.MinCost)
+	clients := &fakeClientStore{
+		clients: map[string]OAuthClient{
+			"conf": {ClientID: "conf", ClientSecret: string(hash), Public: false},
+		},
+	}
+	h := &TokenHandler{
+		clients:   clients,
+		codes:     &fakeCodeStore{},
+		tokens:    &fakeTokenStore{},
+		config:    ApplyDefaults(Config{}),
+		validator: validate.New(),
+		logger:    slog.Default(),
+	}
+
+	c := formContext(url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {"conf"},
+		"client_secret": {"wrong-secret"},
+		"refresh_token": {"some-token"},
+	})
+
+	resp, err := h.Exchange(c)
+	if err != nil {
+		t.Fatalf("Exchange error: %v", err)
+	}
+	if resp.Status != 401 {
+		t.Fatalf("status = %d, want 401", resp.Status)
+	}
+	body := readJSON(t, resp)
+	if body["error"] != "invalid_client" {
+		t.Errorf("error = %q, want invalid_client", body["error"])
 	}
 }
 

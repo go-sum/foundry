@@ -90,11 +90,6 @@ func JSON(status int, v any) Response {
 	return Response{Status: status, Headers: h, Body: pr}
 }
 
-// Deprecated: StreamJSON is identical to JSON. Use JSON instead.
-func StreamJSON(status int, v any) Response {
-	return JSON(status, v)
-}
-
 // Problem renders an RFC 7807 application/problem+json response from the
 // given *Error. The context c may be nil (e.g., in tests). When c is non-nil,
 // the request path is used as the "instance" fallback and the request ID is

@@ -9,6 +9,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/go-sum/foundry/pkg/web"
@@ -56,20 +58,45 @@ type ServerConfig struct {
 func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
 		Addr:              ":8080",
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: defaultReadHeaderTimeout,
+		ReadTimeout:       defaultReadTimeout,
+		WriteTimeout:      defaultWriteTimeout,
+		IdleTimeout:       defaultIdleTimeout,
 		ShutdownTimeout:   15 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+		MaxHeaderBytes:    defaultMaxHeaderBytes,
 	}
+}
+
+// DefaultServerConfigFromEnv returns a ServerConfig populated from environment variables,
+// starting from DefaultServerConfig() defaults. It reads SERVER_TRUSTED_PROXIES as a
+// comma-separated list of CIDR prefixes and validates each entry.
+func DefaultServerConfigFromEnv() (ServerConfig, error) {
+	cfg := DefaultServerConfig()
+	raw := strings.TrimSpace(os.Getenv("SERVER_TRUSTED_PROXIES"))
+	if raw == "" {
+		return cfg, nil
+	}
+	parts := strings.Split(raw, ",")
+	var proxies []string
+	for _, part := range parts {
+		if cidr := strings.TrimSpace(part); cidr != "" {
+			proxies = append(proxies, cidr)
+		}
+	}
+	if len(proxies) > 0 {
+		if _, err := ParseTrustedProxies(proxies); err != nil {
+			return ServerConfig{}, fmt.Errorf("serve: trusted proxies: %w", err)
+		}
+		cfg.TrustedProxies = proxies
+	}
+	return cfg, nil
 }
 
 // NewServer creates a *http.Server with handler adapted via ToHTTPHandler, using
 // production-safe timeouts and the given config. cfg.Addr defaults to ":8080".
 //
 // Use Shutdown to drain active connections gracefully.
-func NewServer(handler web.Handler, cfg ServerConfig) *http.Server {
+func NewServer(handler web.Handler, cfg ServerConfig) (*http.Server, error) {
 	addr := cmp.Or(cfg.Addr, ":8080")
 	readHeaderTimeout := cmp.Or(cfg.ReadHeaderTimeout, defaultReadHeaderTimeout)
 	readTimeout := cmp.Or(cfg.ReadTimeout, defaultReadTimeout)
@@ -87,7 +114,11 @@ func NewServer(handler web.Handler, cfg ServerConfig) *http.Server {
 		tlsCfg = cfg.TLSConfig.Clone()
 	}
 
-	httpHandler := http.Handler(ToHTTPHandler(handler))
+	trustedProxies, err := ParseTrustedProxies(cfg.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("web/serve: NewServer: %w", err)
+	}
+	httpHandler := http.Handler(ToHTTPHandlerWithConfig(handler, Config{TrustedProxies: trustedProxies}))
 	if cfg.H2C {
 		httpHandler = h2c.NewHandler(httpHandler, &http2.Server{})
 	}
@@ -102,7 +133,7 @@ func NewServer(handler web.Handler, cfg ServerConfig) *http.Server {
 		MaxHeaderBytes:    maxHeaderBytes,
 		ErrorLog:          errorLog,
 		TLSConfig:         tlsCfg,
-	}
+	}, nil
 }
 
 // Shutdown gracefully drains the server within the context deadline, then closes it.
@@ -120,7 +151,10 @@ func ListenAndServe(ctx context.Context, handler web.Handler, cfg ServerConfig) 
 		return fmt.Errorf("web/serve: H2C and TLSConfig are mutually exclusive")
 	}
 
-	srv := NewServer(handler, cfg)
+	srv, err := NewServer(handler, cfg)
+	if err != nil {
+		return err
+	}
 
 	if srv.TLSConfig != nil {
 		if err := http2.ConfigureServer(srv, nil); err != nil {

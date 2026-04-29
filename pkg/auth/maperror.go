@@ -21,6 +21,8 @@ func mapServiceError(err error) error {
 		return web.ErrValidation("This verification has expired. Please request a new code.")
 	case errors.Is(err, ErrTooManyAttempts):
 		return web.ErrForbidden("Too many failed attempts. Please request a new code.")
+	case errors.Is(err, ErrTokenConsumed):
+		return web.ErrForbidden("This verification link has already been used. Please request a new code.")
 	case errors.Is(err, ErrVerificationMissing):
 		return web.ErrBadRequest("Verification data is missing or invalid")
 	case errors.Is(err, ErrAdminExists):

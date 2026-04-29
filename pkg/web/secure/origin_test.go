@@ -409,11 +409,28 @@ func TestOriginGuard_AllCases(t *testing.T) {
 			wantCalled: true,
 		},
 		{
-			name:       "POST Sec-Fetch-Site same-site passes",
+			name:       "POST Sec-Fetch-Site same-site no origin passes",
 			cfg:        strictOriginCfg(),
 			method:     http.MethodPost,
 			secFetch:   "same-site",
 			wantCalled: true,
+		},
+		{
+			name:       "POST Sec-Fetch-Site same-site trusted origin passes",
+			cfg:        strictOriginCfg(),
+			method:     http.MethodPost,
+			secFetch:   "same-site",
+			origin:     "http://example.com",
+			wantCalled: true,
+		},
+		{
+			name:        "POST Sec-Fetch-Site same-site untrusted origin blocked",
+			cfg:         strictOriginCfg(),
+			method:      http.MethodPost,
+			secFetch:    "same-site",
+			origin:      "http://evil.example.com",
+			wantCalled:  false,
+			wantBlocked: true,
 		},
 		// --- cross-site Sec-Fetch-Site ---
 		{
@@ -520,5 +537,48 @@ func TestOriginGuard_AllCases(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestOriginGuard_ServerOrigin_MatchesConfiguredOrigin(t *testing.T) {
+	called := false
+	cfg := OriginGuardConfig{
+		ServerOrigin: "https://legit.example.com",
+	}
+	handler := OriginGuard(cfg)(originGuardNext(&called))
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Scheme: "https", Host: "attacker.example.com", Path: "/"})
+	req.SetHost("attacker.example.com")
+	req.Headers.Set("Origin", "https://legit.example.com")
+
+	resp, err := handler(web.NewContext(context.Background(), req))
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Status != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.Status, http.StatusOK)
+	}
+	if !called {
+		t.Error("next handler was not called when Origin matched ServerOrigin")
+	}
+}
+
+func TestOriginGuard_ServerOrigin_RejectsSpoofedHost(t *testing.T) {
+	called := false
+	cfg := OriginGuardConfig{
+		ServerOrigin: "https://legit.example.com",
+	}
+	handler := OriginGuard(cfg)(originGuardNext(&called))
+
+	req := web.NewRequest(http.MethodPost, &url.URL{Scheme: "https", Host: "attacker.example.com", Path: "/"})
+	req.SetHost("attacker.example.com")
+	req.Headers.Set("Origin", "https://attacker.example.com")
+
+	_, err := handler(web.NewContext(context.Background(), req))
+
+	assertOriginForbidden(t, err)
+	if called {
+		t.Error("next handler was called when Origin matched spoofed Host but not ServerOrigin")
 	}
 }

@@ -2,7 +2,7 @@ package kv
 
 import (
 	kvstore "github.com/go-sum/foundry/pkg/kv"
-	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/showcase/base"
 	"github.com/go-sum/foundry/pkg/web/router"
 )
 
@@ -10,7 +10,7 @@ import (
 type Config struct {
 	BasePath   string
 	Store      kvstore.Store
-	Page       showcase.PageFunc
+	Page       base.PageFunc
 	PerPage    int
 	MaxPerPage int
 }

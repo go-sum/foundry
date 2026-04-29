@@ -16,9 +16,6 @@ import (
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification"
 	"github.com/go-sum/foundry/pkg/queue"
-	"github.com/go-sum/foundry/pkg/web"
-	"github.com/go-sum/foundry/pkg/web/htmx"
-	"github.com/go-sum/foundry/pkg/web/otelweb"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/serve"
@@ -45,6 +42,19 @@ type stoppableSessionStore interface {
 	Stop()
 }
 
+// Option configures the application at construction time.
+type Option func(*appOptions)
+
+type appOptions struct {
+	sessionStoreFactory func() session.Store
+}
+
+// WithSessionStoreFactory overrides the factory used to create the in-memory
+// session store. Intended for tests that need to observe store lifecycle events.
+func WithSessionStoreFactory(f func() session.Store) Option {
+	return func(o *appOptions) { o.sessionStoreFactory = f }
+}
+
 // Runtime holds cross-cutting infrastructure dependencies.
 type Runtime struct {
 	Config *config.Config
@@ -54,11 +64,13 @@ type Runtime struct {
 
 // Security holds resolved security middleware configurations.
 type Security struct {
-	CSRF    secure.CSRFConfig
-	Headers secure.HeadersConfig
-	CSP     secure.CSPNonceConfig
-	Origins []string
-	Session session.Config
+	CSRF         secure.CSRFConfig
+	Headers      secure.HeadersConfig
+	CSP          secure.CSPNonceConfig
+	Origins      []string
+	AllowedHosts []string
+	ServerOrigin string
+	Session      session.Config
 }
 
 // Services holds application-level service instances.
@@ -116,7 +128,11 @@ func (a *App) Close() error {
 
 // New builds and wires the complete application. Returns an error on any
 // configuration or infrastructure failure — never calls os.Exit.
-func New(ctx context.Context) (_ *App, err error) {
+func New(ctx context.Context, opts ...Option) (_ *App, err error) {
+	var o appOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	runtime, err := provideRuntime(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("runtime: %w", err)
@@ -135,7 +151,7 @@ func New(ctx context.Context) (_ *App, err error) {
 		Icons: iconReg,
 	}
 
-	security, store, err := provideSecurity(ctx, runtime)
+	security, store, err := provideSecurity(ctx, runtime, o.sessionStoreFactory)
 	if err != nil {
 		return nil, fmt.Errorf("security: %w", err)
 	}
@@ -155,19 +171,7 @@ func New(ctx context.Context) (_ *App, err error) {
 		}
 	}()
 
-	routing.Use(
-		web.AsyncContext(),
-		otelweb.Middleware(runtime.Tracer),
-		web.WithRequestID(),
-		provideErrorBoundary(runtime, routing),
-		serve.AccessLogMiddleware(runtime.Logger),
-		secure.Headers(security.Headers),
-		secure.CSPNonce(security.CSP),
-		session.Middleware(security.Session),
-		secure.CSRF(security.CSRF),
-		htmx.VaryMiddleware(),
-		auth.LoadSession(),
-	)
+	installGlobalMiddleware(routing, runtime, security)
 
 	services, err := provideServices(ctx, runtime, security, routing, pres)
 	if err != nil {

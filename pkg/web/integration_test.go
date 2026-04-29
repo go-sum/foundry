@@ -214,10 +214,10 @@ func mustGenerateKeyHex(t *testing.T) string {
 	return keyHex
 }
 
-func mustCSRFConfig(t *testing.T, keyHex string, previousKeysHex ...string) secure.CSRFConfig {
+func mustCSRFConfig(t *testing.T, keyHex string) secure.CSRFConfig {
 	t.Helper()
 
-	cfg, err := secure.NewCSRFConfigFromHex(keyHex, strings.Join(previousKeysHex, ","))
+	cfg, err := secure.NewCSRFConfigFromHex(keyHex)
 	if err != nil {
 		t.Fatalf("secure.NewCSRFConfigFromHex: %v", err)
 	}
@@ -532,35 +532,6 @@ func TestIntegration_StatelessCSRFFlow(t *testing.T) {
 			t.Fatalf("POST /submit body = %q, want %q", body, "accepted:bob")
 		}
 	})
-}
-
-func TestIntegration_StatelessCSRFKeyRotation(t *testing.T) {
-	t.Parallel()
-
-	oldKey := mustGenerateKeyHex(t)
-	oldApp, page := newPreparedStatelessApp(t, mustCSRFConfig(t, oldKey))
-	oldCookie := mustCookie(t, oldApp, "csrf")
-
-	newKey := mustGenerateKeyHex(t)
-	rotatedApp := newServerAndClient(t, newStatelessRouter(t, mustCSRFConfig(t, newKey, oldKey)))
-	resp := mustDo(t, rotatedApp.client, newFormPost(
-		t,
-		rotatedApp.url("form.submit", nil),
-		url.Values{
-			"_csrf": {page.token},
-			"name":  {"carol"},
-		},
-		withOrigin(rotatedApp.base),
-		withCookie(&http.Cookie{Name: oldCookie.Name, Value: oldCookie.Value}),
-	))
-	body := mustReadBody(t, resp)
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("rotated POST /submit status = %d, want %d", resp.StatusCode, http.StatusOK)
-	}
-	if body != "accepted:carol" {
-		t.Fatalf("rotated POST /submit body = %q, want %q", body, "accepted:carol")
-	}
 }
 
 func TestIntegration_RouterHTTPContract(t *testing.T) {
@@ -1097,28 +1068,6 @@ func TestIntegration_PanicRecovery(t *testing.T) {
 // ---------------------------------------------------------------------------
 // CSRF: X-XSRF-Token header accepted
 // ---------------------------------------------------------------------------
-
-func TestIntegration_XSRFTokenHeaderAccepted(t *testing.T) {
-	t.Parallel()
-
-	app, page := newPreparedSessionApp(t)
-	resp := mustDo(t, app.client, newFormPost(
-		t,
-		app.url("form.submit", nil),
-		url.Values{"name": {"dave"}},
-		withOrigin(app.base),
-		withHeader("X-XSRF-Token", page.token),
-	))
-	body := mustReadBody(t, resp)
-
-	if resp.StatusCode != http.StatusSeeOther && resp.StatusCode != http.StatusOK {
-		t.Fatalf("X-XSRF-Token POST status = %d, want 200 or 303", resp.StatusCode)
-	}
-	// Ensure it was not rejected with 403.
-	if resp.StatusCode == http.StatusForbidden {
-		t.Fatalf("X-XSRF-Token POST was rejected with 403; body = %q", body)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // CSRF: session mode issues no separate csrf cookie

@@ -47,19 +47,3 @@ func TestRegistry_RegisterSprites(t *testing.T) {
 	}
 }
 
-func TestDefaultRegistry(t *testing.T) {
-	orig := DefaultRegistry
-	t.Cleanup(func() { DefaultRegistry = orig })
-
-	DefaultRegistry = NewRegistry()
-	RegisterSprite("test-sprite", "img/test.svg")
-	got := SpritePath("test-sprite")
-	if got != "/public/img/test.svg" {
-		t.Errorf("SpritePath = %q, want %q", got, "/public/img/test.svg")
-	}
-
-	miss := SpritePath("missing")
-	if miss != "" {
-		t.Errorf("SpritePath miss = %q, want empty", miss)
-	}
-}

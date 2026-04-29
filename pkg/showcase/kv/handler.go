@@ -1,7 +1,7 @@
 package kv
 
 import (
-	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/showcase/base"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/htmx"
 	"github.com/go-sum/foundry/pkg/web/render"
@@ -16,7 +16,7 @@ func newHandler(cfg Config) *handler {
 }
 
 func (h *handler) Index(c *web.Context) (web.Response, error) {
-	pg := showcase.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
+	pg := base.ParsePager(c, h.cfg.PerPage, h.cfg.MaxPerPage)
 	result, err := listKeys(c.Context(), h.cfg.Store, "*", pg.Page, pg.PerPage)
 	if err != nil {
 		return web.Response{}, web.ErrInternal(err)

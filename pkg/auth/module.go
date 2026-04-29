@@ -31,8 +31,9 @@ type ModuleConfig struct {
 	Credentials CredentialStore
 	AdminUsers  AdminStore
 
-	Notifier   Notifier
-	TokenCodec TokenCodec
+	Notifier       Notifier
+	TokenCodec     TokenCodec
+	TokenNonceStore TokenNonceStore
 
 	Renderer      Renderer
 	AdminRenderer AdminRenderer
@@ -63,6 +64,9 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 	if config.EmailTOTP.Enabled && cfg.TokenCodec == nil {
 		return nil, fmt.Errorf("auth: TokenCodec is required when email TOTP is enabled")
 	}
+	if config.EmailTOTP.Enabled && cfg.TokenNonceStore == nil {
+		return nil, fmt.Errorf("auth: TokenNonceStore is required when email TOTP is enabled")
+	}
 	if config.Passkey.Enabled && cfg.Credentials == nil {
 		return nil, fmt.Errorf("auth: Credentials (CredentialStore) is required when passkeys are enabled")
 	}
@@ -71,6 +75,7 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 		Users:      cfg.Users,
 		Notifier:   cfg.Notifier,
 		TokenCodec: cfg.TokenCodec,
+		NonceStore: cfg.TokenNonceStore,
 		EmailTOTP:  config.EmailTOTP,
 	})
 

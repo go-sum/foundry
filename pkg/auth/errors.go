@@ -14,6 +14,7 @@ var (
 	ErrVerificationExpired       = errors.New("auth: verification expired")
 	ErrVerificationMissing       = errors.New("auth: verification missing")
 	ErrTooManyAttempts           = errors.New("auth: too many verification attempts")
+	ErrTokenConsumed             = errors.New("auth: token already consumed")
 	ErrUnsupportedMethod         = errors.New("auth: unsupported auth method")
 	ErrWebAuthnIDAlreadySet      = errors.New("auth: webauthn id already set")
 	ErrPasskeyNotFound           = errors.New("auth: passkey not found")

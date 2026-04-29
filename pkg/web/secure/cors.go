@@ -14,6 +14,8 @@ import (
 type CORSConfig struct {
 	// AllowOrigins is the list of allowed origins. Use "*" for wildcard
 	// (wildcard responses are automatically reflected when credentials are enabled).
+	// When AllowOrigins, AllowOriginPatterns, and AllowOriginFunc are all empty,
+	// no cross-origin requests are permitted (deny by default).
 	AllowOrigins []string
 
 	// AllowOriginPatterns are regular expressions evaluated against the request origin.
@@ -59,9 +61,6 @@ type CORSConfig struct {
 
 // CORS returns middleware that handles Cross-Origin Resource Sharing.
 func CORS(cfg CORSConfig) web.Middleware {
-	if len(cfg.AllowOrigins) == 0 && len(cfg.AllowOriginPatterns) == 0 && cfg.AllowOriginFunc == nil {
-		cfg.AllowOrigins = []string{"*"}
-	}
 	if len(cfg.AllowMethods) == 0 {
 		cfg.AllowMethods = []string{
 			http.MethodGet, http.MethodHead, http.MethodPut,

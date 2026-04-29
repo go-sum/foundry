@@ -1,7 +1,7 @@
 package db
 
 import (
-	"github.com/go-sum/foundry/pkg/showcase"
+	"github.com/go-sum/foundry/pkg/showcase/base"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -10,7 +10,7 @@ import (
 type Config struct {
 	BasePath   string
 	Pool       *pgxpool.Pool
-	Page       showcase.PageFunc
+	Page       base.PageFunc
 	Schema     string
 	PerPage    int
 	MaxPerPage int
