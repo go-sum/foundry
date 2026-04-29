@@ -130,7 +130,7 @@ func (i NavGroup) render(ctx navbarItemContext) g.Node {
 	}
 	if ctx.viewport == viewportDesktop && ctx.depth == 0 {
 		return h.Details(
-			h.Class("group relative"),
+			h.Class("group relative flex items-stretch"),
 			groupSummary(i.Label, i.Icon, ctx),
 			h.Div(
 				h.Class("absolute left-0 top-full z-50 mt-px flex min-w-[16rem] flex-col divide-y divide-border rounded-md border border-border bg-popover shadow-lg"),
@@ -140,10 +140,10 @@ func (i NavGroup) render(ctx navbarItemContext) g.Node {
 	}
 	return h.Details(
 		g.Attr("data-nav-group", string(ctx.viewport)),
-		h.Class(groupContainerClass(ctx.viewport, ctx.depth)),
+		h.Class(groupContainerClass(ctx.depth)),
 		groupSummary(i.Label, i.Icon, ctx),
 		h.Div(
-			h.Class(groupPanelClass(ctx.viewport, ctx.depth)),
+			h.Class(groupPanelClass(ctx.depth)),
 			g.Group(nodes),
 		),
 	)
@@ -164,7 +164,7 @@ func (i NavSeparator) render(ctx navbarItemContext) g.Node {
 	if ctx.viewport == viewportDesktop && ctx.depth == 0 {
 		return nil
 	}
-	return navSeparator(ctx.viewport, ctx.depth)
+	return navSeparator(ctx.depth)
 }
 
 // NavText renders non-interactive text, useful for user names or status labels.
@@ -280,7 +280,7 @@ func (i NavForm) render(ctx navbarItemContext) g.Node {
 	}
 	buttonNodes := []g.Node{
 		h.Type("submit"),
-		h.Class(navActionClass(ctx.viewport, ctx.depth)),
+		h.Class(navActionClass(ctx.depth)),
 	}
 	buttonNodes = append(buttonNodes, navItemContent(ctx.icons, i.Icon, label)...)
 	nodes = append(nodes, h.Button(buttonNodes...))
@@ -312,12 +312,12 @@ func Navbar(p NavbarProps) g.Node {
 	drawerID := navbarID(p.ID)
 
 	return h.Nav(
-		h.Class("w-full border-b bg-background text-foreground"),
+		h.Class("w-full border-b md:border-b-0 bg-background text-foreground"),
 		h.Div(
 			h.Class("container mx-auto flex h-14 items-center px-4"),
 			h.Div(h.Class("mr-4 flex shrink-0"), brandNode(p.Brand)),
 			h.Div(
-				h.Class("hidden min-w-0 flex-1 items-center md:flex"),
+				h.Class("hidden min-w-0 flex-1 items-stretch self-stretch md:flex"),
 				desktopNavRegion(p),
 			),
 			mobileToggleButton(drawerID),
@@ -355,9 +355,9 @@ func desktopNavRegion(p NavbarProps) g.Node {
 	start := renderSections(viewportDesktop, p, AlignStart)
 	end := renderSections(viewportDesktop, p, AlignEnd)
 	return h.Div(
-		h.Class("flex min-w-0 flex-1 items-center justify-between gap-6"),
-		h.Div(h.Class("flex min-w-0 flex-1 items-center gap-6"), g.Group(start)),
-		h.Div(h.Class("flex items-center gap-3"), g.Group(end)),
+		h.Class("flex min-w-0 flex-1 items-stretch justify-between gap-6"),
+		h.Div(h.Class("flex min-w-0 flex-1 items-stretch gap-6"), g.Group(start)),
+		h.Div(h.Class("flex items-stretch gap-3"), g.Group(end)),
 	)
 }
 
@@ -420,12 +420,12 @@ func renderSection(viewport navbarViewport, section NavbarSection, ctx NavbarCon
 		children := []g.Node{}
 		if section.Label != "" {
 			children = append(children, h.Span(
-				h.Class("text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground"),
+				h.Class("self-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground"),
 				g.Text(section.Label),
 			))
 		}
-		children = append(children, h.Div(h.Class("flex items-center gap-2"), g.Group(items)))
-		return h.Div(h.Class("flex min-w-0 items-center gap-3"), g.Group(children))
+		children = append(children, h.Div(h.Class("flex items-stretch gap-2"), g.Group(items)))
+		return h.Div(h.Class("flex min-w-0 items-stretch gap-3"), g.Group(children))
 	}
 	children := []g.Node{}
 	if section.Label != "" {
@@ -473,41 +473,50 @@ func submenuNodes(href, label string, matchPrefix bool, icon icons.Key, items []
 		icons:         ctx.icons,
 	})
 	if len(nodes) > 0 && len(childNodes) > 0 {
-		nodes = append(nodes, navSeparator(ctx.viewport, ctx.depth+1))
+		nodes = append(nodes, navSeparator(ctx.depth+1))
 	}
 	return append(nodes, childNodes...)
 }
 
+func navIndent(depth int) string {
+	switch {
+	case depth >= 2:
+		return "pl-12 pr-4 md:pl-8"
+	case depth == 1:
+		return "pl-8 pr-4 md:px-4"
+	default:
+		return "px-4"
+	}
+}
+
 func navLinkClass(viewport navbarViewport, depth int, current bool) string {
+	if viewport == viewportDesktop && depth == 0 {
+		base := "inline-flex items-center gap-2 border-b-2 px-4 text-sm font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50"
+		if current {
+			return base + " border-primary text-foreground"
+		}
+		return base + " border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+	}
+	indent := navIndent(depth)
 	base := "outline-none transition-colors hover:bg-accent/60 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
 	if current {
 		base += " bg-accent/60 text-accent-foreground"
 	}
-	if viewport == viewportDesktop && depth == 0 {
-		return "inline-flex items-center gap-2 rounded-md px-4 py-3 text-sm font-medium text-foreground " + base
-	}
-	if viewport == viewportDesktop {
-		return "block w-full px-4 py-3 text-sm font-medium " + base
-	}
-	return "block w-full px-4 py-4 text-sm font-medium " + base
+	return "block w-full " + indent + " py-4 md:py-3 text-sm font-medium " + base
 }
 
 func navTextClass(viewport navbarViewport, depth int) string {
 	if viewport == viewportDesktop && depth == 0 {
 		return "text-sm text-muted-foreground"
 	}
-	if viewport == viewportDesktop {
-		return "block w-full px-4 py-3 text-sm font-medium text-foreground"
-	}
-	return "block px-4 py-4 text-sm font-medium text-foreground"
+	indent := navIndent(depth)
+	return "block w-full " + indent + " py-4 md:py-3 text-sm font-medium text-foreground"
 }
 
-func navActionClass(viewport navbarViewport, depth int) string {
+func navActionClass(depth int) string {
+	indent := navIndent(depth)
 	base := "w-full text-left outline-none transition-colors hover:bg-accent/60 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-	if viewport == viewportDesktop && depth > 0 {
-		return "block px-4 py-3 text-sm font-medium " + base
-	}
-	return "block px-4 py-4 text-sm font-medium " + base
+	return "block " + indent + " py-4 md:py-3 text-sm font-medium " + base
 }
 
 func groupSummary(label string, icon icons.Key, ctx navbarItemContext) g.Node {
@@ -515,42 +524,41 @@ func groupSummary(label string, icon icons.Key, ctx navbarItemContext) g.Node {
 	children = append(children, chevronIcon(ctx.icons))
 	if ctx.viewport == viewportDesktop && ctx.depth == 0 {
 		return h.Summary(
-			h.Class("navmenu-summary flex list-none cursor-pointer items-center gap-2 rounded-md px-4 py-3 text-sm font-medium outline-none transition-colors hover:bg-accent/60 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"),
+			h.Class("navmenu-summary flex list-none cursor-pointer items-center gap-2 border-b-2 border-transparent px-4 text-sm font-medium text-muted-foreground outline-none transition-colors hover:border-border hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"),
 			g.Group(children),
 		)
 	}
+	indent := navIndent(ctx.depth)
 	return h.Summary(
-		h.Class("navmenu-summary flex list-none cursor-pointer items-center justify-between gap-3 px-4 py-4 text-left text-sm font-medium outline-none transition-colors hover:bg-accent/60 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"),
+		h.Class("navmenu-summary flex list-none cursor-pointer items-center justify-between gap-3 "+indent+" py-4 md:py-3 text-left text-sm font-medium outline-none transition-colors hover:bg-accent/60 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"),
 		g.Group(children),
 	)
 }
 
-func groupContainerClass(viewport navbarViewport, depth int) string {
-	if viewport == viewportDesktop && depth > 0 {
-		return "border-t border-border/70 bg-background"
+func groupContainerClass(depth int) string {
+	if depth > 0 {
+		return "bg-background md:border-t md:border-border/70"
 	}
 	return "bg-background"
 }
 
-func groupPanelClass(viewport navbarViewport, depth int) string {
-	if viewport == viewportDesktop && depth > 0 {
-		return "flex flex-col divide-y divide-border border-t border-border/70"
+func groupPanelClass(depth int) string {
+	base := "flex flex-col divide-y divide-border border-t"
+	if depth > 0 {
+		return base + " border-border md:border-border/70"
 	}
-	return "flex flex-col divide-y divide-border border-t border-border"
+	return base + " border-border"
 }
 
-func navSeparator(viewport navbarViewport, depth int) g.Node {
+func navSeparator(depth int) g.Node {
 	return core.Separator(core.SeparatorProps{
-		Extra: []g.Node{h.Class(separatorClass(viewport, depth))},
+		Extra: []g.Node{h.Class(separatorClass(depth))},
 	})
 }
 
-func separatorClass(viewport navbarViewport, depth int) string {
-	if viewport == viewportMobile {
-		return "mx-2 my-2"
-	}
+func separatorClass(depth int) string {
 	if depth > 0 {
-		return "my-2"
+		return "mx-2 my-2 md:mx-0"
 	}
 	return "mx-2 my-2"
 }
