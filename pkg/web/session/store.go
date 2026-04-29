@@ -19,6 +19,7 @@ var (
 // Implementations are responsible for encoding the token written to the client cookie:
 //   - MemoryStore uses a random 256-bit session ID; the token is that ID.
 //   - CookieStore uses an AEAD-encrypted blob; the token is the encoded blob.
+//   - KVStore uses a random 256-bit session ID; the token is that ID.
 type Store interface {
 	// Read loads session data for the given token.
 	// Returns ErrSessionNotFound if the token is unknown, expired, or fails verification.

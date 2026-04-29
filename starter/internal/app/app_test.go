@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/serve"
@@ -28,13 +30,14 @@ func setupTestEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "testing")
 	t.Setenv("SECURITY_CSRF_KEY", testCSRFHexKey)
 	t.Setenv("SECURITY_AUTH_TOKEN_KEY", testAuthTokenHexKey)
+	t.Setenv("SECURITY_SESSION_KEY", testSessionHexKey)
 	t.Setenv("SITE_BASE_URL", "http://test.local")
 
 	dir, err := os.MkdirTemp("", "static-*")
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(dir) }) //nolint:errcheck
+	t.Cleanup(func() { os.RemoveAll(dir) }) //nolint:errcheck // cleanup: best-effort removal, failure is non-fatal in tests
 	t.Setenv("TEST_STATIC_DIR", dir)
 }
 
@@ -62,9 +65,9 @@ func newSecurityHarness(t *testing.T) (http.Handler, *App) {
 			}
 			return web.Text(http.StatusOK, "ok"), nil
 		},
-		session.Middleware(a.Security.Session),
-		secure.CSRF(a.Security.CSRF),
-		secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: a.Security.Origins, ServerOrigin: a.Security.ServerOrigin}),
+		session.Middleware(a.Session),
+		secure.CSRF(a.CSRF),
+		secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: a.Origins, ServerOrigin: a.ServerOrigin}),
 	)
 	srv, err := serve.NewServer(handler, a.Config.Server)
 	if err != nil {
@@ -111,6 +114,37 @@ func (s *stubSessionStore) Delete(context.Context, string) error {
 
 func (s *stubSessionStore) Stop() {
 	s.stopCount++
+}
+
+type stubKVStore struct {
+	pingErr    error
+	closeErr   error
+	closeCount int
+}
+
+func (s *stubKVStore) Ping(context.Context) error { return s.pingErr }
+
+func (s *stubKVStore) Get(context.Context, string) ([]byte, error) {
+	return nil, kv.ErrNotFound
+}
+
+func (s *stubKVStore) Set(context.Context, string, []byte, kv.SetOptions) error { return nil }
+
+func (s *stubKVStore) Delete(context.Context, ...string) error { return nil }
+
+func (s *stubKVStore) Exists(context.Context, ...string) (int64, error) { return 0, nil }
+
+func (s *stubKVStore) Close() error {
+	s.closeCount++
+	return s.closeErr
+}
+
+func (s *stubKVStore) SessionRead(context.Context, string, time.Time) ([]byte, int64, bool, error) {
+	return nil, 0, false, nil
+}
+
+func (s *stubKVStore) SessionSave(context.Context, string, []byte, time.Time, time.Duration, int64, time.Time) (int64, bool, bool, error) {
+	return 1, false, false, nil
 }
 
 func TestApp_Healthz_Returns200(t *testing.T) {
@@ -163,9 +197,6 @@ func TestApp_GET_SetsRequestIDHeader(t *testing.T) {
 // successfully when SESSION_STORE=cookie with a valid encryption key.
 func TestApp_CookieSessionStore_BootsAndServesRequests(t *testing.T) {
 	setupTestEnv(t)
-	t.Setenv("SESSION_STORE", "cookie")
-	// 32-byte AES key expressed as 64 hex chars.
-	t.Setenv("SECURITY_SESSION_KEY", testSessionHexKey)
 
 	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
@@ -182,12 +213,66 @@ func TestApp_CookieSessionStore_BootsAndServesRequests(t *testing.T) {
 // a descriptive error when SESSION_STORE=cookie but SECURITY_SESSION_KEY is absent.
 func TestApp_CookieSessionStore_MissingKey_ReturnsError(t *testing.T) {
 	setupTestEnv(t)
-	t.Setenv("SESSION_STORE", "cookie")
 	t.Setenv("SECURITY_SESSION_KEY", "")
 
 	_, err := New(context.Background())
 	if err == nil {
 		t.Fatal("expected error for missing SECURITY_SESSION_KEY, got nil")
+	}
+}
+
+func TestApp_MemorySessionStore_AllowedInTesting(t *testing.T) {
+	setupTestEnv(t)
+	t.Setenv("SESSION_STORE", "memory")
+
+	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req.Host = "test.local"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestApp_KVSessionStore_AllowedInTesting(t *testing.T) {
+	setupTestEnv(t)
+	t.Setenv("SESSION_STORE", "kv")
+
+	store := &stubKVStore{}
+	a, err := New(context.Background(), WithKVStoreFactory(func(context.Context, Runtime) (kv.Store, error) {
+		return store, nil
+	}))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := a.Close(); err != nil {
+			t.Errorf("App.Close() error = %v", err)
+		}
+	})
+
+	h := serve.ToHTTPHandler(a.router.Serve)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	req.Host = "test.local"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestApp_KVSessionStore_UnreachableKV_ReturnsError(t *testing.T) {
+	setupTestEnv(t)
+	t.Setenv("SESSION_STORE", "kv")
+
+	_, err := New(context.Background(), WithKVStoreFactory(func(context.Context, Runtime) (kv.Store, error) {
+		return &stubKVStore{pingErr: errors.New("dial tcp: connection refused")}, nil
+	}))
+	if err == nil {
+		t.Fatal("expected error for unreachable KV, got nil")
 	}
 }
 
@@ -240,8 +325,8 @@ func TestApp_SecurityHarness_TrustedProxyAcceptsHTTPSOrigin(t *testing.T) {
 
 	// Override ServerOrigin to HTTPS to simulate a production deployment
 	// behind a TLS-terminating proxy where SITE_BASE_URL is the external URL.
-	a.Security.ServerOrigin = "https://test.local"
-	a.Security.CSRF.ServerOrigin = "https://test.local"
+	a.ServerOrigin = "https://test.local"
+	a.CSRF.ServerOrigin = "https://test.local"
 
 	handler := web.Chain(
 		func(c *web.Context) (web.Response, error) {
@@ -250,9 +335,9 @@ func TestApp_SecurityHarness_TrustedProxyAcceptsHTTPSOrigin(t *testing.T) {
 			}
 			return web.Text(http.StatusOK, "ok"), nil
 		},
-		session.Middleware(a.Security.Session),
-		secure.CSRF(a.Security.CSRF),
-		secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: a.Security.Origins, ServerOrigin: a.Security.ServerOrigin}),
+		session.Middleware(a.Session),
+		secure.CSRF(a.CSRF),
+		secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: a.Origins, ServerOrigin: a.ServerOrigin}),
 	)
 	srv, err := serve.NewServer(handler, a.Config.Server)
 	if err != nil {
@@ -355,6 +440,18 @@ func TestAppClose_StopsSessionStore(t *testing.T) {
 	}
 }
 
+func TestAppClose_ClosesSharedKVOnce(t *testing.T) {
+	store := &stubKVStore{}
+	a := &App{Services: Services{KVStore: store}}
+
+	if err := a.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if store.closeCount != 1 {
+		t.Fatalf("closeCount = %d, want 1", store.closeCount)
+	}
+}
+
 // TestNew_CleansUpSessionStoreOnRouteRegistrationError must not run in parallel:
 // it swaps the package-level newMemorySessionStore var, which is not goroutine-safe.
 func TestApp_AllowedHosts_RejectsRequestWithBadHost(t *testing.T) {
@@ -389,6 +486,7 @@ func TestApp_Healthz_SkipsAllowedHosts(t *testing.T) {
 
 func TestNew_CleansUpSessionStoreOnRouteRegistrationError(t *testing.T) {
 	setupTestEnv(t)
+	t.Setenv("SESSION_STORE", "memory")
 	t.Setenv("TEST_STATIC_DIR", filepath.Join(t.TempDir(), "missing"))
 
 	store := &stubSessionStore{}

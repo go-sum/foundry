@@ -3,6 +3,7 @@ package redisstore
 import (
 	"cmp"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"time"
@@ -21,6 +22,7 @@ type Config struct {
 	DialTimeout  time.Duration `                         help:"connection dial timeout (default 5s)"`
 	ReadTimeout  time.Duration `                         help:"read timeout (default 3s)"`
 	WriteTimeout time.Duration `                         help:"write timeout (default 3s)"`
+	TLSConfig    *tls.Config   `                         help:"optional TLS config for managed Redis services"`
 }
 
 // RedisStore implements kv.Store and kv.Scanner backed by a Redis-protocol server.
@@ -46,6 +48,7 @@ func New(cfg Config) *RedisStore {
 			DialTimeout:  cmp.Or(cfg.DialTimeout, 5*time.Second),
 			ReadTimeout:  cmp.Or(cfg.ReadTimeout, 3*time.Second),
 			WriteTimeout: cmp.Or(cfg.WriteTimeout, 3*time.Second),
+			TLSConfig:    cfg.TLSConfig,
 		}),
 	}
 }

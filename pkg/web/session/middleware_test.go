@@ -78,6 +78,23 @@ func (s *failDeleteTokenStore) Delete(ctx context.Context, token string) error {
 	return s.base.Delete(ctx, token)
 }
 
+type recordingSaveStore struct {
+	savedAbsolute time.Time
+}
+
+func (s *recordingSaveStore) Read(context.Context, string) ([]byte, int64, error) {
+	return nil, 0, ErrSessionNotFound
+}
+
+func (s *recordingSaveStore) Save(_ context.Context, _ string, _ []byte, absolute time.Time, _ time.Duration, _ int64) (string, error) {
+	s.savedAbsolute = absolute
+	return "token", nil
+}
+
+func (s *recordingSaveStore) Delete(context.Context, string) error {
+	return nil
+}
+
 func testMemoryConfig(t *testing.T) Config {
 	t.Helper()
 	return Config{
@@ -556,6 +573,35 @@ func TestMiddleware_NewSession_WriteEmitsCookie(t *testing.T) {
 
 	if sc := resp.Headers.Get("Set-Cookie"); sc == "" {
 		t.Fatal("Set-Cookie absent, want cookie emitted after write on new session")
+	}
+}
+
+func TestMiddleware_CommitSetsAbsoluteDeadline(t *testing.T) {
+	store := &recordingSaveStore{}
+	cfg := Config{
+		Store: store,
+		CookieTemplate: web.Cookie{
+			Name:     "sess",
+			Path:     "/",
+			HTTPOnly: true,
+			SameSite: "Lax",
+		},
+		TTL: time.Hour,
+	}
+
+	before := time.Now()
+	_, err := runRequest(t, Middleware(cfg), "", func(c *web.Context) (web.Response, error) {
+		sess, _ := FromContext(c)
+		_ = sess.Set("k", "v")
+		return web.Respond(http.StatusOK), nil
+	})
+	if err != nil {
+		t.Fatalf("Middleware error = %v", err)
+	}
+
+	want := before.Add(time.Hour)
+	if diff := store.savedAbsolute.Sub(want); diff < 0 || diff > 5*time.Second {
+		t.Fatalf("saved absolute = %v, want approximately %v (diff = %v)", store.savedAbsolute, want, diff)
 	}
 }
 

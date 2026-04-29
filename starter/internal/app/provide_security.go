@@ -6,13 +6,14 @@ import (
 	"fmt"
 
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
+	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 	"github.com/go-sum/foundry/pkg/web/session"
 
 	config "github.com/go-sum/foundry/config"
 )
 
-func provideSecurity(_ context.Context, runtime Runtime, storeFactory func() session.Store) (Security, session.Store, error) {
+func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, storeFactory func() session.Store) (Security, session.Store, error) {
 	cfg := runtime.Config
 
 	origins := make([]string, 0, 1+len(cfg.Site.OriginAllowlist))
@@ -21,7 +22,7 @@ func provideSecurity(_ context.Context, runtime Runtime, storeFactory func() ses
 	}
 	origins = append(origins, cfg.Site.OriginAllowlist...)
 
-	sessCfg, store, err := provideSession(runtime, storeFactory)
+	sessCfg, store, err := provideSession(runtime, kvStore, storeFactory)
 	if err != nil {
 		return Security{}, nil, err
 	}
@@ -41,9 +42,11 @@ func provideSecurity(_ context.Context, runtime Runtime, storeFactory func() ses
 	}, store, nil
 }
 
-func provideSession(runtime Runtime, storeFactory func() session.Store) (session.Config, session.Store, error) {
+func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() session.Store) (session.Config, session.Store, error) {
 	var store session.Store
-	switch runtime.Config.SessionStore {
+	sessionStore := runtime.Config.SessionStore
+
+	switch sessionStore {
 	case "cookie":
 		keyHex := cfgpkg.ExpandSecret("SECURITY_SESSION_KEY")
 		if keyHex == "" {
@@ -62,13 +65,25 @@ func provideSession(runtime Runtime, storeFactory func() session.Store) (session
 			return session.Config{}, nil, fmt.Errorf("session: cookie store: %w", err)
 		}
 		store = session.NewCookieStore(codec)
-	default:
+	case "kv":
+		backend, ok := kvStore.(session.KVBackend)
+		if !ok {
+			return session.Config{}, nil, config.ErrKVSessionStoreUnsupported
+		}
+		store = session.NewKVStore(backend, session.KVStoreConfig{
+			Prefix: runtime.Config.Session.KVPrefix,
+		})
+	case "memory":
+		if runtime.Config.Env != config.Testing {
+			return session.Config{}, nil, config.ErrSessionStoreMemoryTestingOnly
+		}
 		if storeFactory != nil {
 			store = storeFactory()
 		} else {
 			store = session.NewMemoryStore()
 		}
+	default:
+		return session.Config{}, nil, fmt.Errorf("session: unsupported store %q", sessionStore)
 	}
 	return session.NewConfig(runtime.Config.Session, store), store, nil
 }
-

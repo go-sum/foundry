@@ -10,6 +10,10 @@ case "$DOMAIN" in
   *[!a-zA-Z0-9.:_-]*) echo "ERROR: DOMAIN='$DOMAIN' contains invalid characters" >&2; exit 1 ;;
 esac
 
+case "$TLS_CONFIG" in
+  *[!a-zA-Z0-9./:_\ -]*) echo "ERROR: TLS_CONFIG contains invalid characters" >&2; exit 1 ;;
+esac
+
 if [ "$DEV_MODE" = "--dev" ]; then
   cat > "${SCRIPT_DIR}/Caddyfile" <<EOF
 {

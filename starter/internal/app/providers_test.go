@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +33,7 @@ func testAppContext(method, rawURL string) *web.Context {
 
 func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 	cfg := &configpkg.Config{
+		Env:     configpkg.Testing,
 		CSRF:    secure.DefaultCSRFConfig(),
 		CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
 		Headers: secure.DefaultHeadersConfig(),
@@ -41,13 +43,14 @@ func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 			AbsoluteTTL:  12 * time.Hour,
 			CookieSecure: true,
 		},
+		SessionStore: "memory",
 		Site: site.Config{
 			BaseURL:         "https://app.example.com",
 			OriginAllowlist: []string{"https://admin.example.com", "https://cdn.example.com"},
 		},
 	}
 
-	sec, store, err := provideSecurity(context.Background(), Runtime{Config: cfg}, nil)
+	sec, store, err := provideSecurity(context.Background(), Runtime{Config: cfg}, nil, nil)
 	if err != nil {
 		t.Fatalf("provideSecurity() error = %v", err)
 	}
@@ -87,6 +90,33 @@ func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 	}
 	if got, want := sec.Session.IdleTTL, 30*time.Minute; got != want {
 		t.Fatalf("IdleTTL = %v, want %v", got, want)
+	}
+}
+
+func TestProvideSecurity_EmptySessionStoreFailsFast(t *testing.T) {
+	cfg := &configpkg.Config{
+		Env:     configpkg.Testing,
+		CSRF:    secure.DefaultCSRFConfig(),
+		CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
+		Headers: secure.DefaultHeadersConfig(),
+		Session: session.Settings{
+			CookieName:   "app-session",
+			IdleTTL:      30 * time.Minute,
+			AbsoluteTTL:  12 * time.Hour,
+			CookieSecure: true,
+		},
+		SessionStore: "",
+		Site: site.Config{
+			BaseURL: "https://app.example.com",
+		},
+	}
+
+	_, _, err := provideSecurity(context.Background(), Runtime{Config: cfg}, nil, nil)
+	if err == nil {
+		t.Fatal("provideSecurity() error = nil, want unsupported session store")
+	}
+	if !strings.Contains(err.Error(), `unsupported store ""`) {
+		t.Fatalf("provideSecurity() error = %v, want unsupported empty store", err)
 	}
 }
 

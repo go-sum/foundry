@@ -15,6 +15,22 @@ var (
 	// ErrSessionKeyInvalid is returned when SECURITY_SESSION_KEY is not valid hex-encoded key material.
 	ErrSessionKeyInvalid = errors.New("config: SECURITY_SESSION_KEY must be valid hex-encoded key material")
 
+	// ErrSessionStoreMemoryTestingOnly is returned when the in-memory session
+	// store is selected outside the test environment.
+	ErrSessionStoreMemoryTestingOnly = errors.New("config: SESSION_STORE=memory is only allowed when APP_ENV=testing")
+
+	// ErrKVStoreUnavailable is returned when a selected KV-backed feature cannot
+	// reach the configured KV service at startup.
+	ErrKVStoreUnavailable = errors.New("config: KV store is required but unavailable")
+
+	// ErrKVPasswordMissing is returned when SESSION_STORE=kv is selected in a
+	// non-test environment without KV_PASSWORD configured.
+	ErrKVPasswordMissing = errors.New("config: KV_PASSWORD is required for kv session store outside testing")
+
+	// ErrKVSessionStoreUnsupported is returned when SESSION_STORE=kv is selected
+	// with a KV implementation that does not provide session primitives.
+	ErrKVSessionStoreUnsupported = errors.New("config: SESSION_STORE=kv requires a session-capable KV store")
+
 	// ErrAuthTokenKeyMissing is returned when SECURITY_AUTH_TOKEN_KEY is not set.
 	ErrAuthTokenKeyMissing = errors.New("config: SECURITY_AUTH_TOKEN_KEY is required")
 

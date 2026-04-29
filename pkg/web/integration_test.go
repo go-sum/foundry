@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/go-sum/foundry/pkg/web"
-	"github.com/go-sum/foundry/pkg/web/serve"
 	"github.com/go-sum/foundry/pkg/web/htmx"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
+	"github.com/go-sum/foundry/pkg/web/serve"
 	"github.com/go-sum/foundry/pkg/web/session"
 	xhtml "golang.org/x/net/html"
 )
@@ -354,12 +354,6 @@ func withOrigin(origin string) requestOption {
 func withHeader(name, value string) requestOption {
 	return func(req *http.Request) {
 		req.Header.Set(name, value)
-	}
-}
-
-func withCookie(cookie *http.Cookie) requestOption {
-	return func(req *http.Request) {
-		req.AddCookie(cookie)
 	}
 }
 

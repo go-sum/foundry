@@ -47,12 +47,20 @@ type Option func(*appOptions)
 
 type appOptions struct {
 	sessionStoreFactory func() session.Store
+	kvStoreFactory      func(context.Context, Runtime) (kv.Store, error)
 }
 
-// WithSessionStoreFactory overrides the factory used to create the in-memory
-// session store. Intended for tests that need to observe store lifecycle events.
+// WithSessionStoreFactory overrides the factory used to create the test-only
+// in-memory session store. Intended for tests that need to observe store
+// lifecycle events or deliberately avoid cookie/KV storage.
 func WithSessionStoreFactory(f func() session.Store) Option {
 	return func(o *appOptions) { o.sessionStoreFactory = f }
+}
+
+// WithKVStoreFactory overrides the shared KV dependency used by the app.
+// Intended for tests that need deterministic startup and shutdown behavior.
+func WithKVStoreFactory(f func(context.Context, Runtime) (kv.Store, error)) Option {
+	return func(o *appOptions) { o.kvStoreFactory = f }
 }
 
 // Runtime holds cross-cutting infrastructure dependencies.
@@ -151,7 +159,12 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		Icons: iconReg,
 	}
 
-	security, store, err := provideSecurity(ctx, runtime, o.sessionStoreFactory)
+	sharedKV, err := provideKVStore(ctx, runtime, o.kvStoreFactory)
+	if err != nil {
+		return nil, fmt.Errorf("kv: %w", err)
+	}
+
+	security, store, err := provideSecurity(ctx, runtime, sharedKV, o.sessionStoreFactory)
 	if err != nil {
 		return nil, fmt.Errorf("security: %w", err)
 	}
@@ -161,6 +174,9 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		Security:     security,
 		router:       routing,
 		sessionStore: store,
+		Services: Services{
+			KVStore: sharedKV,
+		},
 	}
 	defer func() {
 		if err == nil {
@@ -173,7 +189,7 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 
 	installGlobalMiddleware(routing, runtime, security)
 
-	services, err := provideServices(ctx, runtime, security, routing, pres)
+	services, err := provideServices(ctx, runtime, security, routing, pres, sharedKV)
 	if err != nil {
 		return nil, fmt.Errorf("services: %w", err)
 	}

@@ -19,6 +19,9 @@ func TestDefaultSettings(t *testing.T) {
 	if !got.CookieSecure {
 		t.Fatal("CookieSecure = false, want true")
 	}
+	if got.KVPrefix != "session:" {
+		t.Fatalf("KVPrefix = %q, want %q", got.KVPrefix, "session:")
+	}
 }
 
 func TestNewConfig(t *testing.T) {

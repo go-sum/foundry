@@ -30,7 +30,11 @@ func (e memEntry) expired() bool {
 	return false
 }
 
-// MemoryStore is an in-memory Store for single-process deployments and tests.
+// MemoryStore is an in-memory Store kept primarily for tests.
+// It exists so tests can exercise large server-side session payloads without
+// hitting cookie-size limits in CookieStore or depending on a real KV service.
+// In the starter app, the composition root rejects this store unless
+// APP_ENV=testing so it cannot be selected accidentally in dev or production.
 // A background goroutine sweeps expired entries every minute; call Stop to drain it.
 type MemoryStore struct {
 	mu       sync.RWMutex
@@ -39,7 +43,8 @@ type MemoryStore struct {
 	stopOnce sync.Once
 }
 
-// NewMemoryStore creates a MemoryStore and starts its background sweep goroutine.
+// NewMemoryStore creates a test-oriented in-memory session store and starts its
+// background sweep goroutine.
 func NewMemoryStore() *MemoryStore {
 	m := &MemoryStore{
 		entries: make(map[string]memEntry),

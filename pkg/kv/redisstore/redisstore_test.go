@@ -2,6 +2,7 @@ package redisstore_test
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net/url"
 	"os"
@@ -32,6 +33,9 @@ func testConfig(t *testing.T) redisstore.Config {
 	cfg := redisstore.Config{Addr: u.Host}
 	if u.User != nil {
 		cfg.Password, _ = u.User.Password()
+	}
+	if u.Scheme == "rediss" {
+		cfg.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}
 	if len(u.Path) > 1 {
 		cfg.DB, _ = strconv.Atoi(u.Path[1:])
@@ -159,8 +163,12 @@ func TestDeleteMultipleKeys(t *testing.T) {
 
 	t.Cleanup(func() { _ = store.Delete(ctx, k1, k2) })
 
-	_ = store.Set(ctx, k1, []byte("1"), kv.SetOptions{})
-	_ = store.Set(ctx, k2, []byte("2"), kv.SetOptions{})
+	if err := store.Set(ctx, k1, []byte("1"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k1, err)
+	}
+	if err := store.Set(ctx, k2, []byte("2"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k2, err)
+	}
 
 	if err := store.Delete(ctx, k1, k2); err != nil {
 		t.Fatalf("Delete multiple: %v", err)
@@ -191,8 +199,12 @@ func TestExistsReturnsCounts(t *testing.T) {
 
 	t.Cleanup(func() { _ = store.Delete(ctx, k1, k2) })
 
-	_ = store.Set(ctx, k1, []byte("a"), kv.SetOptions{})
-	_ = store.Set(ctx, k2, []byte("b"), kv.SetOptions{})
+	if err := store.Set(ctx, k1, []byte("a"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k1, err)
+	}
+	if err := store.Set(ctx, k2, []byte("b"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k2, err)
+	}
 
 	n, err := store.Exists(ctx, k1, k2, k3)
 	if err != nil {
@@ -226,9 +238,15 @@ func TestScanMatchesPrefix(t *testing.T) {
 
 	t.Cleanup(func() { _ = store.Delete(ctx, k1, k2, k3) })
 
-	_ = store.Set(ctx, k1, []byte("1"), kv.SetOptions{})
-	_ = store.Set(ctx, k2, []byte("2"), kv.SetOptions{})
-	_ = store.Set(ctx, k3, []byte("3"), kv.SetOptions{})
+	if err := store.Set(ctx, k1, []byte("1"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k1, err)
+	}
+	if err := store.Set(ctx, k2, []byte("2"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k2, err)
+	}
+	if err := store.Set(ctx, k3, []byte("3"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k3, err)
+	}
 
 	var found []string
 	err := store.Scan(ctx, prefix+":*", func(key string) error {
@@ -280,8 +298,12 @@ func TestScanStopsOnCallbackError(t *testing.T) {
 
 	t.Cleanup(func() { _ = store.Delete(ctx, k1, k2) })
 
-	_ = store.Set(ctx, k1, []byte("1"), kv.SetOptions{})
-	_ = store.Set(ctx, k2, []byte("2"), kv.SetOptions{})
+	if err := store.Set(ctx, k1, []byte("1"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k1, err)
+	}
+	if err := store.Set(ctx, k2, []byte("2"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", k2, err)
+	}
 
 	sentinel := errors.New("stop")
 	err := store.Scan(ctx, prefix+":*", func(key string) error {
@@ -313,8 +335,12 @@ func TestSetOverwritesExistingKey(t *testing.T) {
 
 	t.Cleanup(func() { _ = store.Delete(ctx, key) })
 
-	_ = store.Set(ctx, key, []byte("first"), kv.SetOptions{})
-	_ = store.Set(ctx, key, []byte("second"), kv.SetOptions{})
+	if err := store.Set(ctx, key, []byte("first"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", key, err)
+	}
+	if err := store.Set(ctx, key, []byte("second"), kv.SetOptions{}); err != nil {
+		t.Fatalf("Set %q: %v", key, err)
+	}
 
 	got, err := store.Get(ctx, key)
 	if err != nil {

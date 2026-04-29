@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/go-sum/foundry/pkg/db"
-	"github.com/go-sum/foundry/pkg/kv/redisstore"
+	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification"
 	"github.com/go-sum/foundry/pkg/notification/notifylog"
 	"github.com/go-sum/foundry/pkg/queue"
@@ -60,9 +60,9 @@ func connectWithRetry(ctx context.Context, name string, logger *slog.Logger, max
 	return fmt.Errorf("%s: failed after %d attempts: %w", name, maxAttempts, err)
 }
 
-func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router, pres Presentation) (Services, error) {
+func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router, pres Presentation, kvStore kv.Store) (Services, error) {
 	if runtime.Config.Env == config.Testing {
-		return Services{}, nil
+		return Services{KVStore: kvStore}, nil
 	}
 
 	var pool *pgxpool.Pool
@@ -89,15 +89,9 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 		return Services{}, fmt.Errorf("services: schema not ready (run 'task db:migrate'): %w", err)
 	}
 
-	kvStore := redisstore.New(redisstore.Config{
-		Addr:     runtime.Config.KV.Addr,
-		Password: runtime.Config.KV.Password,
-	})
-	if err := connectWithRetry(ctx, "kv", runtime.Logger, 3, func() error {
-		return kvStore.Ping(ctx)
-	}); err != nil {
+	if kvStore == nil {
 		pool.Close()
-		return Services{}, fmt.Errorf("services: kv: %w", err)
+		return Services{}, fmt.Errorf("services: kv: missing shared store")
 	}
 
 	qStore := pgstore.New(pool)

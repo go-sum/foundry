@@ -217,7 +217,7 @@ func TestLoad_Production_MissingBaseURL_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestLoad_DefaultSessionStore_IsMemory(t *testing.T) {
+func TestLoad_DefaultSessionStore_IsCookie(t *testing.T) {
 	t.Setenv("APP_ENV", "testing")
 	setValidSecrets(t)
 	t.Setenv("SESSION_STORE", "")
@@ -226,8 +226,8 @@ func TestLoad_DefaultSessionStore_IsMemory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.SessionStore != "memory" {
-		t.Errorf("cfg.SessionStore = %q, want %q", cfg.SessionStore, "memory")
+	if cfg.SessionStore != "cookie" {
+		t.Errorf("cfg.SessionStore = %q, want %q", cfg.SessionStore, "cookie")
 	}
 }
 
@@ -242,6 +242,87 @@ func TestLoad_SessionStore_Cookie(t *testing.T) {
 	}
 	if cfg.SessionStore != "cookie" {
 		t.Errorf("cfg.SessionStore = %q, want %q", cfg.SessionStore, "cookie")
+	}
+}
+
+func TestLoad_SessionStore_KV(t *testing.T) {
+	t.Setenv("APP_ENV", "testing")
+	setValidSecrets(t)
+	t.Setenv("SESSION_STORE", "kv")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.SessionStore != "kv" {
+		t.Errorf("cfg.SessionStore = %q, want %q", cfg.SessionStore, "kv")
+	}
+}
+
+func TestLoad_SessionStore_KV_RequiresPasswordOutsideTesting(t *testing.T) {
+	for _, env := range []string{"production", "development"} {
+		t.Run(env, func(t *testing.T) {
+			t.Setenv("APP_ENV", env)
+			setValidSecrets(t)
+			t.Setenv("SITE_BASE_URL", "https://example.com")
+			t.Setenv("SESSION_STORE", "kv")
+			t.Setenv("KV_PASSWORD", "")
+
+			_, err := config.Load()
+			if err == nil {
+				t.Fatal("expected error for missing KV_PASSWORD, got nil")
+			}
+			if !errors.Is(err, config.ErrKVPasswordMissing) {
+				t.Fatalf("got %v, want ErrKVPasswordMissing", err)
+			}
+		})
+	}
+}
+
+func TestLoad_KVTLS_Enabled(t *testing.T) {
+	t.Setenv("APP_ENV", "testing")
+	setValidSecrets(t)
+	t.Setenv("KV_TLS", "true")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !cfg.KV.TLSEnabled {
+		t.Fatal("cfg.KV.TLSEnabled = false, want true")
+	}
+}
+
+func TestLoad_SessionKVPrefix_Override(t *testing.T) {
+	t.Setenv("APP_ENV", "testing")
+	setValidSecrets(t)
+	t.Setenv("SESSION_KV_PREFIX", "starter-a:session:")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Session.KVPrefix != "starter-a:session:" {
+		t.Fatalf("cfg.Session.KVPrefix = %q, want %q", cfg.Session.KVPrefix, "starter-a:session:")
+	}
+}
+
+func TestLoad_SessionStore_Memory_OnlyAllowedInTesting(t *testing.T) {
+	for _, env := range []string{"production", "development"} {
+		t.Run(env, func(t *testing.T) {
+			t.Setenv("APP_ENV", env)
+			setValidSecrets(t)
+			t.Setenv("SITE_BASE_URL", "https://example.com")
+			t.Setenv("SESSION_STORE", "memory")
+
+			_, err := config.Load()
+			if err == nil {
+				t.Fatal("expected error for memory session store outside testing, got nil")
+			}
+			if !errors.Is(err, config.ErrSessionStoreMemoryTestingOnly) {
+				t.Fatalf("got %v, want ErrSessionStoreMemoryTestingOnly", err)
+			}
+		})
 	}
 }
 

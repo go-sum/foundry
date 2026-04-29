@@ -9,6 +9,7 @@ import (
 var (
 	ErrNotFound = errors.New("kv: key not found")
 	ErrClosed   = errors.New("kv: store closed")
+	ErrConflict = errors.New("kv: version conflict")
 )
 
 // SetOptions configures a Set operation.

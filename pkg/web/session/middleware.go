@@ -21,15 +21,18 @@ type Settings struct {
 	IdleTTL      time.Duration
 	AbsoluteTTL  time.Duration
 	CookieSecure bool
+	KVPrefix     string
 }
 
 // DefaultSettings returns production-grade session defaults.
 func DefaultSettings() Settings {
+	kvCfg := DefaultKVStoreConfig()
 	return Settings{
 		CookieName:   "session",
 		IdleTTL:      30 * time.Minute,
 		AbsoluteTTL:  24 * time.Hour,
 		CookieSecure: true,
+		KVPrefix:     kvCfg.Prefix,
 	}
 }
 
@@ -52,7 +55,8 @@ func NewConfig(s Settings, store Store) Config {
 // Config configures the session Middleware.
 type Config struct {
 	// Store handles session persistence. Required.
-	// Use NewMemoryStore for server-side sessions.
+	// Use NewMemoryStore for test-only server-side sessions.
+	// Use NewKVStore for server-side sessions.
 	// Use NewCookieStore for client-side AEAD-encrypted sessions.
 	Store Store `validate:"required"`
 
@@ -141,7 +145,6 @@ func commit(ctx context.Context, resp *web.Response, cfg Config, sess *Session) 
 	if sess == nil {
 		return nil
 	}
-
 	sess.mu.Lock()
 	destroyed := sess.destroyed
 	regenerated := sess.regenerated
@@ -186,6 +189,9 @@ func commit(ctx context.Context, resp *web.Response, cfg Config, sess *Session) 
 
 	absolute := time.Now().Add(cfg.TTL)
 	newToken, err := cfg.Store.Save(ctx, saveToken, data, absolute, cfg.IdleTTL, saveVersion)
+	// Version conflicts are surfaced as transient errors but intentionally not
+	// retried here: automatic replay would re-save a stale payload and risk
+	// clobbering concurrent mutations from another request or browser tab.
 	if err != nil {
 		return classifyStoreError("save", err)
 	}

@@ -10,6 +10,7 @@ package session
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sort"
 	"sync"
 
@@ -237,7 +238,8 @@ func newSession() *Session {
 func sessionFromData(data []byte, token string, version int64) *Session {
 	var p sessionPayload
 	if err := json.Unmarshal(data, &p); err != nil {
-		// Corrupted data → start fresh.
+		// Corrupted store data — start fresh rather than failing the request.
+		slog.Warn("web/session: corrupt session data; starting fresh", "err", err)
 		return newSession()
 	}
 	s := &Session{token: token, version: version}
