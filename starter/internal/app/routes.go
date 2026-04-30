@@ -48,7 +48,7 @@ func starterRouteTree(rt *router.Router, sec Security, svc Services, s *site.Sit
 	contactForm, contactSubmit := contactHandlers(svc)
 
 	browserNodes := []router.Node{
-		router.Use(browserRouteMiddleware(sec)...),
+		router.Use(contentMiddleware(sec)...),
 	}
 	browserNodes = append(browserNodes, site.Routes(metaH)...)
 	browserNodes = append(browserNodes, home.Routes(homeH)...)
@@ -71,7 +71,7 @@ func starterRouteTree(rt *router.Router, sec Security, svc Services, s *site.Sit
 
 func packageOwnedRouteTree(sec Security, svc Services, publicDir string) []router.Node {
 	nodes := []router.Node{
-		router.Use(packageRouteMiddleware(sec)...),
+		router.Use(apiMiddleware(sec)...),
 	}
 	nodes = append(nodes, docs.Routes(docs.DefaultConfig(publicDir))...)
 	if svc.Auth != nil {

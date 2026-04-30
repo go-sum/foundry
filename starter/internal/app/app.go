@@ -193,7 +193,7 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		}
 	}()
 
-	installGlobalMiddleware(routing, runtime, security)
+	routing.Use(coreMiddleware(routing, runtime, security)...)
 
 	services, err := provideServices(ctx, runtime, security, routing, pres, sharedKV, val)
 	if err != nil {

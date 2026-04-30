@@ -13,11 +13,7 @@ import (
 	"github.com/go-sum/foundry/pkg/web/session"
 )
 
-func installGlobalMiddleware(rt *router.Router, runtime Runtime, security Security) {
-	rt.Use(globalMiddleware(rt, runtime, security)...)
-}
-
-func globalMiddleware(rt *router.Router, runtime Runtime, security Security) []web.Middleware {
+func coreMiddleware(rt *router.Router, runtime Runtime, security Security) []web.Middleware {
 	return []web.Middleware{
 		web.AsyncContext(),
 		otelweb.Middleware(runtime.Tracer),
@@ -39,7 +35,7 @@ func globalMiddleware(rt *router.Router, runtime Runtime, security Security) []w
 	}
 }
 
-func browserRouteMiddleware(sec Security) []web.Middleware {
+func contentMiddleware(sec Security) []web.Middleware {
 	return []web.Middleware{
 		web.WithMaxBody(8 << 20),
 		web.MethodOverride(web.MethodOverrideConfig{}),
@@ -52,7 +48,7 @@ func browserRouteMiddleware(sec Security) []web.Middleware {
 	}
 }
 
-func packageRouteMiddleware(sec Security) []web.Middleware {
+func apiMiddleware(sec Security) []web.Middleware {
 	return []web.Middleware{
 		secure.OriginGuard(secure.OriginGuardConfig{
 			TrustedOrigins: sec.Origins,
