@@ -66,20 +66,26 @@ tasks:
 
   dev:
     desc: "Rebuild and attach to the full dev stack"
+    preconditions:
+      - sh: test -f /opt/vps/certs/local.pem
+        msg: "TLS certs missing — run 'task certs:init' first"
     deps:
       - _inspect:tools
       - _net:proxy:ensure
       - task: _caddy:config
-        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls internal", DEV_FLAG: "--dev"}
+        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls /etc/caddy/certs/local.pem /etc/caddy/certs/local-key.pem", DEV_FLAG: "--dev"}
     cmd: "{{.DCOMP_ALL}} up --build {{.CLI_ARGS}}"
 
   dev:up:
     desc: "Start full dev stack detached"
+    preconditions:
+      - sh: test -f /opt/vps/certs/local.pem
+        msg: "TLS certs missing — run 'task certs:init' first"
     deps:
       - _inspect:tools
       - _net:proxy:ensure
       - task: _caddy:config
-        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls internal", DEV_FLAG: "--dev"}
+        vars: {DOMAIN: "{{.DEV_DOMAIN}}", TLS_CONFIG: "tls /etc/caddy/certs/local.pem /etc/caddy/certs/local-key.pem", DEV_FLAG: "--dev"}
     cmd: "{{.DCOMP_ALL}} up --build --detach {{.CLI_ARGS}}"
 
   dev:down:
@@ -152,11 +158,14 @@ tasks:
   certs:init:
     desc: "Generate local TLS certificates with mkcert (run once per machine)"
     cmds:
-      - mkdir -p docker/caddy/certs
+      - mkdir -p /opt/vps/certs
       - >
-        {{.RUN_IN_TOOLS}} tools sh -c 'mkcert -install && mkcert -cert-file
-        /app/docker/caddy/certs/local.pem -key-file
-        /app/docker/caddy/certs/local-key.pem {{.DEV_DOMAIN}}
+        docker compose -f docker-compose.data.yml -f docker-compose.tools.yml
+        --project-name {{.PROJECT_NAME}} run --rm
+        -v /opt/vps/certs:/opt/vps/certs
+        tools sh -c 'mkcert -install && mkcert -cert-file
+        /opt/vps/certs/local.pem -key-file
+        /opt/vps/certs/local-key.pem {{.DEV_DOMAIN}}
         "*.{{.DEV_DOMAIN}}" localhost 127.0.0.1'
 
   # ── Helpers ───────────────────────────────────────────────────────────────────
