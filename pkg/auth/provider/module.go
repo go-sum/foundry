@@ -17,6 +17,14 @@ type ProviderModule struct {
 
 	signinPath func() string
 	config     Config
+	routes     RouteConfig
+}
+
+// RouteConfig returns the resolved route configuration for this module.
+// Callers (e.g. middleware skippers) use this to reference the token path
+// without duplicating the URL string.
+func (m *ProviderModule) RouteConfig() RouteConfig {
+	return m.routes
 }
 
 // ProviderModuleConfig holds all external dependencies needed to wire the provider module.
@@ -26,6 +34,7 @@ type ProviderModuleConfig struct {
 	Logger    *slog.Logger
 
 	Config Config
+	Routes RouteConfig
 
 	Clients  ClientStore
 	Codes    CodeStore
@@ -67,6 +76,7 @@ func NewProviderModule(cfg ProviderModuleConfig) (*ProviderModule, error) {
 	}
 
 	config := ApplyDefaults(cfg.Config)
+	routes := applyRouteDefaults(cfg.Routes)
 
 	m := &ProviderModule{
 		authorizeHandler: &AuthorizeHandler{
@@ -89,6 +99,7 @@ func NewProviderModule(cfg ProviderModuleConfig) (*ProviderModule, error) {
 		discoveryHandler: &DiscoveryHandler{
 			config: cfg.Config,
 			router: cfg.Router,
+			routes: routes,
 		},
 		userinfoHandler: &UserinfoHandler{
 			tokens: cfg.Tokens,
@@ -97,6 +108,7 @@ func NewProviderModule(cfg ProviderModuleConfig) (*ProviderModule, error) {
 		},
 		signinPath: cfg.SigninPath,
 		config:     config,
+		routes:     routes,
 	}
 
 	return m, nil

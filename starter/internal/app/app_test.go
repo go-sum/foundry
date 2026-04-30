@@ -12,8 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sum/foundry/pkg/auth/provider"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/serve"
 	"github.com/go-sum/foundry/pkg/web/session"
@@ -281,12 +283,16 @@ func TestApp_KVSessionStore_UnreachableKV_ReturnsError(t *testing.T) {
 // session is present (no separate csrf double-submit cookie).
 func TestApp_GET_SetsSessionCookie(t *testing.T) {
 	setupTestEnv(t)
-	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	h, _ := newSecurityHarness(t)
+	req := httptest.NewRequest(http.MethodGet, "/form", nil)
 	req.Host = "test.local"
 	rec := httptest.NewRecorder()
 
 	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Status = %d, want %d", rec.Code, http.StatusOK)
+	}
 
 	resp := rec.Result()
 	var found bool
@@ -481,6 +487,92 @@ func TestApp_Healthz_SkipsAllowedHosts(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("Status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func newOAuthRouteSeparationHarness(t *testing.T) http.Handler {
+	setupTestEnv(t)
+	a := mustNew(t)
+	routes := provider.DefaultRouteConfig()
+	rt := router.New()
+	rt.Use(coreMiddleware(rt, a.Runtime, a.Security)...)
+	router.Register(rt,
+		router.Layout(router.Nodes(
+			[]router.Node{router.Use(apiMiddleware(a.Security, routes.Token.Pattern)...)},
+			[]router.Node{router.POST(routes.Token.Pattern, routes.Token.Name, func(_ *web.Context) (web.Response, error) {
+				return web.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_request"}), nil
+			})},
+			[]router.Node{router.Layout(router.Nodes(
+				[]router.Node{router.Use(secure.CSRF(a.CSRF))},
+				[]router.Node{router.POST(routes.AuthorizePost.Pattern, routes.AuthorizePost.Name, func(_ *web.Context) (web.Response, error) {
+					return web.Text(http.StatusOK, "ok"), nil
+				})},
+			)...)},
+		)...),
+	)
+	rt.Freeze()
+	return serve.ToHTTPHandler(rt.Serve)
+}
+
+func TestApp_OAuthTokenEndpoint_NotBlockedByCSRFMiddleware(t *testing.T) {
+	h := newOAuthRouteSeparationHarness(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/oauth/token", strings.NewReader("client_id=test-client"))
+	req.Host = "test.local"
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"error":"invalid_request"`) {
+		t.Fatalf("body = %q, want oauth invalid_request response", rec.Body.String())
+	}
+}
+
+func TestApp_OAuthAuthorizePost_RemainsCSRFProtected(t *testing.T) {
+	h := newOAuthRouteSeparationHarness(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader("action=approve"))
+	req.Host = "test.local"
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("Status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestApp_APIMiddleware_OriginGuardSkipsTokenRoute(t *testing.T) {
+	setupTestEnv(t)
+	a := mustNew(t)
+	routes := provider.DefaultRouteConfig()
+	rt := router.New()
+	rt.Use(coreMiddleware(rt, a.Runtime, a.Security)...)
+	router.Register(rt,
+		router.Layout(router.Nodes(
+			[]router.Node{router.Use(apiMiddleware(a.Security, routes.Token.Pattern)...)},
+			[]router.Node{router.POST(routes.Token.Pattern, routes.Token.Name, func(_ *web.Context) (web.Response, error) {
+				return web.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_request"}), nil
+			})},
+		)...),
+	)
+	rt.Freeze()
+	h := serve.ToHTTPHandler(rt.Serve)
+
+	req := httptest.NewRequest(http.MethodPost, routes.Token.Pattern, strings.NewReader("client_id=test-client"))
+	req.Host = "test.local"
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
 

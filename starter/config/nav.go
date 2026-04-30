@@ -70,7 +70,7 @@ func DefaultNav(rt *router.Router, authRoute string) viewstate.RequestOption {
 								{Label: "Sign up", Href: rt.MustReverse(authRoute, nil), Visibility: compound.NavVisibilityGuest},
 								{
 									Label:  "Sign out",
-									Action: rt.MustReverse(authn.RouteSignout, nil),
+									Action: rt.MustReverse(authn.DefaultRouteConfig().Signout.Name, nil),
 									Method: "POST",
 									HiddenFields: []compound.NavHiddenField{
 										{Name: r.CSRFFieldName, Value: r.CSRFToken},

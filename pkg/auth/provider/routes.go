@@ -1,37 +1,75 @@
 package provider
 
 import (
+	"cmp"
+
 	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/router"
 )
 
-// Route name constants.
-const (
-	RouteAuthorize     = "oauth.authorize"
-	RouteAuthorizePost = "oauth.authorize.post"
-	RouteToken         = "oauth.token"
-	RouteUserinfo      = "oauth.userinfo"
-	RouteDiscovery     = "oauth.discovery"
-)
+// RouteSpec pairs a URL pattern with its router name. Both fields are required;
+// a zero-value RouteSpec is replaced by the default during module construction.
+type RouteSpec struct {
+	Pattern string
+	Name    string
+}
 
-// Routes returns the declarative route tree for the OAuth 2.0 provider module.
+// RouteConfig holds the URL pattern and route name for every OAuth 2.0 provider
+// endpoint. Pass a zero-value RouteConfig (or omit the field entirely) to use
+// DefaultRouteConfig. Populate individual fields to override specific endpoints.
+type RouteConfig struct {
+	Discovery     RouteSpec
+	Token         RouteSpec
+	Userinfo      RouteSpec
+	Authorize     RouteSpec
+	AuthorizePost RouteSpec
+}
+
+// DefaultRouteConfig returns the conventional OAuth 2.0 route patterns.
+func DefaultRouteConfig() RouteConfig { return applyRouteDefaults(RouteConfig{}) }
+
+// applyRouteDefaults fills any zero-value RouteSpec with its default.
+// cmp.Or returns the first non-zero comparable value, so a fully-zero
+// RouteConfig transparently adopts all defaults, and a partial override
+// keeps only the fields that were set.
+func applyRouteDefaults(r RouteConfig) RouteConfig {
+	return RouteConfig{
+		Discovery:     cmp.Or(r.Discovery, RouteSpec{"/.well-known/openid-configuration", "oauth.discovery"}),
+		Token:         cmp.Or(r.Token, RouteSpec{"/oauth/token", "oauth.token"}),
+		Userinfo:      cmp.Or(r.Userinfo, RouteSpec{"/oauth/userinfo", "oauth.userinfo"}),
+		Authorize:     cmp.Or(r.Authorize, RouteSpec{"/oauth/authorize", "oauth.authorize"}),
+		AuthorizePost: cmp.Or(r.AuthorizePost, RouteSpec{"/oauth/authorize", "oauth.authorize.post"}),
+	}
+}
+
+// PublicRoutes returns the public API routes for the OAuth 2.0 provider module.
+func PublicRoutes(m *ProviderModule) []router.Node {
+	r := m.routes
+	return []router.Node{
+		router.GET(r.Discovery.Pattern, r.Discovery.Name, m.discoveryHandler.Serve),
+		router.POST(r.Token.Pattern, r.Token.Name, m.tokenHandler.Exchange),
+		router.GET(r.Userinfo.Pattern, r.Userinfo.Name, m.userinfoHandler.Serve),
+	}
+}
+
+// ProtectedRoutes returns the browser-facing routes that require the user to
+// be logged in and remain inside the CSRF-protected route branch.
+func ProtectedRoutes(m *ProviderModule) []router.Node {
+	r := m.routes
+	return []router.Node{
+		router.Layout(
+			router.Use(authn.RequireAuth(m.signinPath)),
+			router.GET(r.Authorize.Pattern, r.Authorize.Name, m.authorizeHandler.Show),
+			router.POST(r.AuthorizePost.Pattern, r.AuthorizePost.Name, m.authorizeHandler.Submit),
+		),
+	}
+}
+
+// Routes returns the full declarative route tree for the OAuth 2.0 provider module.
 // The caller registers the returned nodes via router.Register(rt, provider.Routes(m)...).
 func Routes(m *ProviderModule) []router.Node {
-	return []router.Node{
-		// OIDC discovery endpoint (public, no auth required).
-		router.GET("/.well-known/openid-configuration", RouteDiscovery, m.discoveryHandler.Serve),
-
-		// Authorization endpoint — requires the user to be logged in.
-		router.Group("/oauth",
-			router.Use(authn.RequireAuth(m.signinPath)),
-			router.GET("/authorize", RouteAuthorize, m.authorizeHandler.Show),
-			router.POST("/authorize", RouteAuthorizePost, m.authorizeHandler.Submit),
-		),
-
-		// Token endpoint — public API (no session, no CSRF).
-		router.POST("/oauth/token", RouteToken, m.tokenHandler.Exchange),
-
-		// Userinfo endpoint — public API, bearer-token authenticated.
-		router.GET("/oauth/userinfo", RouteUserinfo, m.userinfoHandler.Serve),
-	}
+	return router.Nodes(
+		PublicRoutes(m),
+		ProtectedRoutes(m),
+	)
 }

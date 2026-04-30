@@ -61,6 +61,7 @@ type AuthHandler struct {
 	renderer    Renderer
 	config      auth.Config
 	signoutPath func() string
+	routes      RouteConfig
 }
 
 // ShowSignin renders the signin form.
@@ -84,7 +85,7 @@ func (h *AuthHandler) BeginSignin(c *web.Context) (web.Response, error) {
 	}
 
 	returnTo := webauth.SanitizeReturnTo(input.ReturnTo)
-	verifyPath := h.router.MustReverse(RouteVerifyShow, nil)
+	verifyPath := h.router.MustReverse(h.routes.Verify.Name, nil)
 	flow, err := h.svc.BeginSignin(c.Context(), input, verifyPath)
 	if err != nil {
 		return web.Response{}, mapServiceError(err)
@@ -95,7 +96,7 @@ func (h *AuthHandler) BeginSignin(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	redirectURL := h.router.MustReverse(RouteVerifyShow, nil)
+	redirectURL := h.router.MustReverse(h.routes.Verify.Name, nil)
 	return htmxRedirect(c, redirectURL)
 }
 
@@ -120,7 +121,7 @@ func (h *AuthHandler) BeginSignup(c *web.Context) (web.Response, error) {
 	}
 
 	returnTo := webauth.SanitizeReturnTo(input.ReturnTo)
-	verifyPath := h.router.MustReverse(RouteVerifyShow, nil)
+	verifyPath := h.router.MustReverse(h.routes.Verify.Name, nil)
 	flow, err := h.svc.BeginSignup(c.Context(), input, verifyPath)
 	if err != nil {
 		return web.Response{}, mapServiceError(err)
@@ -131,7 +132,7 @@ func (h *AuthHandler) BeginSignup(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	redirectURL := h.router.MustReverse(RouteVerifyShow, nil)
+	redirectURL := h.router.MustReverse(h.routes.Verify.Name, nil)
 	return htmxRedirect(c, redirectURL)
 }
 
@@ -156,7 +157,7 @@ func (h *AuthHandler) ShowVerify(c *web.Context) (web.Response, error) {
 
 	flow, ok := getPendingFlow(sess)
 	if !ok {
-		signinURL := h.router.MustReverse(RouteSigninShow, nil)
+		signinURL := h.router.MustReverse(h.routes.Signin.Name, nil)
 		return web.SeeOther(signinURL), nil
 	}
 
@@ -227,7 +228,7 @@ func (h *AuthHandler) Resend(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrBadRequest("No pending verification flow")
 	}
 
-	verifyPath := h.router.MustReverse(RouteVerifyShow, nil)
+	verifyPath := h.router.MustReverse(h.routes.Verify.Name, nil)
 	newFlow, err := h.svc.ResendPendingFlow(c.Context(), flow, verifyPath)
 	if err != nil {
 		return web.Response{}, mapServiceError(err)
@@ -237,7 +238,7 @@ func (h *AuthHandler) Resend(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	redirectURL := h.router.MustReverse(RouteVerifyShow, nil)
+	redirectURL := h.router.MustReverse(h.routes.Verify.Name, nil)
 	return htmxRedirect(c, redirectURL)
 }
 
@@ -273,7 +274,7 @@ func (h *AuthHandler) BeginEmailChange(c *web.Context) (web.Response, error) {
 		})
 	}
 
-	verifyPath := h.router.MustReverse(RouteVerifyShow, nil)
+	verifyPath := h.router.MustReverse(h.routes.Verify.Name, nil)
 	flow, err := h.svc.BeginEmailChange(c.Context(), userID, input, verifyPath)
 	if err != nil {
 		return web.Response{}, mapServiceError(err)
@@ -283,7 +284,7 @@ func (h *AuthHandler) BeginEmailChange(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	redirectURL := h.router.MustReverse(RouteVerifyShow, nil)
+	redirectURL := h.router.MustReverse(h.routes.Verify.Name, nil)
 	return htmxRedirect(c, redirectURL)
 }
 

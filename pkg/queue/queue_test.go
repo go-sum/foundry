@@ -428,6 +428,42 @@ func TestProcessor_HandlerError(t *testing.T) {
 	}
 }
 
+func TestProcessor_HandlerError_ZeroBackoffDoesNotPanic(t *testing.T) {
+	job := &Job{ID: "job-zero", Queue: "work", Payload: json.RawMessage(`{}`), Attempts: 1}
+	store := &fakeStore{dequeue: []*Job{job}}
+
+	handlerErr := errors.New("processing failed")
+	proc := newTestProcessor(store)
+	proc.Register("work", func(_ context.Context, _ Job) error {
+		return handlerErr
+	}, WithBackoff(0))
+
+	ctx := context.Background()
+	proc.Start(ctx)
+	<-proc.Ready()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if store.failedCount() >= 1 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	if err := proc.Stop(); err != nil {
+		t.Fatalf("proc.Stop: %v", err)
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if len(store.failedIDs) == 0 {
+		t.Fatal("expected Fail to be called")
+	}
+	if store.failedRetry[0] != 0 {
+		t.Errorf("retry backoff = %v, want 0", store.failedRetry[0])
+	}
+}
+
 func TestProcessor_HandlerPanic(t *testing.T) {
 	job := &Job{ID: "job-3", Queue: "work", Payload: json.RawMessage(`{}`)}
 	store := &fakeStore{dequeue: []*Job{job}}
@@ -532,6 +568,15 @@ func TestComputeBackoff_Cap(t *testing.T) {
 	lo, hi := d/2, d*3/2
 	if got < lo || got >= hi {
 		t.Errorf("computeBackoff cap: got %v, want in [%v, %v)", got, lo, hi)
+	}
+}
+
+func TestComputeBackoff_NonPositiveBase(t *testing.T) {
+	tests := []time.Duration{0, -1 * time.Second}
+	for _, base := range tests {
+		if got := computeBackoff(base, 1); got != 0 {
+			t.Errorf("computeBackoff(%v, 1) = %v, want 0", base, got)
+		}
 	}
 }
 

@@ -21,7 +21,6 @@ import (
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 
 	config "github.com/go-sum/foundry/config"
-	"github.com/go-sum/foundry/internal/features/oauthclient"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
@@ -93,7 +92,7 @@ func provideAuth(
 		TokenNonceStore: newKVNonceStore(kvStore),
 		Renderer:        authui.NewRenderer(uiCfg),
 		AdminRenderer:   authui.NewAdminRenderer(uiCfg),
-		AuthEntryPath: router.NewResolver(rt).Path(oauthclient.RouteConnect),
+		AuthEntryPath: router.NewResolver(rt).Path("auth.connect"),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("auth: identity module: %w", err)
@@ -113,7 +112,7 @@ func provideAuth(
 		Consents:        providerStore,
 		Users:           authStore,
 		ConsentRenderer: stubConsentRenderer{},
-		SigninPath:      router.NewResolver(rt).Path(authn.RouteSigninShow),
+		SigninPath:      router.NewResolver(rt).Path(authMod.RouteConfig().Signin.Name),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("auth: provider module: %w", err)

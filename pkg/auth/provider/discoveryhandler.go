@@ -9,6 +9,7 @@ import (
 type DiscoveryHandler struct {
 	config Config
 	router *router.Router
+	routes RouteConfig
 }
 
 type discoveryDocument struct {
@@ -25,9 +26,9 @@ type discoveryDocument struct {
 // Serve handles GET /.well-known/openid-configuration.
 func (h *DiscoveryHandler) Serve(c *web.Context) (web.Response, error) {
 	res := router.NewResolver(h.router)
-	authzPath := res.Path(RouteAuthorize)()
-	tokenPath := res.Path(RouteToken)()
-	userinfoPath := res.Path(RouteUserinfo)()
+	authzPath := res.Path(h.routes.Authorize.Name)()
+	tokenPath := res.Path(h.routes.Token.Name)()
+	userinfoPath := res.Path(h.routes.Userinfo.Name)()
 
 	doc := discoveryDocument{
 		Issuer:                            h.config.Issuer,

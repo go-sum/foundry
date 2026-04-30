@@ -1,106 +1,149 @@
 package authn
 
-import "github.com/go-sum/foundry/pkg/web/router"
+import (
+	"cmp"
 
-// Route name constants for all auth endpoints.
-const (
-	RouteSigninShow   = "auth.signin"
-	RouteSigninPost   = "auth.signin.post"
-	RouteSignupShow   = "auth.signup"
-	RouteSignupPost   = "auth.signup.post"
-	RouteVerifyShow   = "auth.verify"
-	RouteVerifyPost   = "auth.verify.post"
-	RouteVerifyResend = "auth.verify.resend"
-	RouteSignout      = "auth.signout"
-
-	RouteEmailChangeShow = "auth.email_change"
-	RouteEmailChangePost = "auth.email_change.post"
-
-	RoutePasskeyBeginAuth  = "auth.passkey.begin_auth"
-	RoutePasskeyFinishAuth = "auth.passkey.finish_auth"
-	RoutePasskeyBeginReg   = "auth.passkey.begin_reg"
-	RoutePasskeyFinishReg  = "auth.passkey.finish_reg"
-	RoutePasskeyList       = "auth.passkey.list"
-	RoutePasskeyShow       = "auth.passkey.show"
-	RoutePasskeyRename     = "auth.passkey.rename"
-	RoutePasskeyDelete     = "auth.passkey.delete"
-
-	RouteAdminUsers         = "auth.admin.users"
-	RouteAdminUserShow      = "auth.admin.user.show"
-	RouteAdminUserEdit      = "auth.admin.user.edit"
-	RouteAdminUserUpdate    = "auth.admin.user.update"
-	RouteAdminUserDelete    = "auth.admin.user.delete"
-	RouteAdminBootstrap     = "auth.admin.bootstrap"
-	RouteAdminBootstrapPost = "auth.admin.bootstrap.post"
+	"github.com/go-sum/foundry/pkg/web/router"
 )
+
+// RouteSpec pairs a URL pattern with its router name. Both fields are required;
+// a zero-value RouteSpec is replaced by the default during module construction.
+type RouteSpec struct {
+	Pattern string
+	Name    string
+}
+
+// RouteConfig holds the URL pattern and route name for every auth endpoint.
+// Pass a zero-value RouteConfig (or omit the field entirely) to use
+// DefaultRouteConfig. Populate individual fields to override specific endpoints.
+type RouteConfig struct {
+	Signin       RouteSpec
+	SigninPost   RouteSpec
+	Signup       RouteSpec
+	SignupPost   RouteSpec
+	Verify       RouteSpec
+	VerifyPost   RouteSpec
+	VerifyResend RouteSpec
+	Signout      RouteSpec
+
+	PasskeyBeginAuth  RouteSpec
+	PasskeyFinishAuth RouteSpec
+	PasskeyList       RouteSpec
+	PasskeyBeginReg   RouteSpec
+	PasskeyFinishReg  RouteSpec
+	PasskeyShow       RouteSpec
+	PasskeyRenameForm RouteSpec
+	PasskeyRename     RouteSpec
+	PasskeyDelete     RouteSpec
+
+	EmailChangeShow RouteSpec
+	EmailChangePost RouteSpec
+
+	AdminUsers         RouteSpec
+	AdminUserShow      RouteSpec
+	AdminUserEdit      RouteSpec
+	AdminUserUpdate    RouteSpec
+	AdminUserDelete    RouteSpec
+	AdminBootstrap     RouteSpec
+	AdminBootstrapPost RouteSpec
+}
+
+// DefaultRouteConfig returns the conventional auth route patterns.
+func DefaultRouteConfig() RouteConfig { return applyRouteDefaults(RouteConfig{}) }
+
+// applyRouteDefaults fills any zero-value RouteSpec with its default.
+// cmp.Or returns the first non-zero comparable value, so a fully-zero
+// RouteConfig transparently adopts all defaults, and a partial override
+// keeps only the fields that were set.
+func applyRouteDefaults(r RouteConfig) RouteConfig {
+	return RouteConfig{
+		Signin:       cmp.Or(r.Signin, RouteSpec{"/auth/signin", "auth.signin"}),
+		SigninPost:   cmp.Or(r.SigninPost, RouteSpec{"/auth/signin", "auth.signin.post"}),
+		Signup:       cmp.Or(r.Signup, RouteSpec{"/auth/signup", "auth.signup"}),
+		SignupPost:   cmp.Or(r.SignupPost, RouteSpec{"/auth/signup", "auth.signup.post"}),
+		Verify:       cmp.Or(r.Verify, RouteSpec{"/auth/verify", "auth.verify"}),
+		VerifyPost:   cmp.Or(r.VerifyPost, RouteSpec{"/auth/verify", "auth.verify.post"}),
+		VerifyResend: cmp.Or(r.VerifyResend, RouteSpec{"/auth/verify/resend", "auth.verify.resend"}),
+		Signout:      cmp.Or(r.Signout, RouteSpec{"/auth/signout", "auth.signout"}),
+
+		PasskeyBeginAuth:  cmp.Or(r.PasskeyBeginAuth, RouteSpec{"/auth/passkey/authenticate/begin", "auth.passkey.begin_auth"}),
+		PasskeyFinishAuth: cmp.Or(r.PasskeyFinishAuth, RouteSpec{"/auth/passkey/authenticate/finish", "auth.passkey.finish_auth"}),
+		PasskeyList:       cmp.Or(r.PasskeyList, RouteSpec{"/account/passkeys", "auth.passkey.list"}),
+		PasskeyBeginReg:   cmp.Or(r.PasskeyBeginReg, RouteSpec{"/account/passkeys/register/begin", "auth.passkey.begin_reg"}),
+		PasskeyFinishReg:  cmp.Or(r.PasskeyFinishReg, RouteSpec{"/account/passkeys/register/finish", "auth.passkey.finish_reg"}),
+		PasskeyShow:       cmp.Or(r.PasskeyShow, RouteSpec{"/account/passkeys/{id}", "auth.passkey.show"}),
+		PasskeyRenameForm: cmp.Or(r.PasskeyRenameForm, RouteSpec{"/account/passkeys/{id}/edit", "auth.passkey.rename.form"}),
+		PasskeyRename:     cmp.Or(r.PasskeyRename, RouteSpec{"/account/passkeys/{id}", "auth.passkey.rename"}),
+		PasskeyDelete:     cmp.Or(r.PasskeyDelete, RouteSpec{"/account/passkeys/{id}", "auth.passkey.delete"}),
+
+		EmailChangeShow: cmp.Or(r.EmailChangeShow, RouteSpec{"/account/email-change", "auth.email_change"}),
+		EmailChangePost: cmp.Or(r.EmailChangePost, RouteSpec{"/account/email-change", "auth.email_change.post"}),
+
+		AdminUsers:         cmp.Or(r.AdminUsers, RouteSpec{"/admin/users", "auth.admin.users"}),
+		AdminUserShow:      cmp.Or(r.AdminUserShow, RouteSpec{"/admin/users/{id}", "auth.admin.user.show"}),
+		AdminUserEdit:      cmp.Or(r.AdminUserEdit, RouteSpec{"/admin/users/{id}/edit", "auth.admin.user.edit"}),
+		AdminUserUpdate:    cmp.Or(r.AdminUserUpdate, RouteSpec{"/admin/users/{id}", "auth.admin.user.update"}),
+		AdminUserDelete:    cmp.Or(r.AdminUserDelete, RouteSpec{"/admin/users/{id}", "auth.admin.user.delete"}),
+		AdminBootstrap:     cmp.Or(r.AdminBootstrap, RouteSpec{"/admin/elevate", "auth.admin.bootstrap"}),
+		AdminBootstrapPost: cmp.Or(r.AdminBootstrapPost, RouteSpec{"/admin/elevate", "auth.admin.bootstrap.post"}),
+	}
+}
 
 // Routes returns the declarative route tree for the auth module.
 // The caller registers the returned nodes via router.Register(rt, authn.Routes(m)...).
 func Routes(m *Module) []router.Node {
+	r := m.routes
 	nodes := []router.Node{
-		router.Group("/auth",
-			router.GET("/signin", RouteSigninShow, m.AuthHandler.ShowSignin),
-			router.POST("/signin", RouteSigninPost, m.AuthHandler.BeginSignin),
-			router.GET("/signup", RouteSignupShow, m.AuthHandler.ShowSignup),
-			router.POST("/signup", RouteSignupPost, m.AuthHandler.BeginSignup),
-			router.GET("/verify", RouteVerifyShow, m.AuthHandler.ShowVerify),
-			router.POST("/verify", RouteVerifyPost, m.AuthHandler.Verify),
-			router.POST("/verify/resend", RouteVerifyResend, m.AuthHandler.Resend),
-			router.POST("/signout", RouteSignout, m.AuthHandler.Signout),
-		),
+		router.GET(r.Signin.Pattern, r.Signin.Name, m.AuthHandler.ShowSignin),
+		router.POST(r.SigninPost.Pattern, r.SigninPost.Name, m.AuthHandler.BeginSignin),
+		router.GET(r.Signup.Pattern, r.Signup.Name, m.AuthHandler.ShowSignup),
+		router.POST(r.SignupPost.Pattern, r.SignupPost.Name, m.AuthHandler.BeginSignup),
+		router.GET(r.Verify.Pattern, r.Verify.Name, m.AuthHandler.ShowVerify),
+		router.POST(r.VerifyPost.Pattern, r.VerifyPost.Name, m.AuthHandler.Verify),
+		router.POST(r.VerifyResend.Pattern, r.VerifyResend.Name, m.AuthHandler.Resend),
+		router.POST(r.Signout.Pattern, r.Signout.Name, m.AuthHandler.Signout),
 	}
 
 	if m.PasskeyHandler != nil {
-		// Public passkey authentication endpoints (JSON API).
 		nodes = append(nodes,
-			router.Group("/auth/passkey",
-				router.POST("/authenticate/begin", RoutePasskeyBeginAuth, m.PasskeyHandler.BeginAuthentication),
-				router.POST("/authenticate/finish", RoutePasskeyFinishAuth, m.PasskeyHandler.FinishAuthentication),
-			),
-		)
-
-		// Authenticated passkey management endpoints.
-		nodes = append(nodes,
-			router.Group("/account/passkeys",
+			// public passkey auth JSON endpoints
+			router.POST(r.PasskeyBeginAuth.Pattern, r.PasskeyBeginAuth.Name, m.PasskeyHandler.BeginAuthentication),
+			router.POST(r.PasskeyFinishAuth.Pattern, r.PasskeyFinishAuth.Name, m.PasskeyHandler.FinishAuthentication),
+			// authenticated passkey management
+			router.Layout(
 				router.Use(RequireAuth(m.signinPath)),
-				router.GET("", RoutePasskeyList, m.PasskeyHandler.List),
-				router.POST("/register/begin", RoutePasskeyBeginReg, m.PasskeyHandler.BeginRegistration),
-				router.POST("/register/finish", RoutePasskeyFinishReg, m.PasskeyHandler.FinishRegistration),
-				router.GET("/{id}", RoutePasskeyShow, m.PasskeyHandler.Show),
-				router.GET("/{id}/edit", RoutePasskeyRename+".form", m.PasskeyHandler.RenameForm),
-				router.PATCH("/{id}", RoutePasskeyRename, m.PasskeyHandler.Rename),
-				router.DELETE("/{id}", RoutePasskeyDelete, m.PasskeyHandler.Delete),
+				router.GET(r.PasskeyList.Pattern, r.PasskeyList.Name, m.PasskeyHandler.List),
+				router.POST(r.PasskeyBeginReg.Pattern, r.PasskeyBeginReg.Name, m.PasskeyHandler.BeginRegistration),
+				router.POST(r.PasskeyFinishReg.Pattern, r.PasskeyFinishReg.Name, m.PasskeyHandler.FinishRegistration),
+				router.GET(r.PasskeyShow.Pattern, r.PasskeyShow.Name, m.PasskeyHandler.Show),
+				router.GET(r.PasskeyRenameForm.Pattern, r.PasskeyRenameForm.Name, m.PasskeyHandler.RenameForm),
+				router.PATCH(r.PasskeyRename.Pattern, r.PasskeyRename.Name, m.PasskeyHandler.Rename),
+				router.DELETE(r.PasskeyDelete.Pattern, r.PasskeyDelete.Name, m.PasskeyHandler.Delete),
 			),
 		)
 	}
 
-	// Authenticated email change endpoints.
 	nodes = append(nodes,
-		router.Group("/account",
+		// email change (auth required)
+		router.Layout(
 			router.Use(RequireAuth(m.signinPath)),
-			router.GET("/email-change", RouteEmailChangeShow, m.AuthHandler.ShowEmailChange),
-			router.POST("/email-change", RouteEmailChangePost, m.AuthHandler.BeginEmailChange),
+			router.GET(r.EmailChangeShow.Pattern, r.EmailChangeShow.Name, m.AuthHandler.ShowEmailChange),
+			router.POST(r.EmailChangePost.Pattern, r.EmailChangePost.Name, m.AuthHandler.BeginEmailChange),
 		),
-	)
-
-	// Admin user management (requires admin role).
-	nodes = append(nodes,
-		router.Group("/admin",
+		// admin user management (admin role required)
+		router.Layout(
 			router.Use(RequireAuth(m.signinPath), LoadUserRole(m.userReader), RequireAdmin()),
-			router.GET("/users", RouteAdminUsers, m.AdminHandler.List),
-			router.GET("/users/{id}", RouteAdminUserShow, m.AdminHandler.Show),
-			router.GET("/users/{id}/edit", RouteAdminUserEdit, m.AdminHandler.EditForm),
-			router.PATCH("/users/{id}", RouteAdminUserUpdate, m.AdminHandler.Update),
-			router.DELETE("/users/{id}", RouteAdminUserDelete, m.AdminHandler.Delete),
+			router.GET(r.AdminUsers.Pattern, r.AdminUsers.Name, m.AdminHandler.List),
+			router.GET(r.AdminUserShow.Pattern, r.AdminUserShow.Name, m.AdminHandler.Show),
+			router.GET(r.AdminUserEdit.Pattern, r.AdminUserEdit.Name, m.AdminHandler.EditForm),
+			router.PATCH(r.AdminUserUpdate.Pattern, r.AdminUserUpdate.Name, m.AdminHandler.Update),
+			router.DELETE(r.AdminUserDelete.Pattern, r.AdminUserDelete.Name, m.AdminHandler.Delete),
 		),
-	)
-
-	// Admin bootstrap (requires auth but not admin — creates the first admin).
-	nodes = append(nodes,
-		router.Group("/admin",
+		// admin bootstrap (auth required, not admin role — creates first admin)
+		router.Layout(
 			router.Use(RequireAuth(m.signinPath)),
-			router.GET("/elevate", RouteAdminBootstrap, m.AdminHandler.ShowBootstrap),
-			router.POST("/elevate", RouteAdminBootstrapPost, m.AdminHandler.Bootstrap),
+			router.GET(r.AdminBootstrap.Pattern, r.AdminBootstrap.Name, m.AdminHandler.ShowBootstrap),
+			router.POST(r.AdminBootstrapPost.Pattern, r.AdminBootstrapPost.Name, m.AdminHandler.Bootstrap),
 		),
 	)
 

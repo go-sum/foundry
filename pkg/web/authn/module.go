@@ -16,6 +16,7 @@ type Module struct {
 	PasskeyHandler *PasskeyHandler
 	AdminHandler   *AdminHandler
 
+	routes     RouteConfig
 	signinPath func() string
 	userReader auth.UserReader
 	config     auth.Config
@@ -27,7 +28,8 @@ type ModuleConfig struct {
 	Validator validate.Validator
 	Logger    *slog.Logger
 
-	Config auth.Config
+	Config      auth.Config
+	RouteConfig RouteConfig
 
 	Users       auth.UserWriter
 	Credentials auth.CredentialStore
@@ -41,7 +43,7 @@ type ModuleConfig struct {
 	AdminRenderer AdminRenderer
 
 	// AuthEntryPath overrides where RequireAuth redirects unauthenticated users.
-	// When nil, redirects to the direct signin route (RouteSigninShow).
+	// When nil, redirects to the default signin route.
 	AuthEntryPath func() string
 
 	// SignoutRedirectPath overrides where users are sent after signing out.
@@ -56,10 +58,16 @@ func (m *Module) RequireAuth() web.Middleware {
 	return RequireAuth(m.signinPath)
 }
 
+// RouteConfig returns the resolved route configuration for this module.
+func (m *Module) RouteConfig() RouteConfig {
+	return m.routes
+}
+
 // NewModule wires the auth module and returns the assembled Module.
 // The caller registers routes via router.Register(rt, authn.Routes(m)...).
 func NewModule(cfg ModuleConfig) (*Module, error) {
 	config := auth.ApplyDefaults(cfg.Config)
+	routes := applyRouteDefaults(cfg.RouteConfig)
 	if cfg.Router == nil {
 		return nil, fmt.Errorf("auth: Router is required")
 	}
@@ -109,16 +117,18 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 		renderer:    cfg.Renderer,
 		config:      config,
 		signoutPath: signoutPath,
+		routes:      routes,
 	}
 
 	m := &Module{
 		AuthHandler: authHandler,
 		config:      config,
 		userReader:  cfg.Users,
+		routes:      routes,
 	}
 
 	// Resolve signin path lazily so routes can be registered after module creation.
-	m.signinPath = res.Path(RouteSigninShow)
+	m.signinPath = res.Path(routes.Signin.Name)
 	if cfg.AuthEntryPath != nil {
 		m.signinPath = cfg.AuthEntryPath
 	}
@@ -141,6 +151,7 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 		router:    cfg.Router,
 		validator: cfg.Validator,
 		renderer:  cfg.AdminRenderer,
+		routes:    routes,
 	}
 
 	return m, nil

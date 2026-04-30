@@ -13,6 +13,7 @@ import (
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/health"
 	"github.com/go-sum/foundry/pkg/web/router"
+	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/site"
 	"github.com/go-sum/foundry/pkg/web/static"
 )
@@ -69,7 +70,7 @@ func TestRegisterStaticRoutes_ServesFilesFromConfiguredPrefix(t *testing.T) {
 func TestRegisterRoutes_ReturnsErrorWhenStaticRootCannotBeOpened(t *testing.T) {
 	rt := router.New()
 	s := site.New(site.Config{BaseURL: "http://test.local"})
-	err := RegisterRoutes(rt, Security{}, Services{}, static.AssetsConfig{
+	err := RegisterRoutes(rt, DefaultRouteConfig(), Security{}, Services{}, static.AssetsConfig{
 		PublicDir: filepath.Join(t.TempDir(), "missing"),
 		URLPrefix: "/assets",
 	}, t.TempDir(), s, Presentation{})
@@ -82,8 +83,12 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 	dir := t.TempDir()
 	rt := router.New()
 	s := site.New(site.Config{BaseURL: "http://test.local"})
+	csrf, err := secure.NewCSRFConfigFromHex(testCSRFHexKey)
+	if err != nil {
+		t.Fatalf("secure.NewCSRFConfigFromHex() error = %v", err)
+	}
 
-	err := RegisterRoutes(rt, Security{Origins: []string{"http://test.local"}}, Services{}, static.AssetsConfig{
+	err = RegisterRoutes(rt, DefaultRouteConfig(), Security{CSRF: csrf, Origins: []string{"http://test.local"}}, Services{}, static.AssetsConfig{
 		PublicDir: dir,
 		URLPrefix: "/assets",
 	}, dir, s, Presentation{})

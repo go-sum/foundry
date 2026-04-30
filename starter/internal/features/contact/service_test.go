@@ -215,9 +215,9 @@ func TestService_Submit_QueueError_StillSucceeds(t *testing.T) {
 	}
 }
 
-// TestService_Submit_KVError_Degraded verifies that a kv.Get error causes the
-// service to proceed without rate limiting (submission still succeeds).
-func TestService_Submit_KVError_Degraded(t *testing.T) {
+// TestService_Submit_KVError_FailsClosed verifies that a kv.Get error rejects
+// the submission instead of silently disabling rate limiting.
+func TestService_Submit_KVError_FailsClosed(t *testing.T) {
 	repo := &fakeRepo{}
 	store := newFakeKV()
 	store.getErr = errors.New("kv: connection refused")
@@ -232,11 +232,11 @@ func TestService_Submit_KVError_Degraded(t *testing.T) {
 		Message: "Hello",
 	}
 	err := svc.Submit(context.Background(), input, "127.0.0.1")
-	if err != nil {
-		t.Fatalf("Submit must succeed in degraded mode, got: %v", err)
+	if !errors.Is(err, ErrRateLimitUnavailable) {
+		t.Fatalf("expected ErrRateLimitUnavailable, got: %v", err)
 	}
-	if !repo.called {
-		t.Error("expected repo.Create to be called in degraded KV mode")
+	if repo.called {
+		t.Error("repo.Create must NOT be called when the rate limiter is unavailable")
 	}
 }
 
@@ -296,5 +296,52 @@ func TestService_Submit_BelowRateLimit(t *testing.T) {
 	}
 	if err := svc.Submit(context.Background(), input, "127.0.0.1"); err != nil {
 		t.Fatalf("expected success when below rate limit, got: %v", err)
+	}
+}
+
+func TestService_Submit_RateLimitKeyIsEmailOnly(t *testing.T) {
+	repo := &fakeRepo{}
+	store := newFakeKV()
+	q := queue.NewDispatcher(nil)
+	q.Register(QueueName, func(_ context.Context, _ queue.Job) error { return nil })
+
+	cfg := ServiceConfig{
+		RateLimit:  1,
+		RateWindow: time.Minute,
+		QueueName:  QueueName,
+	}
+	svc := NewService(repo, store, q, cfg, slog.Default())
+
+	store.setCount("contact:rate:alice@example.com", cfg.RateLimit)
+
+	input := ContactInput{
+		Name:    "Alice",
+		Email:   "alice@example.com",
+		Message: "Hello",
+	}
+	err := svc.Submit(context.Background(), input, "198.51.100.9")
+	if !errors.Is(err, ErrRateLimited) {
+		t.Fatalf("expected ErrRateLimited, got: %v", err)
+	}
+}
+
+func TestService_Submit_PersistsCanonicalIP(t *testing.T) {
+	repo := &fakeRepo{}
+	store := newFakeKV()
+	q := queue.NewDispatcher(nil)
+	q.Register(QueueName, func(_ context.Context, _ queue.Job) error { return nil })
+
+	svc := newTestService(repo, store, q)
+
+	input := ContactInput{
+		Name:    "Alice",
+		Email:   "alice@example.com",
+		Message: "Hello",
+	}
+	if err := svc.Submit(context.Background(), input, "127.0.0.1:1234"); err != nil {
+		t.Fatalf("Submit returned unexpected error: %v", err)
+	}
+	if repo.created.IPAddress != "127.0.0.1" {
+		t.Errorf("repo.Create IPAddress = %q, want %q", repo.created.IPAddress, "127.0.0.1")
 	}
 }

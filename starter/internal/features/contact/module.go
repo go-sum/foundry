@@ -24,16 +24,16 @@ type Module struct {
 
 // ModuleConfig holds all dependencies needed to wire the contact feature.
 type ModuleConfig struct {
-	Pool      coredb.DBTX
-	KV        kv.Store
-	Queue     *queue.Dispatcher
-	Notifier  *notification.Dispatcher
-	Router    *router.Router
-	Validator validate.Validator
-	Service   ServiceConfig
-	Worker    WorkerConfig
-	ViewOpts  []viewstate.RequestOption
-	Logger    *slog.Logger
+	Pool        coredb.DBTX
+	KV          kv.Store
+	Queue       *queue.Dispatcher
+	Notifier    *notification.Dispatcher
+	Router      *router.Router
+	Validator   validate.Validator
+	Service     ServiceConfig
+	Worker      WorkerConfig
+	ViewOpts []viewstate.RequestOption
+	Logger   *slog.Logger
 }
 
 // NewModule wires the contact feature module.

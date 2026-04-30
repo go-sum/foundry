@@ -95,15 +95,22 @@ func safeExecute(ctx context.Context, handler HandlerFunc, job Job) (err error) 
 
 // computeBackoff returns base * 2^(attempt-1) with ±25% jitter, capped at shift=20.
 func computeBackoff(base time.Duration, attempts int) time.Duration {
-	shift := attempts - 1
-	if shift < 0 {
-		shift = 0
+	if base <= 0 {
+		return 0
 	}
-	if shift > 20 {
-		shift = 20
-	}
+
+	shift := min(max(attempts-1, 0), 20)
 	d := base * (1 << shift)
-	jitter := time.Duration(rand.Int64N(int64(d) / 2))
+	if d <= 0 {
+		return 0
+	}
+
+	half := int64(d) / 2
+	if half <= 0 {
+		return d
+	}
+
+	jitter := time.Duration(rand.Int64N(half))
 	if rand.IntN(2) == 0 {
 		return d + jitter
 	}

@@ -32,3 +32,7 @@ type NotificationPayload struct {
 
 // ErrRateLimited is returned when a submitter has exceeded the allowed rate.
 var ErrRateLimited = errors.New("contact: rate limit exceeded")
+
+// ErrRateLimitUnavailable is returned when the backing store for rate limiting
+// cannot be consulted safely, so submissions are rejected temporarily.
+var ErrRateLimitUnavailable = errors.New("contact: rate limit unavailable")

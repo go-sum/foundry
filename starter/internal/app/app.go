@@ -156,11 +156,13 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 
 	val := validate.New()
 
+	routes := DefaultRouteConfig()
+
 	pres := Presentation{
 		ViewOpts: []viewstate.RequestOption{
 			viewstate.WithIconRegistry(iconReg),
 			viewstate.WithPathFunc(manifest.Path),
-			config.DefaultNav(routing, oauthclient.RouteConnect),
+			config.DefaultNav(routing, routes.OAuthConnect.Name),
 		},
 		Icons: iconReg,
 	}
@@ -202,7 +204,7 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 	app.Services = services
 
 	s := site.New(runtime.Config.Site)
-	if err := RegisterRoutes(routing, security, services, runtime.Config.Assets, runtime.Config.PublicDir, s, pres); err != nil {
+	if err := RegisterRoutes(routing, routes, security, services, runtime.Config.Assets, runtime.Config.PublicDir, s, pres); err != nil {
 		return nil, fmt.Errorf("routes: %w", err)
 	}
 	routing.Freeze()

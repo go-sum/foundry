@@ -44,6 +44,7 @@ type AdminHandler struct {
 	router    *router.Router
 	validator validate.Validator
 	renderer  AdminRenderer
+	routes    RouteConfig
 }
 
 // List returns a paginated list of users.
@@ -172,6 +173,6 @@ func (h *AdminHandler) Bootstrap(c *web.Context) (web.Response, error) {
 		return web.Response{}, mapServiceError(err)
 	}
 
-	adminURL := h.router.MustReverse(RouteAdminUsers, nil)
+	adminURL := h.router.MustReverse(h.routes.AdminUsers.Name, nil)
 	return web.SeeOther(adminURL), nil
 }

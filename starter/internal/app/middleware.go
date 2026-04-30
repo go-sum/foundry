@@ -29,7 +29,6 @@ func coreMiddleware(rt *router.Router, runtime Runtime, security Security) []web
 		secure.Headers(security.Headers),
 		secure.CSPNonce(security.CSP),
 		session.Middleware(security.Session),
-		secure.CSRF(security.CSRF),
 		htmx.VaryMiddleware(),
 		authn.LoadSession(),
 	}
@@ -48,15 +47,16 @@ func contentMiddleware(sec Security) []web.Middleware {
 	}
 }
 
-func apiMiddleware(sec Security) []web.Middleware {
+func apiMiddleware(sec Security, tokenPath string) []web.Middleware {
 	return []web.Middleware{
 		secure.OriginGuard(secure.OriginGuardConfig{
 			TrustedOrigins: sec.Origins,
 			ServerOrigin:   sec.ServerOrigin,
-			// /oauth/token is a server-to-server endpoint; machine clients
-			// do not send Sec-Fetch-Site headers.
+			// The token endpoint is server-to-server; machine clients do not send
+			// browser-origin headers. tokenPath comes from the module's RouteConfig,
+			// so it stays in sync with the registered route without duplicating the string.
 			Skipper: func(c *web.Context) bool {
-				return c.URL() != nil && c.URL().Path == "/oauth/token"
+				return c.URL() != nil && c.URL().Path == tokenPath
 			},
 		}),
 	}

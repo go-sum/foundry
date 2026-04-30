@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/queue"
+	"github.com/go-sum/foundry/pkg/web/serve"
 )
 
 // Service handles contact form submission business logic.
@@ -39,12 +40,13 @@ func NewService(repo Repository, store kv.Store, q *queue.Dispatcher, cfg Servic
 }
 
 func (s *contactService) Submit(ctx context.Context, input ContactInput, ipAddress string) error {
-	email := strings.ToLower(strings.TrimSpace(input.Email))
-	key := "contact:rate:" + email
+	email := normalizeEmail(input.Email)
+	clientIP := canonicalizeIP(ipAddress)
+	key := rateLimitKey(email)
 
 	count, err := s.readCount(ctx, key)
 	if err != nil {
-		s.logger.WarnContext(ctx, "contact: kv read failed, proceeding without rate limit", "err", err)
+		return fmt.Errorf("%w: %w", ErrRateLimitUnavailable, err)
 	} else if count >= s.cfg.RateLimit {
 		return ErrRateLimited
 	}
@@ -53,7 +55,7 @@ func (s *contactService) Submit(ctx context.Context, input ContactInput, ipAddre
 		Name:      input.Name,
 		Email:     input.Email,
 		Message:   input.Message,
-		IPAddress: ipAddress,
+		IPAddress: clientIP,
 	}
 	if err := s.repo.Create(ctx, sub); err != nil {
 		return fmt.Errorf("contact: persist submission: %w", err)
@@ -95,4 +97,23 @@ func (s *contactService) writeCount(ctx context.Context, key string, count int) 
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, uint64(count))
 	return s.kv.Set(ctx, key, b, kv.SetOptions{TTL: s.cfg.RateWindow})
+}
+
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func canonicalizeIP(raw string) string {
+	if normalized, ok := serve.NormalizeProxyIP(raw); ok {
+		return normalized
+	}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "unknown"
+	}
+	return raw
+}
+
+func rateLimitKey(email string) string {
+	return "contact:rate:" + email
 }

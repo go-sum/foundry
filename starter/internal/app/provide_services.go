@@ -65,12 +65,12 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 	}, runtime.Logger)
 
 	contactMod := contact.NewModule(contact.ModuleConfig{
-		Pool:      pool,
-		KV:        kvStore,
-		Queue:     qDispatcher,
-		Notifier:  notifier,
-		Router:    rt,
-		Validator: val,
+		Pool:        pool,
+		KV:          kvStore,
+		Queue:       qDispatcher,
+		Notifier:    notifier,
+		Router:      rt,
+		Validator:   val,
 		Service: contact.ServiceConfig{
 			RateLimit:  runtime.Config.Contact.RateLimit,
 			RateWindow: runtime.Config.Contact.RateWindow,
