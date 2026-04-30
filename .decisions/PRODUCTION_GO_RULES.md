@@ -1,12 +1,12 @@
 ---
 title: Production Go Rules
-description: "zero global state, explicit error handling, validation first, testability, documentation, five rules of production Go, no singletons, constructor injection, fake repositories, interface seams"
+description: "zero global state, explicit error handling, validation first, testability, documentation, declarative over imperative, six rules of production Go, no singletons, constructor injection, fake repositories, interface seams"
 weight: 20
 ---
 
 # Production Go Rules
 
-> Five foundational rules that govern all Go code in this application.
+> Six foundational rules that govern all Go code in this application.
 > Complements [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md) (project structure and wiring),
 > [MIDDLEWARE_AND_CONTEXT.md](./MIDDLEWARE_AND_CONTEXT.md) (middleware patterns),
 > and [ERROR_HANDLING.md](./ERROR_HANDLING.md) (error taxonomy).
@@ -22,12 +22,13 @@ weight: 20
 - §1c Rule 3 — Validation First: validate at entry points before business logic
 - §1d Rule 4 — Testability: interface seams, fake repos, no real DB in service tests
 - §1e Rule 5 — Documentation: exported types and functions need doc comments
+- §1f Rule 6 — Declarative Over Imperative: prefer declarative constructs over manual loops
 - §2 Handler self-review checklist
 - §3 Service self-review checklist
 
 ---
 
-## 1. Five Rules of Production Go
+## 1. Six Rules of Production Go
 
 These rules are non-negotiable for any production Go web application. They
 govern the fundamental shape of all application code.
@@ -128,6 +129,28 @@ func (h *UserHandler) GetByID(c echo.Context) error { ... }
 
 Comments describe *what* and *why*, not *how*. Implementation details belong in
 the code, not in doc comments.
+
+### 1f. Rule 6 — Declarative Over Imperative
+
+Prefer declarative constructs over imperative loops and manual mutation for all code, 
+including Go standard library features.
+
+**Prefer:**
+
+- `cmp.Or(a, b)` over `if a != "" { return a } return b`
+- `slices.Contains(s, v)` over manual `for` + `if` search
+- `slices.SortFunc`, `slices.Filter`, `maps.Keys` over hand-rolled loops
+- Range expressions and iterators over index-based `for i := 0; i < len(...)`
+- Struct literals with named fields over incremental field assignment
+
+**Why:** Declarative code states *what* the result should be rather than *how*
+to compute it step by step. This reduces surface area for off-by-one errors,
+makes intent immediately visible, and lets the standard library handle edge
+cases.
+
+Imperative code is acceptable when no declarative equivalent exists or when
+the declarative form would obscure the logic (e.g., complex multi-step
+mutations with early exits).
 
 ---
 

@@ -415,6 +415,7 @@ if len(items) > 0 {
 - [ ] No field-for-field wrapper types that add no semantics
 - [ ] Helper functions private unless another package genuinely needs them
 - [ ] Option structs used when most callers need config; functional options when most need zero options
+- [ ] Declarative constructs preferred over imperative loops when stdlib provides them (`cmp.Or`, `slices`, `maps`)
 
 ---
 
