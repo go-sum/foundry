@@ -3,7 +3,6 @@ package config
 import (
 	"cmp"
 
-	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/go-sum/foundry/pkg/componentry/compound"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
 	"github.com/go-sum/foundry/pkg/componentry/icons/render"
@@ -11,6 +10,7 @@ import (
 	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/router"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 )
 
 const maxLen = 12
@@ -19,7 +19,7 @@ const maxLen = 12
 // Route URL reversal is deferred until request time so this option is safe to
 // construct before routes are registered. The CSRF token for the signout form
 // is injected from the per-request viewstate.Request.
-func DefaultNav(rt *router.Router) viewstate.RequestOption {
+func DefaultNav(rt *router.Router, authRoute string) viewstate.RequestOption {
 	return func(r *viewstate.Request) {
 		name := r.Auth.DisplayName
 		if runes := []rune(name); len(runes) > maxLen {
@@ -61,13 +61,13 @@ func DefaultNav(rt *router.Router) viewstate.RequestOption {
 				{
 					Align: compound.NavAlignEnd,
 					Items: []compound.NavItem{
-						{Label: "Documentation", Href: rt.MustReverse("docs.index", nil)},
+						{Label: "Documentation", Href: rt.MustReverse("docs.index", nil), Visibility: compound.NavVisibilityUser},
 						{Label: "Contact", Href: rt.MustReverse("contact.form", nil)},
 						{
 							Label: accountLabel,
 							Items: []compound.NavItem{
-								{Label: "Sign in", Href: rt.MustReverse(authn.RouteSigninShow, nil), Visibility: compound.NavVisibilityGuest},
-								{Label: "Sign up", Href: rt.MustReverse(authn.RouteSignupShow, nil), Visibility: compound.NavVisibilityGuest},
+								{Label: "Sign in", Href: rt.MustReverse(authRoute, nil), Visibility: compound.NavVisibilityGuest},
+								{Label: "Sign up", Href: rt.MustReverse(authRoute, nil), Visibility: compound.NavVisibilityGuest},
 								{
 									Label:  "Sign out",
 									Action: rt.MustReverse(authn.RouteSignout, nil),

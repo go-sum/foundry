@@ -130,6 +130,12 @@ func Layout(children ...Node) Node {
 	}
 }
 
+// Scope creates a Layout that applies a single middleware to the given routes,
+// isolating it from sibling routes in the same tree.
+func Scope(mw web.Middleware, routes ...Node) Node {
+	return Layout(append([]Node{Use(mw)}, routes...)...)
+}
+
 // Use declares middleware for the enclosing scope.
 func Use(mw ...web.Middleware) Node {
 	return Node{

@@ -47,43 +47,53 @@ func starterRouteTree(rt *router.Router, sec Security, svc Services, s *site.Sit
 	homeH := home.NewHandler(homeServiceChecks(svc), pres.ViewOpts...)
 	contactForm, contactSubmit := contactHandlers(svc)
 
-	browserNodes := []router.Node{
-		router.Use(contentMiddleware(sec)...),
-	}
-	browserNodes = append(browserNodes, site.Routes(metaH)...)
-	browserNodes = append(browserNodes, home.Routes(homeH)...)
-	browserNodes = append(browserNodes, contact.RoutesWithHandlers(contactForm, contactSubmit)...)
-	browserNodes = append(browserNodes, showcase.Routes(showcase.Config{
-		Icons: pres.Icons,
-		DB:    svc.DBPool,
-		KV:    svc.KVStore,
-		Page: func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := viewstate.NewRequest(c, pres.ViewOpts...)
-			return viewstate.Render(vr, vr.Page(title, content), nil)
-		},
-	})...)
-
 	return []router.Node{
 		router.GET("/healthz", "health.check", health.Handler(healthCheckers(svc)...)),
-		router.Layout(browserNodes...),
+		router.Layout(router.Nodes(
+			[]router.Node{router.Use(contentMiddleware(sec)...)},
+			site.Routes(metaH),
+			home.Routes(homeH),
+			contact.RoutesWithHandlers(contactForm, contactSubmit),
+			showcase.Routes(showcase.Config{
+				Icons: pres.Icons,
+				DB:    svc.DBPool,
+				KV:    svc.KVStore,
+				Page: func(c *web.Context, title string, content g.Node) (web.Response, error) {
+					vr := viewstate.NewRequest(c, pres.ViewOpts...)
+					return viewstate.Render(vr, vr.Page(title, content), nil)
+				},
+			}),
+		)...),
 	}
 }
 
 func packageOwnedRouteTree(sec Security, svc Services, publicDir string) []router.Node {
-	nodes := []router.Node{
-		router.Use(apiMiddleware(sec)...),
+	return []router.Node{router.Layout(router.Nodes(
+		[]router.Node{router.Use(apiMiddleware(sec)...)},
+		protectedDocs(svc.Auth, publicDir),
+		authRoutes(svc),
+	)...)}
+}
+
+func protectedDocs(auth *authn.Module, publicDir string) []router.Node {
+	routes := docs.Routes(docs.DefaultConfig(publicDir))
+	if auth == nil {
+		return routes
 	}
-	nodes = append(nodes, docs.Routes(docs.DefaultConfig(publicDir))...)
-	if svc.Auth != nil {
-		nodes = append(nodes, authn.Routes(svc.Auth)...)
+	return []router.Node{router.Scope(auth.RequireAuth(), routes...)}
+}
+
+func authRoutes(svc Services) []router.Node {
+	return router.Nodes(
+		routesFrom(svc.Auth, authn.Routes),
+		routesFrom(svc.OAuthProvider, provider.Routes),
+		routesFrom(svc.OAuthClient, oauthclient.Routes),
+	)
+}
+
+func routesFrom[T any](dep *T, fn func(*T) []router.Node) []router.Node {
+	if dep == nil {
+		return nil
 	}
-	if svc.OAuthProvider != nil {
-		nodes = append(nodes, provider.Routes(svc.OAuthProvider)...)
-	}
-	if svc.OAuthClient != nil {
-		nodes = append(nodes, oauthclient.Routes(svc.OAuthClient)...)
-	}
-	return []router.Node{
-		router.Layout(nodes...),
-	}
+	return fn(dep)
 }

@@ -55,11 +55,12 @@ type EmailChangePageData struct {
 
 // AuthHandler handles HTTP requests for email-TOTP authentication flows.
 type AuthHandler struct {
-	svc       *auth.AuthService
-	router    *router.Router
-	validator validate.Validator
-	renderer  Renderer
-	config    auth.Config
+	svc         *auth.AuthService
+	router      *router.Router
+	validator   validate.Validator
+	renderer    Renderer
+	config      auth.Config
+	signoutPath func() string
 }
 
 // ShowSignin renders the signin form.
@@ -240,12 +241,11 @@ func (h *AuthHandler) Resend(c *web.Context) (web.Response, error) {
 	return htmxRedirect(c, redirectURL)
 }
 
-// Signout destroys the session and redirects to the signin page.
+// Signout destroys the session and redirects to the configured signout path.
 func (h *AuthHandler) Signout(c *web.Context) (web.Response, error) {
 	sess, _ := session.FromContext(c)
 	sess.Destroy()
-	signinURL := h.router.MustReverse(RouteSigninShow, nil)
-	return web.SeeOther(signinURL), nil
+	return web.SeeOther(h.signoutPath()), nil
 }
 
 // ShowEmailChange renders the email change form for the authenticated user.

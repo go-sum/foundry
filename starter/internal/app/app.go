@@ -160,7 +160,7 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		ViewOpts: []viewstate.RequestOption{
 			viewstate.WithIconRegistry(iconReg),
 			viewstate.WithPathFunc(manifest.Path),
-			config.DefaultNav(routing),
+			config.DefaultNav(routing, oauthclient.RouteConnect),
 		},
 		Icons: iconReg,
 	}

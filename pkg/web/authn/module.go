@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
 )
@@ -38,6 +39,21 @@ type ModuleConfig struct {
 
 	Renderer      Renderer
 	AdminRenderer AdminRenderer
+
+	// AuthEntryPath overrides where RequireAuth redirects unauthenticated users.
+	// When nil, redirects to the direct signin route (RouteSigninShow).
+	AuthEntryPath func() string
+
+	// SignoutRedirectPath overrides where users are sent after signing out.
+	// When nil, redirects to "/".
+	SignoutRedirectPath func() string
+}
+
+// RequireAuth returns middleware that redirects unauthenticated requests to the
+// configured auth entry path (signin or OAuth connect, depending on how the
+// module was wired).
+func (m *Module) RequireAuth() web.Middleware {
+	return RequireAuth(m.signinPath)
 }
 
 // NewModule wires the auth module and returns the assembled Module.
@@ -80,12 +96,19 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 		EmailTOTP:  config.EmailTOTP,
 	})
 
+	res := router.NewResolver(cfg.Router)
+	signoutPath := func() string { return "/" }
+	if cfg.SignoutRedirectPath != nil {
+		signoutPath = cfg.SignoutRedirectPath
+	}
+
 	authHandler := &AuthHandler{
-		svc:       authSvc,
-		router:    cfg.Router,
-		validator: cfg.Validator,
-		renderer:  cfg.Renderer,
-		config:    config,
+		svc:         authSvc,
+		router:      cfg.Router,
+		validator:   cfg.Validator,
+		renderer:    cfg.Renderer,
+		config:      config,
+		signoutPath: signoutPath,
 	}
 
 	m := &Module{
@@ -95,8 +118,10 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 	}
 
 	// Resolve signin path lazily so routes can be registered after module creation.
-	res := router.NewResolver(cfg.Router)
 	m.signinPath = res.Path(RouteSigninShow)
+	if cfg.AuthEntryPath != nil {
+		m.signinPath = cfg.AuthEntryPath
+	}
 
 	if config.Passkey.Enabled {
 		passkeySvc, err := auth.NewPasskeyService(cfg.Users, cfg.Credentials, config.Passkey)
