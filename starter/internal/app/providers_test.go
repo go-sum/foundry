@@ -12,14 +12,14 @@ import (
 	"time"
 
 	configpkg "github.com/go-sum/foundry/config"
-	"github.com/go-sum/foundry/internal/view"
-	"github.com/go-sum/foundry/internal/view/errorpage"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/render"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/go-sum/foundry/pkg/web/site"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
+	"github.com/go-sum/foundry/pkg/web/viewstate/errorpage"
 )
 
 func testAppContext(method, rawURL string) *web.Context {
@@ -115,7 +115,7 @@ func TestProvideSecurity_EmptySessionStoreFailsFast(t *testing.T) {
 	if err == nil {
 		t.Fatal("provideSecurity() error = nil, want unsupported session store")
 	}
-	if !strings.Contains(err.Error(), `unsupported store ""`) {
+	if !strings.Contains(err.Error(), `unsupported store type ""`) {
 		t.Fatalf("provideSecurity() error = %v, want unsupported empty store", err)
 	}
 }
@@ -148,7 +148,7 @@ func TestProvideErrorBoundary_RendersFullAndPartialResponses(t *testing.T) {
 	if err := fullResp.Body.Close(); err != nil {
 		t.Fatalf("full body Close() error = %v", err)
 	}
-	fullWant := render.RenderNode(t, errorpage.ErrorPage(view.NewRequest(fullCtx), web.ErrNotFound("missing page")))
+	fullWant := render.RenderNode(t, errorpage.ErrorPage(viewstate.NewRequest(fullCtx), web.ErrNotFound("missing page")))
 	if got := string(fullBody); got != fullWant {
 		t.Fatalf("full body = %q, want %q", got, fullWant)
 	}

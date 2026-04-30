@@ -4,20 +4,27 @@
 package oauthclient
 
 import (
-	"github.com/go-sum/foundry/pkg/auth"
+	"net/http"
+	"time"
+
 	webauth "github.com/go-sum/foundry/pkg/web/auth"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/session"
 )
 
 // Handler handles the first-party OAuth connect and callback routes.
 type Handler struct {
 	provider webauth.ProviderConfig
+	client   *http.Client
 }
 
 // New creates a Handler for the given first-party ProviderConfig.
 func New(provider webauth.ProviderConfig) *Handler {
-	return &Handler{provider: provider}
+	return &Handler{
+		provider: provider,
+		client:   &http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 // Connect initiates the first-party OAuth 2.1 flow.
@@ -68,7 +75,7 @@ func (h *Handler) Callback(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrBadRequest("Invalid state parameter")
 	}
 
-	tokens, err := webauth.ExchangeCode(c.Context(), nil, webauth.ExchangeParams{
+	tokens, err := webauth.ExchangeCode(c.Context(), h.client, webauth.ExchangeParams{
 		TokenEndpoint: h.provider.TokenEndpoint,
 		ClientID:      h.provider.ClientID,
 		ClientSecret:  h.provider.ClientSecret,
@@ -80,7 +87,7 @@ func (h *Handler) Callback(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	claims, err := webauth.FetchUserinfo(c.Context(), nil, h.provider.UserinfoEndpoint, tokens.AccessToken)
+	claims, err := webauth.FetchUserinfo(c.Context(), h.client, h.provider.UserinfoEndpoint, tokens.AccessToken)
 	if err != nil {
 		return web.Response{}, web.ErrInternal(err)
 	}
@@ -90,7 +97,7 @@ func (h *Handler) Callback(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(err)
 	}
 
-	if err := auth.SetAuth(sess, claims.Sub, claims.Name, claims.EmailVerified); err != nil {
+	if err := authn.SetAuth(sess, claims.Sub, claims.Name, claims.EmailVerified); err != nil {
 		return web.Response{}, web.ErrInternal(err)
 	}
 

@@ -3,14 +3,13 @@ package contact
 import (
 	"log/slog"
 
+	coredb "github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification"
 	"github.com/go-sum/foundry/pkg/queue"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 )
 
 // Module bundles the contact feature's handler and queue worker.
@@ -25,7 +24,7 @@ type Module struct {
 
 // ModuleConfig holds all dependencies needed to wire the contact feature.
 type ModuleConfig struct {
-	Pool      *pgxpool.Pool
+	Pool      coredb.DBTX
 	KV        kv.Store
 	Queue     *queue.Dispatcher
 	Notifier  *notification.Dispatcher
@@ -33,7 +32,7 @@ type ModuleConfig struct {
 	Validator validate.Validator
 	Service   ServiceConfig
 	Worker    WorkerConfig
-	ViewOpts  []view.RequestOption
+	ViewOpts  []viewstate.RequestOption
 	Logger    *slog.Logger
 }
 
@@ -61,6 +60,6 @@ func NewModule(cfg ModuleConfig) *Module {
 
 // NewHandler creates a contact Handler using the module's already-wired service.
 // Call this after the router is available when NewModule was called without one.
-func (m *Module) NewHandler(rt *router.Router, opts ...view.RequestOption) *Handler {
+func (m *Module) NewHandler(rt *router.Router, opts ...viewstate.RequestOption) *Handler {
 	return NewHandler(rt, m.svc, m.val, opts...)
 }

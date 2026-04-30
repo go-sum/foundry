@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/go-sum/foundry/pkg/web/render"
 )
 
 func TestHomePage(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	got := render.RenderNode(t, HomePage(req, nil))
 
 	themeScript := render.RenderNode(t, theme.InitScript())
@@ -40,7 +40,7 @@ func TestHomePage(t *testing.T) {
 }
 
 func TestHomeContent_NoServices(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	got := render.RenderNode(t, HomeContent(req, nil))
 
 	want := `<div class="mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 py-24 text-center">` +
@@ -57,7 +57,7 @@ func TestHomeContent_NoServices(t *testing.T) {
 }
 
 func TestHomeContent_HealthyService(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	got := render.RenderNode(t, HomeContent(req, []ServiceStatus{{Name: "Database", Healthy: true}}))
 
 	want := `<div class="mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 py-24 text-center">` +
@@ -81,7 +81,7 @@ func TestHomeContent_HealthyService(t *testing.T) {
 }
 
 func TestHomeContent_UnhealthyService(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	got := render.RenderNode(t, HomeContent(req, []ServiceStatus{{Name: "Database", Healthy: false}}))
 
 	want := `<div class="mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 py-24 text-center">` +

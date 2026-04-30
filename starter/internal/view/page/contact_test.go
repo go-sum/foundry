@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
 	"github.com/go-sum/foundry/pkg/web/render"
 )
 
 func TestContactContent_ContainsForm(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := contactpartial.FormData{}
 
@@ -48,7 +48,7 @@ func TestContactContent_ContainsForm(t *testing.T) {
 }
 
 func TestContactContent_ExactMatch(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := contactpartial.FormData{}
 
@@ -61,7 +61,7 @@ func TestContactContent_ExactMatch(t *testing.T) {
 }
 
 func TestContactPage_Renders(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := contactpartial.FormData{}
 
@@ -86,7 +86,7 @@ func TestContactPage_Renders(t *testing.T) {
 }
 
 func TestContactPage_FullPageExactMatch(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := contactpartial.FormData{}
 
@@ -121,4 +121,3 @@ func TestContactPage_FullPageExactMatch(t *testing.T) {
 		t.Errorf("ContactPage HTML footer mismatch")
 	}
 }
-

@@ -1,10 +1,11 @@
-package auth
+package authn
 
 import (
 	"errors"
 	"net/url"
 	"strings"
 
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
 	webauth "github.com/go-sum/foundry/pkg/web/auth"
 	"github.com/go-sum/foundry/pkg/web/htmx"
@@ -62,7 +63,7 @@ func RequireAuth(signinPath func() string) web.Middleware {
 
 // LoadUserRole resolves the authenticated user's role from the database and
 // stores it in the request context for downstream authorization checks.
-func LoadUserRole(users UserReader) web.Middleware {
+func LoadUserRole(users auth.UserReader) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
 			uid := UserID(c)
@@ -75,7 +76,7 @@ func LoadUserRole(users UserReader) web.Middleware {
 			}
 			user, err := users.GetUserByID(c.Context(), id)
 			if err != nil {
-				if errors.Is(err, ErrUserNotFound) {
+				if errors.Is(err, auth.ErrUserNotFound) {
 					return web.Response{}, web.ErrUnauthorized("Account not found")
 				}
 				return web.Response{}, web.ErrUnavailable("Unable to authorize", err)
@@ -90,7 +91,7 @@ func LoadUserRole(users UserReader) web.Middleware {
 func RequireAdmin() web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
-			if UserRole(c) != string(RoleAdmin) {
+			if UserRole(c) != string(auth.RoleAdmin) {
 				return web.Response{}, web.ErrForbidden("Admin access required")
 			}
 			return next(c)

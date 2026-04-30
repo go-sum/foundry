@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/kv/redisstore"
 
@@ -43,7 +44,7 @@ func provideKVStore(ctx context.Context, runtime Runtime, factory func(context.C
 	if runtime.Config.Env == config.Testing {
 		attempts = 1
 	}
-	if err := connectWithRetry(ctx, "kv", runtime.Logger, attempts, func() error {
+	if err := cfgpkg.ConnectWithRetry(ctx, "kv", runtime.Logger, attempts, func() error {
 		return store.Ping(ctx)
 	}); err != nil {
 		_ = store.Close() // secondary error during startup failure; primary error returned below

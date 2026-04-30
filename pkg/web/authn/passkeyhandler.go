@@ -1,8 +1,9 @@
-package auth
+package authn
 
 import (
 	"strings"
 
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/session"
@@ -12,7 +13,7 @@ import (
 
 // PasskeyHandler handles HTTP requests for WebAuthn passkey operations.
 type PasskeyHandler struct {
-	svc       *PasskeyService
+	svc       *auth.PasskeyService
 	router    *router.Router
 	validator validate.Validator
 }

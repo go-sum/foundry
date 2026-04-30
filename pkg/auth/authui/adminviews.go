@@ -8,6 +8,7 @@ import (
 	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 	"github.com/go-sum/foundry/pkg/componentry/ui/data"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/render"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	g "maragu.dev/gomponents"
@@ -15,7 +16,7 @@ import (
 )
 
 // usersListView builds the admin users list page content.
-func usersListView(d auth.UsersListPageData) g.Node {
+func usersListView(d authn.UsersListPageData) g.Node {
 	rows := make([]g.Node, len(d.Users))
 	for i, u := range d.Users {
 		rows[i] = userRow(u)
@@ -82,7 +83,7 @@ func userRow(u auth.User) g.Node {
 }
 
 // userEditView builds the admin user edit form.
-func userEditView(c *web.Context, d auth.UserEditPageData) g.Node {
+func userEditView(c *web.Context, d authn.UserEditPageData) g.Node {
 	updateURL := fmt.Sprintf("/admin/users/%s", d.User.ID)
 
 	return data.Card.Root(
@@ -157,7 +158,7 @@ func userEditView(c *web.Context, d auth.UserEditPageData) g.Node {
 }
 
 // bootstrapView builds the admin bootstrap page.
-func bootstrapView(c *web.Context, d auth.BootstrapPageData) g.Node {
+func bootstrapView(c *web.Context, d authn.BootstrapPageData) g.Node {
 	if d.HasAdmin {
 		return data.Card.Root(
 			data.Card.Header(

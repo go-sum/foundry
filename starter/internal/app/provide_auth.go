@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -13,15 +15,37 @@ import (
 	providerpgstore "github.com/go-sum/foundry/pkg/auth/provider/pgstore"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 
 	config "github.com/go-sum/foundry/config"
-	"github.com/go-sum/foundry/internal/view"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )
+
+// kvNonceStore adapts kv.Store to the auth.TokenNonceStore interface.
+type kvNonceStore struct {
+	store kv.Store
+}
+
+func newKVNonceStore(s kv.Store) auth.TokenNonceStore {
+	return &kvNonceStore{store: s}
+}
+
+func (k *kvNonceStore) HasConsumed(ctx context.Context, key string) (bool, error) {
+	n, err := k.store.Exists(ctx, key)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+func (k *kvNonceStore) MarkConsumed(ctx context.Context, key string, ttl time.Duration) error {
+	return k.store.Set(ctx, key, []byte("1"), kv.SetOptions{TTL: ttl})
+}
 
 // provideAuth wires the auth identity module and the OAuth 2.0 Authorization Server.
 func provideAuth(
@@ -30,9 +54,10 @@ func provideAuth(
 	pool *pgxpool.Pool,
 	kvStore kv.Store,
 	rt *router.Router,
-	viewOpts []view.RequestOption,
-) (*auth.Module, *provider.ProviderModule, error) {
-	tokenCodec, err := auth.NewTokenCodec(cfg.Auth.TokenKeys)
+	viewOpts []viewstate.RequestOption,
+	val validate.Validator,
+) (*authn.Module, *provider.ProviderModule, error) {
+	tokenCodec, err := authn.NewTokenCodec(cfg.Auth.TokenKeys)
 	if err != nil {
 		return nil, nil, fmt.Errorf("auth: token codec: %w", err)
 	}
@@ -45,18 +70,18 @@ func provideAuth(
 	authStore := authpgstore.New(pool)
 	uiCfg := authui.Config{
 		Page: func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := view.NewRequest(c, viewOpts...)
+			vr := viewstate.NewRequest(c, viewOpts...)
 			centered := h.Div(
 				h.Class("flex min-h-[calc(100vh-4rem)] items-center justify-center px-4"),
 				h.Div(h.Class("w-full max-w-sm"), content),
 			)
-			return view.Render(vr, vr.Page(title, centered), content)
+			return viewstate.Render(vr, vr.Page(title, centered), content)
 		},
 	}
 
-	authMod, err := auth.NewModule(auth.ModuleConfig{
+	authMod, err := authn.NewModule(authn.ModuleConfig{
 		Router:          rt,
-		Validator:       validate.New(),
+		Validator:       val,
 		Logger:          logger,
 		Config:          cfg.Auth.Identity,
 		Users:           authStore,
@@ -64,7 +89,7 @@ func provideAuth(
 		AdminUsers:      authStore,
 		Notifier:        notifier,
 		TokenCodec:      tokenCodec,
-		TokenNonceStore: auth.NewKVTokenNonceStore(kvStore),
+		TokenNonceStore: newKVNonceStore(kvStore),
 		Renderer:        authui.NewRenderer(uiCfg),
 		AdminRenderer:   authui.NewAdminRenderer(uiCfg),
 	})
@@ -75,7 +100,7 @@ func provideAuth(
 	providerStore := providerpgstore.New(pool)
 	providerMod, err := provider.NewProviderModule(provider.ProviderModuleConfig{
 		Router:    rt,
-		Validator: validate.New(),
+		Validator: val,
 		Logger:    logger,
 		Config: provider.Config{
 			Issuer: cfg.Auth.Provider.Issuer,
@@ -86,7 +111,7 @@ func provideAuth(
 		Consents:        providerStore,
 		Users:           authStore,
 		ConsentRenderer: stubConsentRenderer{},
-		SigninPath:      router.NewResolver(rt).Path(auth.RouteSigninShow),
+		SigninPath:      router.NewResolver(rt).Path(authn.RouteSigninShow),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("auth: provider module: %w", err)

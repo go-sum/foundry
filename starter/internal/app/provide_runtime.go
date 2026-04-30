@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"go.opentelemetry.io/otel/trace/noop"
@@ -25,8 +26,11 @@ func provideRuntime(_ context.Context) (Runtime, error) {
 	}, nil
 }
 
-func provideAssets(cfg *config.Config) (*publish.Manifest, *icons.Registry) {
-	manifest := publish.Must(publish.New(cfg.Assets.PublicDir, cfg.Assets.URLPrefix))
+func provideAssets(cfg *config.Config) (*publish.Manifest, *icons.Registry, error) {
+	manifest, err := publish.New(cfg.Assets.PublicDir, cfg.Assets.URLPrefix)
+	if err != nil {
+		return nil, nil, fmt.Errorf("assets: %w", err)
+	}
 
 	reg := publish.NewRegistry()
 	reg.RegisterSprites(iconset.Default.Sprites)
@@ -41,5 +45,5 @@ func provideAssets(cfg *config.Config) (*publish.Manifest, *icons.Registry) {
 		}
 	}
 	iconReg.RegisterSet(resolved)
-	return manifest, iconReg
+	return manifest, iconReg, nil
 }

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	auth "github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/go-sum/foundry/pkg/web/validate"
 	"github.com/google/uuid"
@@ -80,7 +80,7 @@ func runAuthorizeSubmit(t *testing.T, h *AuthorizeHandler, contentType, body str
 				t.Fatalf("seed session: %v", err)
 			}
 		}
-		auth.SetUserID(c, userID.String())
+		authn.SetUserID(c, userID.String())
 		return h.Submit(c)
 	})(web.NewContext(context.Background(), req))
 	if callErr != nil {

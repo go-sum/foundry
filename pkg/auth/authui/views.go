@@ -1,11 +1,11 @@
 package authui
 
 import (
-	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/componentry/form"
 	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 	"github.com/go-sum/foundry/pkg/componentry/ui/data"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/render"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	g "maragu.dev/gomponents"
@@ -13,7 +13,7 @@ import (
 )
 
 // signinView builds the signin form component.
-func signinView(c *web.Context, d auth.SigninPageData) g.Node {
+func signinView(c *web.Context, d authn.SigninPageData) g.Node {
 	return data.Card.Root(
 		data.Card.Header(
 			data.Card.Title(g.Text("Sign in")),
@@ -63,7 +63,7 @@ func signinView(c *web.Context, d auth.SigninPageData) g.Node {
 }
 
 // signupView builds the signup form component.
-func signupView(c *web.Context, d auth.SignupPageData) g.Node {
+func signupView(c *web.Context, d authn.SignupPageData) g.Node {
 	return data.Card.Root(
 		data.Card.Header(
 			data.Card.Title(g.Text("Sign up")),
@@ -127,7 +127,7 @@ func signupView(c *web.Context, d auth.SignupPageData) g.Node {
 }
 
 // verifyView builds the verification code entry form.
-func verifyView(c *web.Context, d auth.VerifyPageData) g.Node {
+func verifyView(c *web.Context, d authn.VerifyPageData) g.Node {
 	var headerDesc g.Node
 	if d.State.Email != "" {
 		headerDesc = data.Card.Description(
@@ -206,7 +206,7 @@ func verifyView(c *web.Context, d auth.VerifyPageData) g.Node {
 }
 
 // emailChangeView builds the email change form.
-func emailChangeView(c *web.Context, d auth.EmailChangePageData) g.Node {
+func emailChangeView(c *web.Context, d authn.EmailChangePageData) g.Node {
 	return data.Card.Root(
 		data.Card.Header(
 			data.Card.Title(g.Text("Change email")),

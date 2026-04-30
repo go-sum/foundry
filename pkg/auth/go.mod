@@ -2,11 +2,10 @@ module github.com/go-sum/foundry/pkg/auth
 
 go 1.26.0
 
-
 require (
 	github.com/go-playground/validator/v10 v10.30.2
-	github.com/go-sum/foundry/pkg/kv v0.0.0-00010101000000-000000000000
 	github.com/go-sum/foundry/pkg/web v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/web/authn v0.0.0-00010101000000-000000000000
 	github.com/go-webauthn/webauthn v0.17.0
 	github.com/google/uuid v1.6.0
 	golang.org/x/crypto v0.50.0
@@ -28,4 +27,9 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
+)
+
+replace (
+	github.com/go-sum/foundry/pkg/web v0.0.0-00010101000000-000000000000 => ../web
+	github.com/go-sum/foundry/pkg/web/authn v0.0.0-00010101000000-000000000000 => ../web/authn
 )

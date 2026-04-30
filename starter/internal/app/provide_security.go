@@ -43,11 +43,15 @@ func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, store
 }
 
 func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() session.Store) (session.Config, session.Store, error) {
-	var store session.Store
-	sessionStore := runtime.Config.SessionStore
+	cfg := session.StoreConfig{
+		Type:       runtime.Config.SessionStore,
+		Env:        string(runtime.Config.Env),
+		TestingEnv: string(config.Testing),
+		Settings:   runtime.Config.Session,
+	}
 
-	switch sessionStore {
-	case "cookie":
+	switch runtime.Config.SessionStore {
+	case session.StoreTypeCookie:
 		keyHex := cfgpkg.ExpandSecret("SECURITY_SESSION_KEY")
 		if keyHex == "" {
 			return session.Config{}, nil, config.ErrSessionKeyMissing
@@ -64,26 +68,17 @@ func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() sessi
 		if err != nil {
 			return session.Config{}, nil, fmt.Errorf("session: cookie store: %w", err)
 		}
-		store = session.NewCookieStore(codec)
-	case "kv":
+		cfg.Codec = codec
+	case session.StoreTypeKV:
 		backend, ok := kvStore.(session.KVBackend)
 		if !ok {
 			return session.Config{}, nil, config.ErrKVSessionStoreUnsupported
 		}
-		store = session.NewKVStore(backend, session.KVStoreConfig{
-			Prefix: runtime.Config.Session.KVPrefix,
-		})
-	case "memory":
-		if runtime.Config.Env != config.Testing {
-			return session.Config{}, nil, config.ErrSessionStoreMemoryTestingOnly
-		}
-		if storeFactory != nil {
-			store = storeFactory()
-		} else {
-			store = session.NewMemoryStore()
-		}
-	default:
-		return session.Config{}, nil, fmt.Errorf("session: unsupported store %q", sessionStore)
+		cfg.KVBackend = backend
+		cfg.KVPrefix = runtime.Config.Session.KVPrefix
+	case session.StoreTypeMemory:
+		cfg.TestFactory = storeFactory
 	}
-	return session.NewConfig(runtime.Config.Session, store), store, nil
+
+	return session.NewStoreFromConfig(cfg)
 }

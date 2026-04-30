@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
-	auth "github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/go-sum/foundry/pkg/web/validate"
 )
@@ -42,7 +42,7 @@ func (h *AuthorizeHandler) Show(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(fmt.Errorf("provider: no session in context"))
 	}
 
-	userIDStr := auth.UserID(c)
+	userIDStr := authn.UserID(c)
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return web.Response{}, web.ErrUnauthorized("Not authenticated")
@@ -80,7 +80,7 @@ func (h *AuthorizeHandler) Submit(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrInternal(fmt.Errorf("provider: no session in context"))
 	}
 
-	userIDStr := auth.UserID(c)
+	userIDStr := authn.UserID(c)
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		return web.Response{}, web.ErrUnauthorized("Not authenticated")

@@ -6,7 +6,7 @@ import (
 	pform "github.com/go-sum/foundry/pkg/componentry/patterns/form"
 	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )
@@ -21,7 +21,7 @@ type FormData struct {
 }
 
 // ContactForm renders the contact form or success state inside a swap target div.
-func ContactForm(req view.Request, submitURL string, data FormData) g.Node {
+func ContactForm(req viewstate.Request, submitURL string, data FormData) g.Node {
 	return h.Div(h.ID("contact-form"),
 		g.If(data.Sent, successState()),
 		g.If(!data.Sent, formState(req, submitURL, data)),
@@ -35,7 +35,7 @@ func successState() g.Node {
 	)
 }
 
-func formState(req view.Request, submitURL string, data FormData) g.Node {
+func formState(req viewstate.Request, submitURL string, data FormData) g.Node {
 	return h.Form(
 		h.ID("contact-form-inner"),
 		g.Attr("hx-post", submitURL),

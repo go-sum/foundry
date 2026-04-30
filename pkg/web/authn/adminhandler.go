@@ -1,8 +1,9 @@
-package auth
+package authn
 
 import (
 	"strconv"
 
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
@@ -14,13 +15,13 @@ import (
 type AdminRenderer interface {
 	UsersListPage(c *web.Context, data UsersListPageData) (web.Response, error)
 	UserEditPage(c *web.Context, data UserEditPageData) (web.Response, error)
-	UserRowFragment(c *web.Context, user User) (web.Response, error)
+	UserRowFragment(c *web.Context, user auth.User) (web.Response, error)
 	BootstrapPage(c *web.Context, data BootstrapPageData) (web.Response, error)
 }
 
 // UsersListPageData carries state for rendering the admin users list view.
 type UsersListPageData struct {
-	Users   []User
+	Users   []auth.User
 	Page    int
 	PerPage int
 	Total   int64
@@ -28,7 +29,7 @@ type UsersListPageData struct {
 
 // UserEditPageData carries state for rendering the admin user edit form.
 type UserEditPageData struct {
-	User   User
+	User   auth.User
 	Errors map[string]string
 }
 
@@ -39,7 +40,7 @@ type BootstrapPageData struct {
 
 // AdminHandler handles HTTP requests for admin user management.
 type AdminHandler struct {
-	svc       *AdminService
+	svc       *auth.AdminService
 	router    *router.Router
 	validator validate.Validator
 	renderer  AdminRenderer
@@ -114,7 +115,7 @@ func (h *AdminHandler) Update(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrBadRequest("Invalid user ID")
 	}
 
-	var input UpdateUserInput
+	var input auth.UpdateUserInput
 	if err := validate.Bind(h.validator, c.Request, &input); err != nil {
 		user, getErr := h.svc.GetUser(c.Context(), id)
 		if getErr != nil {

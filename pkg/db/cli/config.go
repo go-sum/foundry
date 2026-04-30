@@ -142,7 +142,7 @@ func (c *dbConfig) buildSchemaInputs() ([]migrate.SchemaInput, error) {
 			Name:     name,
 			SQL:      sql,
 			Priority: entry.Priority,
-			Group: entry.Group,
+			Group:    entry.Group,
 		})
 	}
 	return inputs, nil
@@ -176,14 +176,29 @@ func (c *dbConfig) migrationsDir() string {
 }
 
 func (c *dbConfig) dsnFunc() func() (string, error) {
-	return db.DSN
+	return func() (string, error) {
+		url := expandSecret("DATABASE_URL")
+		if url == "" {
+			return "", fmt.Errorf("DATABASE_URL is required (set as Docker secret or environment variable)")
+		}
+		return url, nil
+	}
+}
+
+// expandSecret reads the named value from /run/secrets/<name> (Docker secrets)
+// falling back to the environment variable of the same name.
+func expandSecret(name string) string {
+	if b, err := os.ReadFile(filepath.Join("/run/secrets", name)); err == nil {
+		return strings.TrimRight(string(b), "\n\r\t ")
+	}
+	return os.Getenv(name)
 }
 
 func expandEnvWithDefaults(s string) string {
 	return os.Expand(s, func(key string) string {
-		if idx := strings.Index(key, ":-"); idx != -1 {
-			envKey := key[:idx]
-			defVal := key[idx+2:]
+		if before, after, ok := strings.Cut(key, ":-"); ok {
+			envKey := before
+			defVal := after
 			if val, ok := os.LookupEnv(envKey); ok && val != "" {
 				return val
 			}

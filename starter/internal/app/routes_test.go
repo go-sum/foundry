@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/health"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/site"
 	"github.com/go-sum/foundry/pkg/web/static"
@@ -118,11 +119,11 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 }
 
 func TestHealthHandler_ReturnsOKWithNoCheckers(t *testing.T) {
-	h := healthHandler()
+	h := health.Handler()
 	c := testRouteContext(http.MethodGet, "/healthz")
 	resp, err := h(c)
 	if err != nil {
-		t.Fatalf("healthHandler() error = %v", err)
+		t.Fatalf("health.Handler() error = %v", err)
 	}
 	if got, want := resp.Status, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
@@ -130,12 +131,12 @@ func TestHealthHandler_ReturnsOKWithNoCheckers(t *testing.T) {
 }
 
 func TestHealthHandler_ReturnsUnavailableWhenCheckerFails(t *testing.T) {
-	failing := &fakeHealthChecker{err: errors.New("connection refused")}
-	h := healthHandler(failing)
+	failing := health.CheckerFunc(func(_ context.Context) error { return errors.New("connection refused") })
+	h := health.Handler(failing)
 	c := testRouteContext(http.MethodGet, "/healthz")
 	_, err := h(c)
 	if err == nil {
-		t.Fatal("healthHandler() error = nil, want non-nil")
+		t.Fatal("health.Handler() error = nil, want non-nil")
 	}
 	var webErr *web.Error
 	if !errors.As(err, &webErr) {
@@ -145,10 +146,6 @@ func TestHealthHandler_ReturnsUnavailableWhenCheckerFails(t *testing.T) {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
 }
-
-type fakeHealthChecker struct{ err error }
-
-func (f *fakeHealthChecker) Check(_ context.Context) error { return f.err }
 
 func TestUnavailableHandler_ReturnsUnavailableError(t *testing.T) {
 	h := unavailableHandler("contact")

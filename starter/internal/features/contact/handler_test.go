@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/go-sum/foundry/internal/view/page"
 	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
 	"github.com/go-sum/foundry/pkg/web"
@@ -63,7 +63,7 @@ func TestHandler_Form_RendersPage(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 
-	vr := view.NewRequest(c)
+	vr := viewstate.NewRequest(c)
 	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
 	want := render.RenderNode(t, page.ContactPage(vr, submitURL, contactpartial.FormData{}))
 	if got != want {
@@ -91,7 +91,7 @@ func TestHandler_Form_HTMXPartial(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 
-	vr := view.NewRequest(c)
+	vr := viewstate.NewRequest(c)
 	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
 	want := render.RenderNode(t, contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{}))
 	if got != want {
@@ -128,7 +128,7 @@ func TestHandler_Submit_ValidationError(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 
-	vr := view.NewRequest(c)
+	vr := viewstate.NewRequest(c)
 	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
 	fieldErrors := map[string][]string{
 		"name":    {"is required"},
@@ -173,7 +173,7 @@ func TestHandler_Submit_Success(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	got := string(body)
 
-	vr := view.NewRequest(c)
+	vr := viewstate.NewRequest(c)
 	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
 	want := render.RenderNode(t, contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{Sent: true}))
 	if got != want {
@@ -302,4 +302,3 @@ func TestHandler_Submit_ValidationError_PartialFields(t *testing.T) {
 		})
 	}
 }
-

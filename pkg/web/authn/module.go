@@ -1,9 +1,10 @@
-package auth
+package authn
 
 import (
 	"fmt"
 	"log/slog"
 
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
 )
@@ -15,8 +16,8 @@ type Module struct {
 	AdminHandler   *AdminHandler
 
 	signinPath func() string
-	userReader UserReader
-	config     Config
+	userReader auth.UserReader
+	config     auth.Config
 }
 
 // ModuleConfig holds all external dependencies needed to wire the auth module.
@@ -25,24 +26,24 @@ type ModuleConfig struct {
 	Validator validate.Validator
 	Logger    *slog.Logger
 
-	Config Config
+	Config auth.Config
 
-	Users       UserWriter
-	Credentials CredentialStore
-	AdminUsers  AdminStore
+	Users       auth.UserWriter
+	Credentials auth.CredentialStore
+	AdminUsers  auth.AdminStore
 
-	Notifier       Notifier
-	TokenCodec     TokenCodec
-	TokenNonceStore TokenNonceStore
+	Notifier        auth.Notifier
+	TokenCodec      auth.TokenCodec
+	TokenNonceStore auth.TokenNonceStore
 
 	Renderer      Renderer
 	AdminRenderer AdminRenderer
 }
 
 // NewModule wires the auth module and returns the assembled Module.
-// The caller registers routes via router.Register(rt, auth.Routes(m)...).
+// The caller registers routes via router.Register(rt, authn.Routes(m)...).
 func NewModule(cfg ModuleConfig) (*Module, error) {
-	config := ApplyDefaults(cfg.Config)
+	config := auth.ApplyDefaults(cfg.Config)
 	if cfg.Router == nil {
 		return nil, fmt.Errorf("auth: Router is required")
 	}
@@ -71,7 +72,7 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 		return nil, fmt.Errorf("auth: Credentials (CredentialStore) is required when passkeys are enabled")
 	}
 
-	authSvc := NewAuthService(AuthServiceConfig{
+	authSvc := auth.NewAuthService(auth.AuthServiceConfig{
 		Users:      cfg.Users,
 		Notifier:   cfg.Notifier,
 		TokenCodec: cfg.TokenCodec,
@@ -98,7 +99,7 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 	m.signinPath = res.Path(RouteSigninShow)
 
 	if config.Passkey.Enabled {
-		passkeySvc, err := NewPasskeyService(cfg.Users, cfg.Credentials, config.Passkey)
+		passkeySvc, err := auth.NewPasskeyService(cfg.Users, cfg.Credentials, config.Passkey)
 		if err != nil {
 			return nil, fmt.Errorf("auth: passkey service: %w", err)
 		}
@@ -109,7 +110,7 @@ func NewModule(cfg ModuleConfig) (*Module, error) {
 		}
 	}
 
-	adminSvc := NewAdminService(cfg.AdminUsers)
+	adminSvc := auth.NewAdminService(cfg.AdminUsers)
 	m.AdminHandler = &AdminHandler{
 		svc:       adminSvc,
 		router:    cfg.Router,

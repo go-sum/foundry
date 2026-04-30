@@ -4,15 +4,16 @@ import (
 	"github.com/go-sum/foundry/internal/features/contact"
 	"github.com/go-sum/foundry/internal/features/home"
 	"github.com/go-sum/foundry/internal/features/oauthclient"
-	"github.com/go-sum/foundry/internal/view"
-	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/auth/provider"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/docs"
 	"github.com/go-sum/foundry/pkg/showcase"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/health"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/site"
 	"github.com/go-sum/foundry/pkg/web/static"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 
 	g "maragu.dev/gomponents"
 )
@@ -57,13 +58,13 @@ func starterRouteTree(rt *router.Router, sec Security, svc Services, s *site.Sit
 		DB:    svc.DBPool,
 		KV:    svc.KVStore,
 		Page: func(c *web.Context, title string, content g.Node) (web.Response, error) {
-			vr := view.NewRequest(c, pres.ViewOpts...)
-			return view.Render(vr, vr.Page(title, content), nil)
+			vr := viewstate.NewRequest(c, pres.ViewOpts...)
+			return viewstate.Render(vr, vr.Page(title, content), nil)
 		},
 	})...)
 
 	return []router.Node{
-		router.GET("/healthz", "health.check", healthHandler(healthCheckers(svc)...)),
+		router.GET("/healthz", "health.check", health.Handler(healthCheckers(svc)...)),
 		router.Layout(browserNodes...),
 	}
 }
@@ -74,7 +75,7 @@ func packageOwnedRouteTree(sec Security, svc Services, publicDir string) []route
 	}
 	nodes = append(nodes, docs.Routes(docs.DefaultConfig(publicDir))...)
 	if svc.Auth != nil {
-		nodes = append(nodes, auth.Routes(svc.Auth)...)
+		nodes = append(nodes, authn.Routes(svc.Auth)...)
 	}
 	if svc.OAuthProvider != nil {
 		nodes = append(nodes, provider.Routes(svc.OAuthProvider)...)

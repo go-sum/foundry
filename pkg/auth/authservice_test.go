@@ -113,7 +113,7 @@ func newTestAuthService(store *fakeUserStore, notifier *fakeNotifier) *AuthServi
 	return NewAuthService(AuthServiceConfig{
 		Users:      store,
 		Notifier:   notifier,
-		TokenCodec: stubTokenCodec{},
+		TokenCodec: fixedTokenCodec{},
 		NonceStore: newFakeNonceStore(),
 		EmailTOTP:  EmailTOTPConfig{Enabled: true, PeriodSeconds: 300},
 		Clock:      fixedClock,
@@ -251,7 +251,7 @@ func TestBeginSignin_SuppressedBranches_LogsNoEmail(t *testing.T) {
 func TestBeginSignin_Disabled_ReturnsErrUnsupportedMethod(t *testing.T) {
 	svc := NewAuthService(AuthServiceConfig{
 		Users:      &fakeUserStore{},
-		TokenCodec: stubTokenCodec{},
+		TokenCodec: fixedTokenCodec{},
 		EmailTOTP:  EmailTOTPConfig{Enabled: false},
 		Clock:      fixedClock,
 	})
@@ -278,7 +278,7 @@ func TestBeginSignin_DBError_ReturnsError(t *testing.T) {
 func TestBeginSignup_Disabled_ReturnsErrUnsupportedMethod(t *testing.T) {
 	svc := NewAuthService(AuthServiceConfig{
 		Users:      &fakeUserStore{},
-		TokenCodec: stubTokenCodec{},
+		TokenCodec: fixedTokenCodec{},
 		EmailTOTP:  EmailTOTPConfig{Enabled: false},
 		Clock:      fixedClock,
 	})
@@ -378,7 +378,7 @@ func TestBeginSignup_DBLookupError_ReturnsError(t *testing.T) {
 func TestBeginEmailChange_Disabled_ReturnsErrUnsupportedMethod(t *testing.T) {
 	svc := NewAuthService(AuthServiceConfig{
 		Users:      &fakeUserStore{},
-		TokenCodec: stubTokenCodec{},
+		TokenCodec: fixedTokenCodec{},
 		EmailTOTP:  EmailTOTPConfig{Enabled: false},
 		Clock:      fixedClock,
 	})

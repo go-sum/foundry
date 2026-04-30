@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/compress"
 	"github.com/go-sum/foundry/pkg/web/etag"
 	"github.com/go-sum/foundry/pkg/web/htmx"
@@ -35,7 +35,7 @@ func globalMiddleware(rt *router.Router, runtime Runtime, security Security) []w
 		session.Middleware(security.Session),
 		secure.CSRF(security.CSRF),
 		htmx.VaryMiddleware(),
-		auth.LoadSession(),
+		authn.LoadSession(),
 	}
 }
 

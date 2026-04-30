@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-sum/foundry/pkg/auth"
-	coredb "github.com/go-sum/foundry/pkg/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -70,8 +69,8 @@ func (s *Store) CreateCredential(ctx context.Context, cred auth.PasskeyCredentia
 		cred.LastUsedAt,
 	))
 	if err != nil {
-		return auth.PasskeyCredential{}, coredb.MapError(err, "auth: create credential",
-			coredb.OnUniqueViolation(auth.ErrPasskeyAlreadyRegistered),
+		return auth.PasskeyCredential{}, mapError(err, "auth: create credential",
+			onUniqueViolation(auth.ErrPasskeyAlreadyRegistered),
 		)
 	}
 	return c, nil

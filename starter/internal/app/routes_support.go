@@ -2,10 +2,10 @@ package app
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/go-sum/foundry/internal/features/home"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/health"
 )
 
 func homeServiceChecks(svc Services) []home.Checker {
@@ -25,10 +25,10 @@ func homeServiceChecks(svc Services) []home.Checker {
 	return checks
 }
 
-func healthCheckers(svc Services) []healthChecker {
-	var checkers []healthChecker
+func healthCheckers(svc Services) []health.Checker {
+	var checkers []health.Checker
 	if svc.DBPool != nil {
-		checkers = append(checkers, &dbHealthChecker{pool: svc.DBPool})
+		checkers = append(checkers, health.DBChecker(svc.DBPool))
 	}
 	return checkers
 }
@@ -44,29 +44,4 @@ func unavailableHandler(feature string) web.Handler {
 	return func(*web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrUnavailable(feature+" feature unavailable", nil)
 	}
-}
-
-type healthChecker interface {
-	Check(ctx context.Context) error
-}
-
-func healthHandler(checkers ...healthChecker) web.Handler {
-	return func(c *web.Context) (web.Response, error) {
-		for _, ch := range checkers {
-			if err := ch.Check(c.Context()); err != nil {
-				return web.Response{}, web.ErrUnavailable("database unhealthy", err)
-			}
-		}
-		return web.Text(http.StatusOK, "ok"), nil
-	}
-}
-
-type dbHealthChecker struct {
-	pool interface {
-		Ping(context.Context) error
-	}
-}
-
-func (d *dbHealthChecker) Check(ctx context.Context) error {
-	return d.pool.Ping(ctx)
 }

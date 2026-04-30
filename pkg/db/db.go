@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/go-sum/foundry/pkg/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -101,24 +100,6 @@ func WithProductionDefaults() Option {
 		WithConnectTimeout(5 * time.Second)(c)
 		WithStatementTimeout(30 * time.Second)(c)
 	}
-}
-
-// DSN resolves the database connection string from Docker secrets or environment.
-func DSN() (string, error) {
-	url := config.ExpandSecret("DATABASE_URL")
-	if url == "" {
-		return "", fmt.Errorf("DATABASE_URL is required (set as Docker secret or environment variable)")
-	}
-	return url, nil
-}
-
-// Connect resolves DSN automatically then creates a pgxpool.
-func Connect(ctx context.Context, opts ...Option) (*pgxpool.Pool, error) {
-	dsn, err := DSN()
-	if err != nil {
-		return nil, err
-	}
-	return ConnectDSN(ctx, dsn, opts...)
 }
 
 // ConnectDSN creates a pgxpool from the given DSN and verifies connectivity.

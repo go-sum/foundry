@@ -1,4 +1,4 @@
-package auth
+package authn
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 	"github.com/go-sum/foundry/pkg/web/session"
@@ -78,11 +79,11 @@ func assertCookieBudget(t *testing.T, setCookie string) {
 
 func TestPendingFlow_FitsCookieSessionBudget(t *testing.T) {
 	setCookie := writeCookieSession(t, func(sess *session.Session) error {
-		return setPendingFlow(sess, PendingFlow{
-			Purpose:     FlowSignup,
+		return setPendingFlow(sess, auth.PendingFlow{
+			Purpose:     auth.FlowSignup,
 			Email:       "casey.longname@example.com",
 			DisplayName: "Casey Longname For Cookie Budget Coverage",
-			Role:        RoleUser,
+			Role:        auth.RoleUser,
 			UserID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
 			Secret:      strings.Repeat("a", 64),
 			IssuedAt:    time.Now().UTC(),
@@ -113,7 +114,7 @@ func TestPasskeyCeremony_FitsCookieSessionBudget(t *testing.T) {
 		}
 		return setPasskeyCeremony(sess, passkeyCeremonyState{
 			Operation: "register",
-			Ceremony: PasskeyCeremony{
+			Ceremony: auth.PasskeyCeremony{
 				Challenge:            []byte(strings.Repeat("c", 32)),
 				RelyingPartyID:       "example.com",
 				UserID:               []byte(strings.Repeat("u", 64)),
@@ -122,7 +123,7 @@ func TestPasskeyCeremony_FitsCookieSessionBudget(t *testing.T) {
 				Mediation:            "conditional",
 				Extensions:           map[string]any{"credProps": true},
 				Expires:              time.Now().UTC().Add(5 * time.Minute),
-				CredentialParameters: []PasskeyCredentialParameter{
+				CredentialParameters: []auth.PasskeyCredentialParameter{
 					{Type: "public-key", Algorithm: -7},
 					{Type: "public-key", Algorithm: -257},
 				},

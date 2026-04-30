@@ -1,6 +1,7 @@
-package auth
+package authn
 
 import (
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/google/uuid"
 )
@@ -51,19 +52,19 @@ func getVerified(sess *session.Session) bool {
 	return v
 }
 
-func setPendingFlow(sess *session.Session, flow PendingFlow) error {
+func setPendingFlow(sess *session.Session, flow auth.PendingFlow) error {
 	return sess.Set(sessionKeyPendingFlow, flow)
 }
 
-func getPendingFlow(sess *session.Session) (PendingFlow, bool) {
-	flow, ok, _ := session.Get[PendingFlow](sess, sessionKeyPendingFlow)
+func getPendingFlow(sess *session.Session) (auth.PendingFlow, bool) {
+	flow, ok, _ := session.Get[auth.PendingFlow](sess, sessionKeyPendingFlow)
 	return flow, ok
 }
 
 type passkeyCeremonyState struct {
-	Operation string          `json:"operation"`
-	Ceremony  PasskeyCeremony `json:"ceremony"`
-	UserID    uuid.UUID       `json:"user_id,omitempty"`
+	Operation string             `json:"operation"`
+	Ceremony  auth.PasskeyCeremony `json:"ceremony"`
+	UserID    uuid.UUID          `json:"user_id,omitempty"`
 }
 
 func setPasskeyCeremony(sess *session.Session, state passkeyCeremonyState) error {

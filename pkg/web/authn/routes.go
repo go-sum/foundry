@@ -1,4 +1,4 @@
-package auth
+package authn
 
 import "github.com/go-sum/foundry/pkg/web/router"
 
@@ -35,7 +35,7 @@ const (
 )
 
 // Routes returns the declarative route tree for the auth module.
-// The caller registers the returned nodes via router.Register(rt, auth.Routes(m)...).
+// The caller registers the returned nodes via router.Register(rt, authn.Routes(m)...).
 func Routes(m *Module) []router.Node {
 	nodes := []router.Node{
 		router.Group("/auth",

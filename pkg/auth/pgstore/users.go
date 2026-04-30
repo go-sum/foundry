@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/go-sum/foundry/pkg/auth"
-	coredb "github.com/go-sum/foundry/pkg/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -64,8 +63,8 @@ RETURNING id, email, display_name, role, verified, webauthn_id, created_at, upda
 func (s *Store) CreateUser(ctx context.Context, email, displayName string, role auth.Role, verified bool) (auth.User, error) {
 	u, err := scanUser(s.pool.QueryRow(ctx, createUser, email, displayName, string(role), verified))
 	if err != nil {
-		return auth.User{}, coredb.MapError(err, "auth: create user",
-			coredb.OnUniqueViolation(auth.ErrEmailTaken),
+		return auth.User{}, mapError(err, "auth: create user",
+			onUniqueViolation(auth.ErrEmailTaken),
 		)
 	}
 	return u, nil
@@ -84,8 +83,8 @@ func (s *Store) UpdateUserEmail(ctx context.Context, id uuid.UUID, email string)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return auth.User{}, auth.ErrUserNotFound
 		}
-		return auth.User{}, coredb.MapError(err, "auth: update email",
-			coredb.OnUniqueViolation(auth.ErrEmailTaken),
+		return auth.User{}, mapError(err, "auth: update email",
+			onUniqueViolation(auth.ErrEmailTaken),
 		)
 	}
 	return u, nil
@@ -102,8 +101,8 @@ func (s *Store) SetWebAuthnID(ctx context.Context, id uuid.UUID, webauthnID []by
 		if errors.Is(err, pgx.ErrNoRows) {
 			return auth.User{}, auth.ErrUserNotFound
 		}
-		return auth.User{}, coredb.MapError(err, "auth: set webauthn id",
-			coredb.OnUniqueViolation(auth.ErrWebAuthnIDAlreadySet),
+		return auth.User{}, mapError(err, "auth: set webauthn id",
+			onUniqueViolation(auth.ErrWebAuthnIDAlreadySet),
 		)
 	}
 	return u, nil
@@ -121,8 +120,8 @@ func (s *Store) SetWebAuthnIDIfNull(ctx context.Context, id uuid.UUID, webauthnI
 		if errors.Is(err, pgx.ErrNoRows) {
 			return auth.User{}, auth.ErrWebAuthnIDAlreadySet
 		}
-		return auth.User{}, coredb.MapError(err, "auth: set webauthn id if null",
-			coredb.OnUniqueViolation(auth.ErrWebAuthnIDAlreadySet),
+		return auth.User{}, mapError(err, "auth: set webauthn id if null",
+			onUniqueViolation(auth.ErrWebAuthnIDAlreadySet),
 		)
 	}
 	return u, nil
@@ -187,8 +186,8 @@ func (s *Store) UpdateUser(ctx context.Context, id uuid.UUID, email, displayName
 		if errors.Is(err, pgx.ErrNoRows) {
 			return auth.User{}, auth.ErrUserNotFound
 		}
-		return auth.User{}, coredb.MapError(err, "auth: update user",
-			coredb.OnUniqueViolation(auth.ErrEmailTaken),
+		return auth.User{}, mapError(err, "auth: update user",
+			onUniqueViolation(auth.ErrEmailTaken),
 		)
 	}
 	return u, nil

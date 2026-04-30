@@ -1,7 +1,7 @@
 package provider
 
 import (
-	auth "github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/router"
 )
 
@@ -23,7 +23,7 @@ func Routes(m *ProviderModule) []router.Node {
 
 		// Authorization endpoint — requires the user to be logged in.
 		router.Group("/oauth",
-			router.Use(auth.RequireAuth(m.signinPath)),
+			router.Use(authn.RequireAuth(m.signinPath)),
 			router.GET("/authorize", RouteAuthorize, m.authorizeHandler.Show),
 			router.POST("/authorize", RouteAuthorizePost, m.authorizeHandler.Submit),
 		),

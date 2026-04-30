@@ -4,7 +4,7 @@ package home
 import (
 	"context"
 
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/go-sum/foundry/internal/view/page"
 	"github.com/go-sum/foundry/pkg/web"
 )
@@ -18,11 +18,11 @@ type Checker struct {
 // Handler serves the home page.
 type Handler struct {
 	checkers []Checker
-	reqOpts  []view.RequestOption
+	reqOpts  []viewstate.RequestOption
 }
 
 // NewHandler creates a new home Handler.
-func NewHandler(checkers []Checker, opts ...view.RequestOption) *Handler {
+func NewHandler(checkers []Checker, opts ...viewstate.RequestOption) *Handler {
 	return &Handler{checkers: checkers, reqOpts: opts}
 }
 
@@ -35,6 +35,6 @@ func (h *Handler) Show(c *web.Context) (web.Response, error) {
 			Healthy: ch.Fn(c.Context()) == nil,
 		})
 	}
-	vr := view.NewRequest(c, h.reqOpts...)
-	return view.Render(vr, page.HomePage(vr, statuses), page.HomeContent(vr, statuses))
+	vr := viewstate.NewRequest(c, h.reqOpts...)
+	return viewstate.Render(vr, page.HomePage(vr, statuses), page.HomeContent(vr, statuses))
 }

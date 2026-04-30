@@ -1,10 +1,11 @@
-package auth
+package authn
 
 import (
 	"context"
 	"testing"
 	"time"
 
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
@@ -13,55 +14,69 @@ import (
 
 type stubUserStore struct{}
 
-func (stubUserStore) GetUserByID(context.Context, uuid.UUID) (User, error) { return User{}, nil }
-func (stubUserStore) GetUserByEmail(context.Context, string) (User, error) { return User{}, nil }
-func (stubUserStore) CreateUser(context.Context, string, string, Role, bool) (User, error) {
-	return User{}, nil
+func (stubUserStore) GetUserByID(context.Context, uuid.UUID) (auth.User, error) {
+	return auth.User{}, nil
 }
-func (stubUserStore) UpdateUserEmail(context.Context, uuid.UUID, string) (User, error) {
-	return User{}, nil
+func (stubUserStore) GetUserByEmail(context.Context, string) (auth.User, error) {
+	return auth.User{}, nil
 }
-func (stubUserStore) SetWebAuthnID(context.Context, uuid.UUID, []byte) (User, error) {
-	return User{}, nil
+func (stubUserStore) CreateUser(context.Context, string, string, auth.Role, bool) (auth.User, error) {
+	return auth.User{}, nil
 }
-func (stubUserStore) SetWebAuthnIDIfNull(context.Context, uuid.UUID, []byte) (User, error) {
-	return User{}, nil
+func (stubUserStore) UpdateUserEmail(context.Context, uuid.UUID, string) (auth.User, error) {
+	return auth.User{}, nil
 }
-func (stubUserStore) GetUserByWebAuthnID(context.Context, []byte) (User, error) { return User{}, nil }
+func (stubUserStore) SetWebAuthnID(context.Context, uuid.UUID, []byte) (auth.User, error) {
+	return auth.User{}, nil
+}
+func (stubUserStore) SetWebAuthnIDIfNull(context.Context, uuid.UUID, []byte) (auth.User, error) {
+	return auth.User{}, nil
+}
+func (stubUserStore) GetUserByWebAuthnID(context.Context, []byte) (auth.User, error) {
+	return auth.User{}, nil
+}
 
 type stubAdminStore struct{}
 
-func (stubAdminStore) GetUserByID(context.Context, uuid.UUID) (User, error)    { return User{}, nil }
-func (stubAdminStore) GetUserByEmail(context.Context, string) (User, error)    { return User{}, nil }
-func (stubAdminStore) ListUsers(context.Context, int32, int32) ([]User, error) { return nil, nil }
-func (stubAdminStore) UpdateUser(context.Context, uuid.UUID, string, string, string) (User, error) {
-	return User{}, nil
+func (stubAdminStore) GetUserByID(context.Context, uuid.UUID) (auth.User, error) {
+	return auth.User{}, nil
 }
-func (stubAdminStore) DeleteUser(context.Context, uuid.UUID) error             { return nil }
-func (stubAdminStore) CountUsers(context.Context) (int64, error)               { return 0, nil }
-func (stubAdminStore) HasAdmin(context.Context) (bool, error)                  { return false, nil }
-func (stubAdminStore) IsLastAdmin(context.Context, uuid.UUID) (bool, error)    { return false, nil }
-func (stubAdminStore) ElevateToAdmin(context.Context, uuid.UUID) (User, error) { return User{}, nil }
+func (stubAdminStore) GetUserByEmail(context.Context, string) (auth.User, error) {
+	return auth.User{}, nil
+}
+func (stubAdminStore) ListUsers(context.Context, int32, int32) ([]auth.User, error) {
+	return nil, nil
+}
+func (stubAdminStore) UpdateUser(context.Context, uuid.UUID, string, string, string) (auth.User, error) {
+	return auth.User{}, nil
+}
+func (stubAdminStore) DeleteUser(context.Context, uuid.UUID) error          { return nil }
+func (stubAdminStore) CountUsers(context.Context) (int64, error)            { return 0, nil }
+func (stubAdminStore) HasAdmin(context.Context) (bool, error)               { return false, nil }
+func (stubAdminStore) IsLastAdmin(context.Context, uuid.UUID) (bool, error) { return false, nil }
+func (stubAdminStore) ElevateToAdmin(context.Context, uuid.UUID) (auth.User, error) {
+	return auth.User{}, nil
+}
 
 type stubCredentialStore struct{}
 
-func (stubCredentialStore) CreateCredential(context.Context, PasskeyCredential) (PasskeyCredential, error) {
-	return PasskeyCredential{}, nil
+func (stubCredentialStore) CreateCredential(context.Context, auth.PasskeyCredential) (auth.PasskeyCredential, error) {
+	return auth.PasskeyCredential{}, nil
 }
-func (stubCredentialStore) GetByCredentialID(context.Context, []byte) (PasskeyCredential, error) {
-	return PasskeyCredential{}, nil
+func (stubCredentialStore) GetByCredentialID(context.Context, []byte) (auth.PasskeyCredential, error) {
+	return auth.PasskeyCredential{}, nil
 }
-func (stubCredentialStore) GetByIDForUser(context.Context, uuid.UUID, uuid.UUID) (PasskeyCredential, error) {
-	return PasskeyCredential{}, nil
+func (stubCredentialStore) GetByIDForUser(context.Context, uuid.UUID, uuid.UUID) (auth.PasskeyCredential, error) {
+	return auth.PasskeyCredential{}, nil
 }
-func (stubCredentialStore) ListByUserID(context.Context, uuid.UUID) ([]PasskeyCredential, error) {
+func (stubCredentialStore) ListByUserID(context.Context, uuid.UUID) ([]auth.PasskeyCredential, error) {
 	return nil, nil
 }
 func (stubCredentialStore) TouchPasskeyCredential(context.Context, uuid.UUID, int64, bool, time.Time) error {
 	return nil
 }
-func (stubCredentialStore) RenameCredential(context.Context, uuid.UUID, uuid.UUID, string) (PasskeyCredential, error) {
-	return PasskeyCredential{}, nil
+func (stubCredentialStore) RenameCredential(context.Context, uuid.UUID, uuid.UUID, string) (auth.PasskeyCredential, error) {
+	return auth.PasskeyCredential{}, nil
 }
 func (stubCredentialStore) DeleteCredential(context.Context, uuid.UUID, uuid.UUID) error {
 	return nil
@@ -90,7 +105,7 @@ func (stubAdminRenderer) UsersListPage(*web.Context, UsersListPageData) (web.Res
 func (stubAdminRenderer) UserEditPage(*web.Context, UserEditPageData) (web.Response, error) {
 	return web.Respond(200), nil
 }
-func (stubAdminRenderer) UserRowFragment(*web.Context, User) (web.Response, error) {
+func (stubAdminRenderer) UserRowFragment(*web.Context, auth.User) (web.Response, error) {
 	return web.Respond(200), nil
 }
 func (stubAdminRenderer) BootstrapPage(*web.Context, BootstrapPageData) (web.Response, error) {
@@ -99,8 +114,10 @@ func (stubAdminRenderer) BootstrapPage(*web.Context, BootstrapPageData) (web.Res
 
 type stubTokenCodec struct{}
 
-func (stubTokenCodec) Encode(VerificationToken) (string, error) { return "token", nil }
-func (stubTokenCodec) Decode(string) (VerificationToken, error) { return VerificationToken{}, nil }
+func (stubTokenCodec) Encode(auth.VerificationToken) (string, error) { return "token", nil }
+func (stubTokenCodec) Decode(string) (auth.VerificationToken, error) {
+	return auth.VerificationToken{}, nil
+}
 
 func validModuleConfig() ModuleConfig {
 	return ModuleConfig{

@@ -9,8 +9,8 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/auth/provider"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
 	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
@@ -21,12 +21,13 @@ import (
 	"github.com/go-sum/foundry/pkg/web/serve"
 	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/go-sum/foundry/pkg/web/site"
+	"github.com/go-sum/foundry/pkg/web/validate"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	config "github.com/go-sum/foundry/config"
 	"github.com/go-sum/foundry/internal/features/contact"
 	"github.com/go-sum/foundry/internal/features/oauthclient"
-	"github.com/go-sum/foundry/internal/view"
 )
 
 // App is the assembled application.
@@ -89,7 +90,7 @@ type Services struct {
 	Processor *queue.Processor
 	Notifier  *notification.Dispatcher
 	Contact   *contact.Module
-	Auth      *auth.Module
+	Auth      *authn.Module
 	// OAuthProvider is the built-in OAuth 2.0 Authorization Server.
 	OAuthProvider *provider.ProviderModule
 	// OAuthClient is the first-party OAuth 2.1 client handler.
@@ -99,7 +100,7 @@ type Services struct {
 
 // Presentation consolidates view-layer dependencies assembled at the composition root.
 type Presentation struct {
-	ViewOpts []view.RequestOption
+	ViewOpts []viewstate.RequestOption
 	Icons    *icons.Registry
 }
 
@@ -146,14 +147,19 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		return nil, fmt.Errorf("runtime: %w", err)
 	}
 
-	manifest, iconReg := provideAssets(runtime.Config)
+	manifest, iconReg, err := provideAssets(runtime.Config)
+	if err != nil {
+		return nil, fmt.Errorf("assets: %w", err)
+	}
 
 	routing := router.New()
 
+	val := validate.New()
+
 	pres := Presentation{
-		ViewOpts: []view.RequestOption{
-			view.WithIconRegistry(iconReg),
-			view.WithPathFunc(manifest.Path),
+		ViewOpts: []viewstate.RequestOption{
+			viewstate.WithIconRegistry(iconReg),
+			viewstate.WithPathFunc(manifest.Path),
 			config.DefaultNav(routing),
 		},
 		Icons: iconReg,
@@ -189,7 +195,7 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 
 	installGlobalMiddleware(routing, runtime, security)
 
-	services, err := provideServices(ctx, runtime, security, routing, pres, sharedKV)
+	services, err := provideServices(ctx, runtime, security, routing, pres, sharedKV, val)
 	if err != nil {
 		return nil, fmt.Errorf("services: %w", err)
 	}

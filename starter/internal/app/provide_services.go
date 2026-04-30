@@ -3,12 +3,11 @@ package app
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"math/rand/v2"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification"
@@ -24,51 +23,15 @@ import (
 	"github.com/go-sum/foundry/internal/features/oauthclient"
 )
 
-func connectWithRetry(ctx context.Context, name string, logger *slog.Logger, maxAttempts int, fn func() error) error {
-	var err error
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		if err = fn(); err == nil {
-			return nil
-		}
-		if attempt >= maxAttempts {
-			break
-		}
-
-		backoff := time.Duration(1<<attempt) * time.Second
-		// ±25% jitter to prevent thundering herd on service restart.
-		jitter := time.Duration(rand.Int64N(int64(backoff) / 2))
-		if rand.IntN(2) == 0 {
-			backoff += jitter
-		} else {
-			backoff -= jitter
-		}
-
-		logger.WarnContext(ctx, "service connection failed, retrying",
-			"service", name,
-			"attempt", attempt,
-			"max_attempts", maxAttempts,
-			"backoff", backoff,
-			"error", err,
-		)
-
-		select {
-		case <-time.After(backoff):
-		case <-ctx.Done():
-			return fmt.Errorf("%s: %w (context canceled during retry)", name, err)
-		}
-	}
-	return fmt.Errorf("%s: failed after %d attempts: %w", name, maxAttempts, err)
-}
-
-func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router, pres Presentation, kvStore kv.Store) (Services, error) {
+func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router, pres Presentation, kvStore kv.Store, val validate.Validator) (Services, error) {
 	if runtime.Config.Env == config.Testing {
 		return Services{KVStore: kvStore}, nil
 	}
 
 	var pool *pgxpool.Pool
-	if err := connectWithRetry(ctx, "db", runtime.Logger, 3, func() error {
+	if err := cfgpkg.ConnectWithRetry(ctx, "db", runtime.Logger, 3, func() error {
 		var err error
-		pool, err = db.Connect(ctx,
+		pool, err = db.ConnectDSN(ctx, cfgpkg.ExpandSecret("DATABASE_URL"),
 			db.WithProductionDefaults(),
 			db.WithSlowQueryLogger(runtime.Logger, 500*time.Millisecond),
 		)
@@ -107,7 +70,7 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 		Queue:     qDispatcher,
 		Notifier:  notifier,
 		Router:    rt,
-		Validator: validate.New(),
+		Validator: val,
 		Service: contact.ServiceConfig{
 			RateLimit:  runtime.Config.Contact.RateLimit,
 			RateWindow: runtime.Config.Contact.RateWindow,
@@ -121,7 +84,7 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 		Logger:   runtime.Logger,
 	})
 
-	authMod, oauthProvider, err := provideAuth(runtime.Config, runtime.Logger, pool, kvStore, rt, pres.ViewOpts)
+	authMod, oauthProvider, err := provideAuth(runtime.Config, runtime.Logger, pool, kvStore, rt, pres.ViewOpts, val)
 	if err != nil {
 		pool.Close()
 		return Services{}, fmt.Errorf("services: %w", err)

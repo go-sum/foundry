@@ -1,6 +1,7 @@
-package auth
+package authn
 
 import (
+	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
 	webauth "github.com/go-sum/foundry/pkg/web/auth"
 	"github.com/go-sum/foundry/pkg/web/htmx"
@@ -21,44 +22,44 @@ type Renderer interface {
 
 // SigninPageData carries state for rendering the signin view.
 type SigninPageData struct {
-	Input      BeginSigninInput
+	Input      auth.BeginSigninInput
 	Errors     map[string]string
 	FormErrors []string
-	Config     Config
+	Config     auth.Config
 	ReturnTo   string // URL to return to after successful signin; empty means "/"
 }
 
 // SignupPageData carries state for rendering the signup view.
 type SignupPageData struct {
-	Input      BeginSignupInput
+	Input      auth.BeginSignupInput
 	Errors     map[string]string
 	FormErrors []string
-	Config     Config
+	Config     auth.Config
 	ReturnTo   string // URL to return to after successful signup; empty means "/"
 }
 
 // VerifyPageData carries state for rendering the verification view.
 type VerifyPageData struct {
-	Input      VerifyInput
+	Input      auth.VerifyInput
 	Errors     map[string]string
 	FormErrors []string
-	State      VerifyPageState
+	State      auth.VerifyPageState
 }
 
 // EmailChangePageData carries state for rendering the email change view.
 type EmailChangePageData struct {
-	Input      BeginEmailChangeInput
+	Input      auth.BeginEmailChangeInput
 	Errors     map[string]string
 	FormErrors []string
 }
 
 // AuthHandler handles HTTP requests for email-TOTP authentication flows.
 type AuthHandler struct {
-	svc       *AuthService
+	svc       *auth.AuthService
 	router    *router.Router
 	validator validate.Validator
 	renderer  Renderer
-	config    Config
+	config    auth.Config
 }
 
 // ShowSignin renders the signin form.
@@ -71,7 +72,7 @@ func (h *AuthHandler) ShowSignin(c *web.Context) (web.Response, error) {
 func (h *AuthHandler) BeginSignin(c *web.Context) (web.Response, error) {
 	sess, _ := session.FromContext(c)
 
-	var input BeginSigninInput
+	var input auth.BeginSigninInput
 	if err := validate.Bind(h.validator, c.Request, &input); err != nil {
 		return h.renderer.SigninPage(c, SigninPageData{
 			Input:      input,
@@ -107,7 +108,7 @@ func (h *AuthHandler) ShowSignup(c *web.Context) (web.Response, error) {
 func (h *AuthHandler) BeginSignup(c *web.Context) (web.Response, error) {
 	sess, _ := session.FromContext(c)
 
-	var input BeginSignupInput
+	var input auth.BeginSignupInput
 	if err := validate.Bind(h.validator, c.Request, &input); err != nil {
 		return h.renderer.SignupPage(c, SignupPageData{
 			Input:      input,
@@ -148,7 +149,7 @@ func (h *AuthHandler) ShowVerify(c *web.Context) (web.Response, error) {
 		}
 		return h.renderer.VerifyPage(c, VerifyPageData{
 			State: state,
-			Input: VerifyInput{Token: token},
+			Input: auth.VerifyInput{Token: token},
 		})
 	}
 
@@ -159,7 +160,7 @@ func (h *AuthHandler) ShowVerify(c *web.Context) (web.Response, error) {
 	}
 
 	return h.renderer.VerifyPage(c, VerifyPageData{
-		State: VerifyPageState{
+		State: auth.VerifyPageState{
 			Purpose:   flow.Purpose,
 			Email:     flow.Email,
 			CanResend: true,
@@ -172,7 +173,7 @@ func (h *AuthHandler) ShowVerify(c *web.Context) (web.Response, error) {
 func (h *AuthHandler) Verify(c *web.Context) (web.Response, error) {
 	sess, _ := session.FromContext(c)
 
-	var input VerifyInput
+	var input auth.VerifyInput
 	if err := validate.Bind(h.validator, c.Request, &input); err != nil {
 		return h.renderer.VerifyPage(c, VerifyPageData{
 			Input:      input,
@@ -180,7 +181,7 @@ func (h *AuthHandler) Verify(c *web.Context) (web.Response, error) {
 		})
 	}
 
-	var result VerifyResult
+	var result auth.VerifyResult
 	var err error
 	var returnTo string
 
@@ -192,7 +193,7 @@ func (h *AuthHandler) Verify(c *web.Context) (web.Response, error) {
 			return web.Response{}, web.ErrBadRequest("No pending verification flow")
 		}
 		returnTo = flow.ReturnTo
-		var updatedFlow PendingFlow
+		var updatedFlow auth.PendingFlow
 		result, updatedFlow, err = h.svc.VerifyPendingFlow(c.Context(), flow, input)
 		if err != nil {
 			// Persist the attempt count back to the session so brute-force
@@ -264,7 +265,7 @@ func (h *AuthHandler) BeginEmailChange(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrBadRequest("Invalid session")
 	}
 
-	var input BeginEmailChangeInput
+	var input auth.BeginEmailChangeInput
 	if err := validate.Bind(h.validator, c.Request, &input); err != nil {
 		return h.renderer.EmailChangePage(c, EmailChangePageData{
 			Input:      input,

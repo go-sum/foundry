@@ -1,33 +1,34 @@
-// Package view provides request-scoped presentation state and rendering helpers.
-package view
+// Package viewstate provides request-scoped presentation state and rendering helpers.
+package viewstate
 
 import (
-	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/componentry/compound"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
-	"github.com/go-sum/foundry/internal/view/layout"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/render"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/session"
+	"github.com/go-sum/foundry/pkg/web/viewstate/layout"
 
 	g "maragu.dev/gomponents"
 )
 
 // Request collects request-scoped presentation state needed by pages and layout.
 type Request struct {
-	CurrentPath     string
-	HTMX            HTMXRequest
-	CSRFToken       string             // CSRF token for form rendering; set via WithCSRFToken.
-	CSRFFieldName   string             // CSRF form field name; auto-populated from context.
-	CSRFHeaderName  string             // CSRF header name; auto-populated from context.
-	RequestID       string             // Correlation ID; set via WithRequestID.
-	Nonce           string             // CSP nonce; set via WithNonce.
-	Flash           []string           // Flash messages; set via WithFlash.
-	Auth            auth.Identity      // Auth identity; auto-populated from context via auth.LoadSession middleware.
-	NavConfig       compound.NavConfig // Declarative nav config; set via WithNavConfig.
-	PathFunc        func(string) string // Asset path resolver; set via WithPathFunc.
-	Icons           *icons.Registry    // Icon registry; set via WithIconRegistry.
+	CurrentPath    string
+	HTMX           HTMXRequest
+	CSRFToken      string             // CSRF token for form rendering; set via WithCSRFToken.
+	CSRFFieldName  string             // CSRF form field name; auto-populated from context.
+	CSRFHeaderName string             // CSRF header name; auto-populated from context.
+	RequestID      string             // Correlation ID; set via WithRequestID.
+	Nonce          string             // CSP nonce; set via WithNonce.
+	Flash          []string           // Flash messages; set via WithFlash.
+	Auth           authn.Identity     // Auth identity; auto-populated from context via authn.LoadSession middleware.
+	NavConfig      compound.NavConfig // Declarative nav config; set via WithNavConfig.
+	PathFunc       func(string) string // Asset path resolver; set via WithPathFunc.
+	Icons          *icons.Registry    // Icon registry; set via WithIconRegistry.
+	layoutFunc     func(layout.Props) g.Node
 }
 
 // HTMXRequest holds HTMX-specific request state parsed from headers.
@@ -65,7 +66,7 @@ func WithFlash(messages ...string) RequestOption {
 
 // WithAuth sets the auth identity on the view request, overriding the value
 // auto-populated from context. Useful in tests and middleware that synthesise identity.
-func WithAuth(id auth.Identity) RequestOption {
+func WithAuth(id authn.Identity) RequestOption {
 	return func(r *Request) { r.Auth = id }
 }
 
@@ -89,6 +90,13 @@ func WithPathFunc(fn func(string) string) RequestOption {
 // WithIconRegistry sets the icon registry used for rendering nav icons.
 func WithIconRegistry(r *icons.Registry) RequestOption {
 	return func(req *Request) { req.Icons = r }
+}
+
+// WithLayoutFunc sets a custom layout function that replaces the default HTML shell.
+// Use this when the app needs a different document structure while keeping the
+// standard request-scoped state machinery.
+func WithLayoutFunc(fn func(layout.Props) g.Node) RequestOption {
+	return func(r *Request) { r.layoutFunc = fn }
 }
 
 // NewRequest builds request-scoped presentation state from a web.Context.
@@ -115,7 +123,7 @@ func NewRequest(c *web.Context, opts ...RequestOption) Request {
 		r.CSRFFieldName = secure.CSRFFieldName(c)
 		r.CSRFHeaderName = secure.CSRFHeaderName(c)
 		r.Nonce = secure.Nonce(c)
-		r.Auth = auth.GetIdentity(c)
+		r.Auth = authn.GetIdentity(c)
 		if sess, ok := session.FromContext(c); ok {
 			if msgs, ok := session.PopFlashMessages(sess); ok {
 				r.Flash = msgs
@@ -159,7 +167,7 @@ func (r Request) Page(title string, children ...g.Node) g.Node {
 			Icons:           r.Icons,
 		})
 	}
-	return layout.Page(layout.Props{
+	props := layout.Props{
 		Title:          title,
 		Nonce:          r.Nonce,
 		CSRFToken:      r.CSRFToken,
@@ -169,7 +177,11 @@ func (r Request) Page(title string, children ...g.Node) g.Node {
 		Nav:            nav,
 		PathFunc:       r.PathFunc,
 		Children:       children,
-	})
+	}
+	if r.layoutFunc != nil {
+		return r.layoutFunc(props)
+	}
+	return layout.Page(props)
 }
 
 // Render chooses the correct response mode. HTMX partial requests receive

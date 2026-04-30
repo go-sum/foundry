@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/go-sum/foundry/internal/view/page"
 	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
 	"github.com/go-sum/foundry/pkg/web"
@@ -16,27 +16,27 @@ import (
 // Handler serves the contact form endpoints.
 type Handler struct {
 	rt      *router.Router
-	reqOpts []view.RequestOption
+	reqOpts []viewstate.RequestOption
 	svc     Service
 	val     validate.Validator
 }
 
 // NewHandler creates a contact Handler.
-func NewHandler(rt *router.Router, svc Service, val validate.Validator, opts ...view.RequestOption) *Handler {
+func NewHandler(rt *router.Router, svc Service, val validate.Validator, opts ...viewstate.RequestOption) *Handler {
 	return &Handler{rt: rt, reqOpts: opts, svc: svc, val: val}
 }
 
 // Form renders the contact form page.
 func (h *Handler) Form(c *web.Context) (web.Response, error) {
-	vr := view.NewRequest(c, h.reqOpts...)
+	vr := viewstate.NewRequest(c, h.reqOpts...)
 	submitURL := h.rt.MustReverse("contact.submit", nil)
 	data := contactpartial.FormData{}
-	return view.Render(vr, page.ContactPage(vr, submitURL, data), contactpartial.ContactForm(vr, submitURL, data))
+	return viewstate.Render(vr, page.ContactPage(vr, submitURL, data), contactpartial.ContactForm(vr, submitURL, data))
 }
 
 // Submit processes a contact form POST.
 func (h *Handler) Submit(c *web.Context) (web.Response, error) {
-	vr := view.NewRequest(c, h.reqOpts...)
+	vr := viewstate.NewRequest(c, h.reqOpts...)
 	submitURL := h.rt.MustReverse("contact.submit", nil)
 
 	var input ContactInput

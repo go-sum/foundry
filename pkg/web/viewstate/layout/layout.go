@@ -1,4 +1,4 @@
-// Package layout provides the application's HTML shell.
+// Package layout provides the HTML shell for viewstate-aware pages.
 package layout
 
 import (

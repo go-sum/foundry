@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/go-sum/foundry/pkg/web/render"
 )
 
@@ -15,7 +15,7 @@ const (
 )
 
 func TestContactForm_FormState(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := FormData{}
 
@@ -47,7 +47,7 @@ func TestContactForm_FormState(t *testing.T) {
 }
 
 func TestContactForm_FormState_WithSubmitURL(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/api/contact/submit"
 	data := FormData{}
 
@@ -59,7 +59,7 @@ func TestContactForm_FormState_WithSubmitURL(t *testing.T) {
 }
 
 func TestContactForm_SuccessState(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := FormData{Sent: true}
 
@@ -82,7 +82,7 @@ func TestContactForm_SuccessState(t *testing.T) {
 }
 
 func TestContactForm_SuccessState_ExactMatch(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := FormData{Sent: true}
 
@@ -102,7 +102,7 @@ func TestContactForm_SuccessState_ExactMatch(t *testing.T) {
 }
 
 func TestContactForm_ValidationErrors(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := FormData{
 		Name: "Alice",
@@ -135,7 +135,7 @@ func TestContactForm_ValidationErrors(t *testing.T) {
 }
 
 func TestContactForm_ValidationErrors_MultipleFields(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := FormData{
 		Errors: map[string][]string{
@@ -159,7 +159,7 @@ func TestContactForm_ValidationErrors_MultipleFields(t *testing.T) {
 }
 
 func TestContactForm_PreservesFormValues(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := FormData{
 		Name:    "Bob",
@@ -180,7 +180,7 @@ func TestContactForm_PreservesFormValues(t *testing.T) {
 }
 
 func TestContactForm_CSRFToken(t *testing.T) {
-	req := view.Request{CSRFToken: "test-csrf-token-abc"}
+	req := viewstate.Request{CSRFToken: "test-csrf-token-abc"}
 	submitURL := "/contact"
 	data := FormData{}
 
@@ -192,7 +192,7 @@ func TestContactForm_CSRFToken(t *testing.T) {
 }
 
 func TestContactForm_HTMLEntities(t *testing.T) {
-	req := view.Request{}
+	req := viewstate.Request{}
 	submitURL := "/contact"
 	data := FormData{
 		Name: "O'Brien & Associates",

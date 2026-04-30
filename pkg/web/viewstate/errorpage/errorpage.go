@@ -7,15 +7,15 @@ import (
 	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 	"github.com/go-sum/foundry/pkg/componentry/ui/data"
 	"github.com/go-sum/foundry/pkg/componentry/ui/feedback"
-	"github.com/go-sum/foundry/internal/view"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/viewstate"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )
 
 // ErrorPage wraps ErrorContent in the full-page layout.
-func ErrorPage(req view.Request, e *web.Error) g.Node {
+func ErrorPage(req viewstate.Request, e *web.Error) g.Node {
 	return req.Page(e.Title, ErrorContent(e))
 }
 

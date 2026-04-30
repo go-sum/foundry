@@ -2,7 +2,7 @@
 package page
 
 import (
-	"github.com/go-sum/foundry/internal/view"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
@@ -15,12 +15,12 @@ type ServiceStatus struct {
 }
 
 // HomePage renders the home page.
-func HomePage(req view.Request, statuses []ServiceStatus) g.Node {
+func HomePage(req viewstate.Request, statuses []ServiceStatus) g.Node {
 	return req.Page("Home", HomeContent(req, statuses))
 }
 
 // HomeContent renders the home page content (for HTMX partial).
-func HomeContent(_ view.Request, statuses []ServiceStatus) g.Node {
+func HomeContent(_ viewstate.Request, statuses []ServiceStatus) g.Node {
 	nodes := []g.Node{
 		h.Div(
 			h.Class("space-y-4"),
