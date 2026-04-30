@@ -10,8 +10,8 @@ weight: 28
 > application.
 >
 > It complements [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md) (project
-> structure, wiring, and shutdown), [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) (handler,
-> middleware, error taxonomy, and retry/resilience patterns), and
+> structure, wiring, and shutdown), [`ERROR_HANDLING.md`](./ERROR_HANDLING.md)
+> (error taxonomy, retry, and resilience patterns), and
 > [`CODE_REVIEW.md`](./CODE_REVIEW.md) (review checklists).
 >
 > Read this together with [`CLAUDE.md`](../CLAUDE.md) for behavioral rules.

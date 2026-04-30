@@ -81,26 +81,26 @@ For `##`-level sections, all nested `###` subsections are included automatically
 
 The MCP parser extracts section numbers from headers by splitting on the first `.`:
 
-```
-## 5. Title         →  number="5",  title="Title"
-### 5a. Title       →  number="5a", title="Title"
-## 10b. Long Title  →  number="10b", title="Long Title"
-```
+- `## 5. Title` → `number="5"`, `title="Title"`
+- `### 5a. Title` → `number="5a"`, `title="Title"`
+- `## 10b. Long Title` → `number="10b"`, `title="Long Title"`
 
 **Valid number format:** starts with a digit (`0–9`), followed by zero or more alphanumeric
 characters (`0–9`, `a–z`, `A–Z`). Examples: `1`, `2a`, `5c`, `10b`, `0`.
+
+When documenting heading syntax in a `.decisions/` file, indent sample headings or
+prefix them with list markers. Literal column-1 `##` / `###` examples are parsed as
+real sections by `gomcp`.
 
 ### 2a. Level-2 Section Numbering (`##`)
 
 Use sequential integers starting from 1. Reserve `0` for the Quick Reference section:
 
-```markdown
-## 0. Quick Reference
-## 1. First Major Topic
-## 2. Second Major Topic
-## 2a. Sub-topic of 2 (when a topic requires subordinate grouping)
-## 3. Third Major Topic
-```
+    ## 0. Quick Reference
+    ## 1. First Major Topic
+    ## 2. Second Major Topic
+    ## 2a. Sub-topic of 2 (when a topic requires subordinate grouping)
+    ## 3. Third Major Topic
 
 The `Na.` pattern for `##` sections (e.g., `## 2a.`) is appropriate only when a topic
 needs a related but distinct grouping that does not warrant its own document.
@@ -109,13 +109,11 @@ needs a related but distinct grouping that does not warrant its own document.
 
 Use the parent section number as a prefix, followed by a lowercase letter:
 
-```markdown
-## 3. Dependency Injection
-### 3a. Constructor Functions for Dependency Wiring
-### 3b. Layered Dependency Injection Pattern
-### 3c. Interface-Based Dependencies for Testability
-### 3d. Configuration Struct as a Dependency
-```
+    ## 3. Dependency Injection
+    ### 3a. Constructor Functions for Dependency Wiring
+    ### 3b. Layered Dependency Injection Pattern
+    ### 3c. Interface-Based Dependencies for Testability
+    ### 3d. Configuration Struct as a Dependency
 
 Letters continue alphabetically: `3a`, `3b`, `3c`, ... `3z`. For sections with more than
 26 subsections, continue with `3aa`, `3ab`, etc. (rare in practice).
@@ -124,12 +122,10 @@ Letters continue alphabetically: `3a`, `3b`, `3c`, ... `3z`. For sections with m
 
 These formats are silently broken by the parser:
 
-```markdown
-### 1.1 Title      ← parser extracts "1", not "1.1" — collides with parent ## 1
-### 2.3 Title      ← same problem
-### Title          ← no number at all — only reachable by fragile title substring match
-## Title           ← no number — same problem
-```
+    ### 1.1 Title      ← parser extracts "1", not "1.1" — collides with parent ## 1
+    ### 2.3 Title      ← same problem
+    ### Title          ← no number at all — only reachable by fragile title substring match
+    ## Title           ← no number — same problem
 
 ---
 
@@ -180,13 +176,11 @@ contain keywords. Avoid titles exceeding 10 words.
 
 Every `.decisions/` document must have YAML frontmatter at the top:
 
-```yaml
----
-title: Short Human-Readable Title
-description: "keyword one, keyword two, keyword three, ..."
-weight: 15
----
-```
+    ---
+    title: Short Human-Readable Title
+    description: "keyword one, keyword two, keyword three, ..."
+    weight: 15
+    ---
 
 ### 4a. Title Field
 
@@ -201,13 +195,13 @@ of searchable terms — not a prose sentence. Include:
 - Names of patterns, tools, or mechanisms (e.g., `pgxpool`, `AppHandler`, `slog`)
 - Alternative phrasings agents might search for
 
-```yaml
-# Good — keyword list:
-description: "raw SQL vs ORM, pgx driver, connection pooling, pgxpool configuration, repository pattern, sentinel errors, schema migrations, DBTX interface, transaction management, deadlock prevention"
+Good example:
 
-# Avoid — prose sentence:
-description: "Governing patterns for Go data persistence — driver selection, connection pooling, migrations, transactions, and the repository pattern."
-```
+    description: "raw SQL vs ORM, pgx driver, connection pooling, pgxpool configuration, repository pattern, sentinel errors, schema migrations, DBTX interface, transaction management, deadlock prevention"
+
+Avoid:
+
+    description: "Governing patterns for Go data persistence — driver selection, connection pooling, migrations, transactions, and the repository pattern."
 
 ### 4c. Weight Field
 
@@ -291,14 +285,12 @@ Every document must begin with a `## 0. Quick Reference` section immediately aft
 introductory blockquote. It should contain 5–10 bullet points covering the document's
 key topics and their section numbers:
 
-```markdown
-## 0. Quick Reference
+    ## 0. Quick Reference
 
-- §1 Topic one: brief description of what agents find here
-- §2 Topic two: key pattern or rule name
-- §3a Specific subsection: when this is the primary entry point
-- §4 Topic four: include named tools or patterns
-```
+    - §1 Topic one: brief description of what agents find here
+    - §2 Topic two: key pattern or rule name
+    - §3a Specific subsection: when this is the primary entry point
+    - §4 Topic four: include named tools or patterns
 
 ### 7b. Purpose
 

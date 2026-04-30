@@ -13,16 +13,18 @@ weight: 30
 > It incorporates the relevant design principles from [`tailwindcss.com`](https://tailwindcss.com/) 
 > and one of the definitive guides on design [`Refactoring UI`](https://refactoringui.com/) 
 > by Adam Wathan & Steve Schoger, adapted to the application's current UI surface and
-> the `github.com/go-sum/componentry` package layout. This guide should stand on its own
+> the `github.com/go-sum/foundry/pkg/componentry` package layout. This guide should stand on its own
 > without requiring the source text.
 >
 > The guidance is tailored to:
 >
-> - reusable components in `github.com/go-sum/componentry/ui/`
-> - form controls in `github.com/go-sum/componentry/form/`
-> - higher-level interaction and HTMX helpers in `github.com/go-sum/componentry/interactive/`
->   and `github.com/go-sum/componentry/patterns/`
-> - app-specific composition in `internal/view/`
+> - reusable components in `github.com/go-sum/foundry/pkg/componentry/ui/`
+> - form controls in `github.com/go-sum/foundry/pkg/componentry/form/`
+> - higher-level interaction and HTMX helpers in
+>   `github.com/go-sum/foundry/pkg/componentry/interactive/` and
+>   `github.com/go-sum/foundry/pkg/componentry/patterns/`
+> - app-specific composition in `starter/internal/view/` layered on top of
+>   `pkg/web/viewstate/`
 
 ---
 
@@ -58,11 +60,12 @@ inside views.
 
 This guide covers:
 
-- visual principles for components in `github.com/go-sum/componentry/ui/`
-- how `github.com/go-sum/componentry/form`, `github.com/go-sum/componentry/interactive`, and
-  `github.com/go-sum/componentry/patterns` should shape interface behavior
-- how full pages and HTMX partials in `internal/view/` should compose those
-  pieces
+- visual principles for components in `github.com/go-sum/foundry/pkg/componentry/ui/`
+- how `github.com/go-sum/foundry/pkg/componentry/form`,
+  `github.com/go-sum/foundry/pkg/componentry/interactive`, and
+  `github.com/go-sum/foundry/pkg/componentry/patterns` should shape interface behavior
+- how full pages and HTMX partials in `starter/internal/view/` should compose
+  those pieces through `pkg/web/viewstate`
 - the default spacing, typography, color, and elevation language of the app
 
 This guide does not try to document every exported API. For exact props and
@@ -70,18 +73,18 @@ rendering behavior, read the package source and tests.
 
 Primary code references:
 
-- `github.com/go-sum/componentry/examples`
-- `github.com/go-sum/componentry/ui/core`
-- `github.com/go-sum/componentry/ui/data`
-- `github.com/go-sum/componentry/ui/feedback`
-- `github.com/go-sum/componentry/ui/layout`
-- `github.com/go-sum/componentry/form`
-- `github.com/go-sum/componentry/interactive`
-- `github.com/go-sum/componentry/patterns`
-- `internal/view/layout/`
-- `internal/view/page/`
-- `internal/view/partial/`
-- `internal/view/errorpage/`
+- `pkg/showcase/componentry/`
+- `github.com/go-sum/foundry/pkg/componentry/ui/core`
+- `github.com/go-sum/foundry/pkg/componentry/ui/data`
+- `github.com/go-sum/foundry/pkg/componentry/ui/feedback`
+- `github.com/go-sum/foundry/pkg/componentry/ui/layout`
+- `github.com/go-sum/foundry/pkg/componentry/form`
+- `github.com/go-sum/foundry/pkg/componentry/interactive`
+- `github.com/go-sum/foundry/pkg/componentry/patterns`
+- `pkg/web/viewstate/layout/`
+- `pkg/web/viewstate/errorpage/`
+- `starter/internal/view/page/`
+- `starter/internal/view/partial/`
 
 ---
 
@@ -100,9 +103,9 @@ In this repo that means:
 
 Good current examples:
 
-- `internal/view/page/users.go`
-- `internal/view/partial/userpartial/user_form.go`
-- `internal/view/page/contact.go`
+- `starter/internal/view/page/home.go`
+- `starter/internal/view/page/contact.go`
+- `starter/internal/view/partial/contactpartial/contact_form.go`
 
 The shell should emerge from repeated feature needs. It should not be the first
 thing designed.
@@ -219,9 +222,9 @@ Current hierarchy defaults:
 
 Examples:
 
-- `github.com/go-sum/componentry/ui/data` (card)
-- `github.com/go-sum/componentry/ui/core` (button)
-- `internal/view/page/home.go`
+- `github.com/go-sum/foundry/pkg/componentry/ui/data` (card)
+- `github.com/go-sum/foundry/pkg/componentry/ui/core` (button)
+- `starter/internal/view/page/home.go`
 
 ### 3h. Size Alone Does Not Create Hierarchy
 
@@ -383,10 +386,10 @@ Current patterns to preserve:
 
 Examples:
 
-- `github.com/go-sum/componentry/ui/core` (button)
-- `github.com/go-sum/componentry/form` (field)
-- `github.com/go-sum/componentry/ui/feedback` (alert)
-- `github.com/go-sum/componentry/interactive/pagination`
+- `github.com/go-sum/foundry/pkg/componentry/ui/core` (button)
+- `github.com/go-sum/foundry/pkg/componentry/form` (field)
+- `github.com/go-sum/foundry/pkg/componentry/ui/feedback` (alert)
+- `github.com/go-sum/foundry/pkg/componentry/interactive/pagination`
 
 ---
 
@@ -552,9 +555,9 @@ as a rhythm, not as a pile of local tweaks.
 
 Good current examples:
 
-- `internal/view/page/users.go`
-- `internal/view/page/home.go`
-- `internal/view/errorpage/error.go`
+- `starter/internal/view/page/home.go`
+- `starter/internal/view/page/contact.go`
+- `pkg/web/viewstate/errorpage/errorpage.go`
 
 #### Establish a spacing and sizing system
 
@@ -716,15 +719,16 @@ Every meaningful surface should consider:
 - what appears while work is happening
 - what appears when the operation fails
 
-The empty users card and loading indicator are the current model for this:
+The home status cards and contact form pending state are the current model for this:
 
-- `internal/view/page/users.go`
+- `starter/internal/view/page/home.go`
+- `starter/internal/view/partial/contactpartial/contact_form.go`
 
 ---
 
 ## 5. Component Library Guide
 
-### 5a. Core UI Components (componentry/ui/core)
+### 5a. Core UI Components (pkg/componentry/ui/core)
 
 Use `ui/core` for the smallest shared primitives.
 
@@ -765,7 +769,7 @@ Use sizes consistently:
 - `SizeSm` for row actions, pagination controls, and compact nav actions
 - `SizeLg` only when the layout genuinely needs a larger target
 
-### 5c. Data Display Components (componentry/ui/data)
+### 5c. Data Display Components (pkg/componentry/ui/data)
 
 Use `ui/data` for grouped informational surfaces and tabular display.
 
@@ -783,7 +787,7 @@ Rules:
 - keep table actions compact and aligned for scanning
 - keep card padding inside card subcomponents, not wrapper `div` clutter
 
-### 5d. Feedback Components (componentry/ui/feedback)
+### 5d. Feedback Components (pkg/componentry/ui/feedback)
 
 Use `ui/feedback` for feedback surfaces and progress, not for terse status
 chips.
@@ -793,6 +797,7 @@ Primary components:
 - `Alert`
 - `Toast`
 - `Progress`
+- `Spinner`
 
 Rules:
 
@@ -801,7 +806,7 @@ Rules:
 - destructive variants are for danger or failure, not generic emphasis
 - preserve the accessibility roles and structure already encoded in the package
 
-### 5e. Layout Components (componentry/ui/layout)
+### 5e. Layout Components (pkg/componentry/ui/layout)
 
 Use `ui/layout` for shell-level navigation and structural navigation patterns.
 
@@ -818,18 +823,18 @@ Rules:
   drawer pattern
 - push auth and theme differences through nav slots, not duplicated view logic
 
-### 5f. Form Components (componentry/form)
+### 5f. Form Components (pkg/componentry/form)
 
 Use `form` for accessible field composition and consistent input wiring.
 
 Primary components and helpers:
 
 - `Field`
+- `Fieldset`
 - `Input`
 - `Textarea`
 - `Select`
-- `Checkbox`
-- `Radio`
+- `FileUpload`
 - `Switch`
 - `Toggle`
 - `FieldControlAttrs`
@@ -841,7 +846,7 @@ Rules:
 - prefer package defaults over hand-assembling error markup
 - keep standalone forms narrow unless the task genuinely requires density
 
-### 5g. Interactive Components (componentry/interactive)
+### 5g. Interactive Components (pkg/componentry/interactive)
 
 Use `interactive/*` for higher-level UI that remains HTML-first and progressive.
 
@@ -861,7 +866,7 @@ Rules:
 - keep interaction affordances consistent with the rest of the design language
 - use these packages when behavior would otherwise be reimplemented in a page
 
-### 5h. UI Patterns Library (componentry/patterns)
+### 5h. UI Patterns Library (pkg/componentry/patterns)
 
 Use `patterns/*` for cross-cutting UI behavior and wiring rather than visual
 primitives.
@@ -883,10 +888,10 @@ Rules:
 - use flash and head helpers for app-wide conventions instead of view-local
   duplication
 
-### 5i. Component Examples (componentry/examples)
+### 5i. Component Examples (pkg/showcase/componentry)
 
-Treat `github.com/go-sum/componentry/examples` as the living visual reference
-for the component library.
+Treat `pkg/showcase/componentry` as the living visual reference for the
+component library.
 
 Use it to:
 
@@ -898,9 +903,10 @@ Use it to:
 
 ## 6. View Composition and Layout
 
-### 6a. Layout Templates (internal/view/layout/)
+### 6a. Layout Templates (pkg/web/viewstate/layout/)
 
-`internal/view/layout/base.go` is the application shell.
+`pkg/web/viewstate/layout/layout.go` is the shared application shell behind
+`viewstate.Request.Page(...)`.
 
 It is responsible for:
 
@@ -912,13 +918,13 @@ It is responsible for:
 
 Do not duplicate shell concerns in page-level views.
 
-### 6b. Full Page Views (internal/view/page/)
+### 6b. Full Page Views (starter/internal/view/page/)
 
-Use `internal/view/page/` for full-page constructors.
+Use `starter/internal/view/page/` for full-page constructors.
 
 Rules:
 
-- accept `view.Request` first
+- accept `viewstate.Request` first
 - wrap content with `req.Page(...)`
 - compose page structure with shared components first, utilities second
 - use utility classes for layout and spacing, not to recreate button, card, or
@@ -928,12 +934,11 @@ Rules:
 Current page patterns:
 
 - `home.go`: centered landing composition with clear action hierarchy
-- `users.go`: heading plus HTMX-replaceable region
 - `contact.go`: focused form flow and supportive copy
 
-### 6c. HTMX Partial Views (internal/view/partial/)
+### 6c. HTMX Partial Views (starter/internal/view/partial/)
 
-Use `internal/view/partial/` for HTMX-replaceable fragments.
+Use `starter/internal/view/partial/` for HTMX-replaceable fragments.
 
 Rules:
 
@@ -944,11 +949,11 @@ Rules:
 
 Reference implementations:
 
-- `userpartial/user_row.go`: compact row actions in a tabular context
-- `userpartial/user_form.go`: inline editing while preserving table structure
 - `contactpartial/contact_form.go`: fragment-safe form composition
+- `pkg/web/viewstate/errorpage/errorpage.go`: full-page and partial parity
+- `pkg/showcase/componentry/demo/demo.go`: isolated demo fragments for shared UI
 
-### 6d. Error Page Views (internal/view/errorpage/)
+### 6d. Error Page Views (pkg/web/viewstate/errorpage/)
 
 Errors should look like part of the application, not fallback HTML.
 
@@ -962,7 +967,7 @@ Follow the existing pattern:
 
 Reference:
 
-- `internal/view/errorpage/error.go`
+- `pkg/web/viewstate/errorpage/errorpage.go`
 
 ---
 
@@ -1077,22 +1082,19 @@ Before merging a UI change, confirm:
 
 Use these as the practical source of truth:
 
-- `github.com/go-sum/componentry/examples`
-- `github.com/go-sum/componentry/ui/core` (button, badge, label)
-- `github.com/go-sum/componentry/ui/data` (card, table)
-- `github.com/go-sum/componentry/ui/feedback` (alert, toast, progress)
-- `github.com/go-sum/componentry/ui/layout` (navmenu, navbar, sidebar)
-- `github.com/go-sum/componentry/form` (field)
-- `github.com/go-sum/componentry/interactive/pagination`
-- `github.com/go-sum/componentry/patterns/htmx`
-- `internal/view/layout/base.go`
-- `internal/view/page/home.go`
-- `internal/view/page/users.go`
-- `internal/view/page/contact.go`
-- `internal/view/errorpage/error.go`
-- `internal/view/partial/contactpartial/contact_form.go`
-- `internal/view/partial/userpartial/user_form.go`
-- `internal/view/partial/userpartial/user_row.go`
+- `pkg/showcase/componentry/`
+- `github.com/go-sum/foundry/pkg/componentry/ui/core` (button, badge, label)
+- `github.com/go-sum/foundry/pkg/componentry/ui/data` (card, table)
+- `github.com/go-sum/foundry/pkg/componentry/ui/feedback` (alert, toast, progress, spinner)
+- `github.com/go-sum/foundry/pkg/componentry/ui/layout` (navmenu, navbar, sidebar)
+- `github.com/go-sum/foundry/pkg/componentry/form` (field, fieldset, file upload)
+- `github.com/go-sum/foundry/pkg/componentry/interactive/pagination`
+- `github.com/go-sum/foundry/pkg/componentry/patterns/htmx`
+- `pkg/web/viewstate/layout/layout.go`
+- `pkg/web/viewstate/errorpage/errorpage.go`
+- `starter/internal/view/page/home.go`
+- `starter/internal/view/page/contact.go`
+- `starter/internal/view/partial/contactpartial/contact_form.go`
 
 When this guide and the code diverge, update the guide quickly. UI guidance is
 only useful if it describes the UI that actually exists.

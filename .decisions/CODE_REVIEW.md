@@ -11,8 +11,9 @@ weight: 30
 > verification protocol, and recognized valid patterns into one reference.
 >
 > It complements [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md) (project
-> structure, wiring, and shutdown), [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) (handler,
-> middleware, and service patterns), [`DATA_STORAGE.md`](./DATA_STORAGE.md)
+> structure, wiring, and shutdown), [`ERROR_HANDLING.md`](./ERROR_HANDLING.md)
+> (boundary and resilience patterns), [`MIDDLEWARE_AND_CONTEXT.md`](./MIDDLEWARE_AND_CONTEXT.md)
+> (middleware and request context flow), [`DATA_STORAGE.md`](./DATA_STORAGE.md)
 > (persistence patterns), and [`WEB_DESIGN.md`](./WEB_DESIGN.md) (concurrency
 > and runtime safety).
 
@@ -704,7 +705,7 @@ discipline as defined in [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md):
 - [ ] Server-owned deadlines marked with `web.ErrDependencyTimeout` before reaching boundary
 - [ ] `*web.Error.Error()` not called in intermediate code outside the boundary
 - [ ] Recovered panics not double-logged between boundary and `OnPanic` hook
-- [ ] Structured error events conform to the field schema in DESIGN_PATTERNS.md section 5c
+- [ ] Structured error events conform to the field schema in [`ERROR_HANDLING.md`](./ERROR_HANDLING.md) §4
 - [ ] When OTel tracing installed, `trace_id` and `span_id` included in structured events
 
 ---
@@ -714,6 +715,7 @@ discipline as defined in [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md):
 - Go Code Review Comments: <https://go.dev/wiki/CodeReviewComments>
 - Effective Go: <https://go.dev/doc/effective_go>
 - [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md)
-- [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md)
+- [`ERROR_HANDLING.md`](./ERROR_HANDLING.md)
+- [`MIDDLEWARE_AND_CONTEXT.md`](./MIDDLEWARE_AND_CONTEXT.md)
 - [`DATA_STORAGE.md`](./DATA_STORAGE.md)
 - [`WEB_DESIGN.md`](./WEB_DESIGN.md)

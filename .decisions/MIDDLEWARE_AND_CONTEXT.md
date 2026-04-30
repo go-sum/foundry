@@ -230,7 +230,7 @@ Before merging application-layer code, confirm every applicable item:
 These patterns cause bugs, test fragility, or security issues. Reject them in
 code review.
 
-### Context Anti-Patterns
+### 4a. Context Anti-Patterns
 
 - **String or int context keys.** They collide across packages. Always use an
   unexported typed constant.
@@ -242,7 +242,7 @@ code review.
   cross-cutting concerns that flow through middleware, not for avoiding function
   arguments.
 
-### Middleware Anti-Patterns
+### 4b. Middleware Anti-Patterns
 
 - **Writing the response before calling `next`.** This prevents downstream
   handlers from setting headers or status codes. Write *after* `next.ServeHTTP`

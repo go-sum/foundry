@@ -10,9 +10,9 @@ weight: 35
 > runtime safety patterns in Go web applications.
 >
 > It complements [`ARCHITECTURE_GUIDE.md`](./ARCHITECTURE_GUIDE.md) (project
-> structure, wiring, and shutdown), [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) (handler,
-> middleware, error taxonomy, and resilience patterns), and
-> [`CODE_REVIEW.md`](./CODE_REVIEW.md) (review checklists).
+> structure, wiring, and shutdown), [`ERROR_HANDLING.md`](./ERROR_HANDLING.md)
+> (error taxonomy and resilience patterns), and [`CODE_REVIEW.md`](./CODE_REVIEW.md)
+> (review checklists).
 >
 > Read this together with [`CLAUDE.md`](../CLAUDE.md) for behavioral rules.
 >
@@ -348,7 +348,7 @@ func (s *Server) handleOrder(c echo.Context) error {
 ### 3h. Retry with Exponential Backoff in Workers
 
 For transient failures in worker tasks, use exponential backoff with jitter.
-See [`DESIGN_PATTERNS.md` section 5g](./DESIGN_PATTERNS.md) for the canonical backoff
+See [`ERROR_HANDLING.md`](./ERROR_HANDLING.md) §8b for the canonical backoff
 policy and `pkg/web/retry` for the reference implementation.
 
 ---
@@ -1136,7 +1136,7 @@ Before merging code that introduces concurrency, confirm:
 
 ## 10. Sources
 
-- [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) -- retry, circuit breaker, and resilience patterns
+- [`ERROR_HANDLING.md`](./ERROR_HANDLING.md) -- retry, circuit breaker, and resilience patterns
 - Go Concurrency Patterns: <https://go.dev/blog/pipelines>
 - Effective Go - Concurrency: <https://go.dev/doc/effective_go#concurrency>
 - Go Data Race Detector: <https://go.dev/doc/articles/race_detector>

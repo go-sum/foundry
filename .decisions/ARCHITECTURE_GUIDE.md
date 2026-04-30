@@ -1,6 +1,6 @@
 ---
 title: Architecture Guide
-description: "project structure, flat vs modular layout, server struct pattern, Go 1.22+ routing, dependency injection, constructor functions, functional options, graceful shutdown, signal handling, package design, DRY, YAGNI, SOLID, rendering model, anti-patterns"
+description: "project structure, flat vs modular layout, server struct pattern, Go 1.22+ routing, dependency injection, constructor functions, functional options, graceful shutdown, signal handling, package design, DRY, YAGNI, SOLID, rendering model, leaf-node rule, starter application, pkg modules, anti-patterns"
 weight: 15
 ---
 
@@ -9,10 +9,11 @@ weight: 15
 > This guide is the authoritative source for how Go applications are structured,
 > wired, and run.
 >
-> It complements [`DESIGN_PATTERNS.md`](./DESIGN_PATTERNS.md) (handler, middleware, and
-> service patterns), [`CODE_REVIEW.md`](./CODE_REVIEW.md) (review checklists),
-> [`DATA_STORAGE.md`](./DATA_STORAGE.md) (persistence patterns), and
-> [`WEB_DESIGN.md`](./WEB_DESIGN.md) (concurrency and runtime safety).
+> It complements [`MIDDLEWARE_AND_CONTEXT.md`](./MIDDLEWARE_AND_CONTEXT.md)
+> (middleware and request context flow), [`ERROR_HANDLING.md`](./ERROR_HANDLING.md)
+> (boundary and resilience patterns), [`CODE_REVIEW.md`](./CODE_REVIEW.md)
+> (review checklists), [`DATA_STORAGE.md`](./DATA_STORAGE.md) (persistence patterns),
+> and [`WEB_DESIGN.md`](./WEB_DESIGN.md) (concurrency and runtime safety).
 >
 > Read this together with [`CLAUDE.md`](../CLAUDE.md) for behavioral rules.
 >
@@ -36,8 +37,10 @@ weight: 15
 - §6 Graceful shutdown: run() pattern, signal handling, shutdown timeout, cleanup ordering
 - §7/7a-c Package design: inward dependencies, DRY, YAGNI, SOLID, rendering model
 - §8 Anti-patterns: global DB vars, framework-first thinking, god packages, init() misuse
-- §9 Review checklist: architecture review items
-- §10a Guide relationships and how to navigate the decision docs
+- §9 Leaf-node rule: reusable `pkg/*` modules stay application-independent
+- §10 Review checklist: architecture review items
+- §11 Guide relationships and how to navigate the decision docs
+- §12 Additional sources
 
 ---
 
@@ -930,35 +933,70 @@ harder.
 
 ---
 
-## 9. Review Checklist
+## 9. Leaf-Node Rule
+
+The `pkg/` tree is divided into two tiers with different import rules:
+
+### Tier 1 — Leaf Modules (`pkg/<name>/`)
+
+Root-level `pkg/<name>` modules import only the Go standard library and external (non-foundry) modules. There are no imports from application-specific `internal/` packages and no cross-imports between sibling `pkg/` packages. This means any root-level `pkg/` module can be vendored into any Go project without pulling in application-specific code.
+
+Current leaf modules: `auth`, `web`, `db`, `kv`, `config`, `componentry`, `notification`, `queue`, `assets`.
+
+### Tier 2 — Bridge Sub-Modules (`pkg/<name>/<sub>/`)
+
+Sub-modules under a `pkg/<name>/` root are **bridge modules**: integration points that compose their parent leaf plus other declared packages. They exist to wire together leaf modules without polluting the leaves themselves.
+
+Rules for bridge modules:
+- May import their parent root module (e.g., `pkg/auth/authui` may import `pkg/auth`)
+- May import other `pkg/` leaves or bridges when forming a declared composition
+- Must never create cycles
+- Must be separate `go.mod` workspace modules (never a plain sub-package of the root)
+
+Current bridge modules and their declared composition targets:
+
+| Module | Composes |
+|--------|----------|
+| `pkg/web/authn` | `pkg/auth` (domain) + `pkg/web` (transport) |
+| `pkg/web/viewstate` | `pkg/web` + `pkg/web/authn` + `pkg/componentry` |
+| `pkg/auth/authui` | `pkg/auth` + `pkg/web` + `pkg/web/authn` + `pkg/componentry` |
+| `pkg/auth/pgstore` | `pkg/auth` + pgx (external) |
+| `pkg/auth/provider` | `pkg/auth` + `pkg/web/authn` + `pkg/web` |
+| `pkg/kv/redisstore` | `pkg/kv` + redis (external) |
+| `pkg/docs` | `pkg/web` |
+| `pkg/showcase` | `pkg/web` + `pkg/componentry` + `pkg/kv` |
+
+---
+## 10. Review Checklist
 
 Before merging a structural change, confirm:
 
-- Dependencies are constructed in the composition root and passed through
-  constructors.
-- No package reads environment variables outside `main.go` or the config
-  loader.
+- Dependencies are constructed in the composition root and passed through constructors.
+- No package reads environment variables outside `main.go` or the config loader.
 - No `init()` functions exist for runtime dependency setup.
 - Interfaces are defined at the consumer, not the provider.
-- No package imports a sibling domain package directly; cross-domain
-  communication uses consumer-defined interfaces.
+- No package imports a sibling domain package directly; cross-domain communication uses consumer-defined interfaces.
 - The server struct implements `http.Handler` via an internal router.
 - Route registration is centralized and every route has a name.
 - Path parameters are parsed and validated at the handler boundary.
 - Graceful shutdown follows reverse-creation order with a bounded timeout.
-- Health endpoints reflect actual readiness and are wired to the shutdown
-  sequence.
+- Health endpoints reflect actual readiness and are wired to the shutdown sequence.
 - No global mutable state is used for runtime dependencies.
 - Package names describe what they provide, not how they are used.
 
 ---
 
-## 10a. How The Guides Fit Together
+## 11. How The Guides Fit Together
 
 | Guide | Answers |
 |-------|---------|
 | **ARCHITECTURE_GUIDE.md** (this guide) | Where code belongs, how to structure, wire, and run |
-| [**DESIGN_PATTERNS.md**](./DESIGN_PATTERNS.md) | How handlers, middleware, services, logging, and testing work |
+| [**PRODUCTION_GO_RULES.md**](./PRODUCTION_GO_RULES.md) | Non-negotiable production Go rules: globals, errors, validation, testability |
+| [**MIDDLEWARE_AND_CONTEXT.md**](./MIDDLEWARE_AND_CONTEXT.md) | How request middleware, context keys, and request-scoped metadata flow |
+| [**ERROR_HANDLING.md**](./ERROR_HANDLING.md) | How boundary errors, resilience, panic recovery, and structured error events work |
+| [**STRUCTURED_LOGGING.md**](./STRUCTURED_LOGGING.md) | How `slog`, request logging, and scoped loggers are configured |
+| [**HANDLER_TESTING.md**](./HANDLER_TESTING.md) | How handlers and middleware are exercised with `httptest` and fakes |
+| [**INPUT_VALIDATION.md**](./INPUT_VALIDATION.md) | How request validation, error formatting, and body limits are applied |
 | [**CODE_REVIEW.md**](./CODE_REVIEW.md) | How to review Go code: checklists, severity, verification |
 | [**DATA_STORAGE.md**](./DATA_STORAGE.md) | How to persist: drivers, pooling, migrations, transactions |
 | [**WEB_DESIGN.md**](./WEB_DESIGN.md) | How to handle concurrency, rate limiting, race detection |
@@ -966,12 +1004,9 @@ Before merging a structural change, confirm:
 
 ---
 
-## 10. Sources
+## 12. Additional Sources
 
-- Go standard library: <https://pkg.go.dev/net/http>
 - Go 1.22 ServeMux enhancements: <https://go.dev/blog/routing-enhancements>
 - Effective Go: <https://go.dev/doc/effective_go>
 - Go Code Review Comments: <https://go.dev/wiki/CodeReviewComments>
 - Refactoring Guru, design patterns in Go: <https://refactoring.guru/design-patterns/go>
-- `internal/app/` — composition root and runtime assembly
-- `pkg/web/` — HTTP boundary, error handling, security
