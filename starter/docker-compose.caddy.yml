@@ -2,7 +2,9 @@
 #
 # Independent lifecycle: start/stop without affecting app or data containers.
 # In dev: uses mkcert certificates from /opt/vps/certs/
-# In production: replace tls directive in Caddyfile with ACME (Let's Encrypt)
+# In internal staging: may also consume pre-generated private certs if trusted.
+# In public environments: replace tls directive in Caddyfile with ACME or
+# provider-managed origin certificates such as Cloudflare.
 
 services:
   caddy:

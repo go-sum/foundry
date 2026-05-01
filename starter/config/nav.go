@@ -67,7 +67,7 @@ func DefaultNav(rt *router.Router, authRoute string) viewstate.RequestOption {
 							Label: accountLabel,
 							Items: []compound.NavItem{
 								{Label: "Sign in", Href: rt.MustReverse(authRoute, nil), Visibility: compound.NavVisibilityGuest},
-								{Label: "Sign up", Href: rt.MustReverse(authRoute, nil), Visibility: compound.NavVisibilityGuest},
+								{Label: "Sign up", Href: rt.MustReverse(authn.DefaultRouteConfig().Signup.Name, nil), Visibility: compound.NavVisibilityGuest},
 								{
 									Label:  "Sign out",
 									Action: rt.MustReverse(authn.DefaultRouteConfig().Signout.Name, nil),

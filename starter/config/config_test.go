@@ -266,11 +266,11 @@ func TestLoad_SessionStore_KV_RequiresPasswordOutsideTesting(t *testing.T) {
 			setValidSecrets(t)
 			t.Setenv("SITE_BASE_URL", "https://example.com")
 			t.Setenv("SESSION_STORE", "kv")
-			t.Setenv("KV_PASSWORD", "")
+			t.Setenv("KV_URL", "redis://kv:6379") // URL without password
 
 			_, err := config.Load()
 			if err == nil {
-				t.Fatal("expected error for missing KV_PASSWORD, got nil")
+				t.Fatal("expected error for missing password in KV_URL, got nil")
 			}
 			if !errors.Is(err, config.ErrKVPasswordMissing) {
 				t.Fatalf("got %v, want ErrKVPasswordMissing", err)
@@ -282,7 +282,7 @@ func TestLoad_SessionStore_KV_RequiresPasswordOutsideTesting(t *testing.T) {
 func TestLoad_KVTLS_Enabled(t *testing.T) {
 	t.Setenv("APP_ENV", "testing")
 	setValidSecrets(t)
-	t.Setenv("KV_TLS", "true")
+	t.Setenv("KV_URL", "rediss://kv:6379")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -290,6 +290,40 @@ func TestLoad_KVTLS_Enabled(t *testing.T) {
 	}
 	if !cfg.KV.TLSEnabled {
 		t.Fatal("cfg.KV.TLSEnabled = false, want true")
+	}
+}
+
+func TestLoad_KVURL_Parsed(t *testing.T) {
+	t.Setenv("APP_ENV", "testing")
+	setValidSecrets(t)
+	t.Setenv("KV_URL", "redis://:mypass@kv:6379")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.KV.Addr != "kv:6379" {
+		t.Errorf("cfg.KV.Addr = %q, want %q", cfg.KV.Addr, "kv:6379")
+	}
+	if cfg.KV.Password != "mypass" {
+		t.Errorf("cfg.KV.Password = %q, want %q", cfg.KV.Password, "mypass")
+	}
+	if cfg.KV.TLSEnabled {
+		t.Error("cfg.KV.TLSEnabled = true, want false for redis:// scheme")
+	}
+}
+
+func TestLoad_KVURL_DefaultsWhenEmpty(t *testing.T) {
+	t.Setenv("APP_ENV", "testing")
+	setValidSecrets(t)
+	t.Setenv("KV_URL", "")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.KV.Addr != "localhost:6379" {
+		t.Errorf("cfg.KV.Addr = %q, want %q", cfg.KV.Addr, "localhost:6379")
 	}
 }
 

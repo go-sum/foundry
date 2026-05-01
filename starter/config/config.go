@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
@@ -14,13 +13,6 @@ import (
 	"github.com/go-sum/foundry/pkg/web/site"
 	"github.com/go-sum/foundry/pkg/web/static"
 )
-
-// KVConfig holds connection parameters for the key-value store.
-type KVConfig struct {
-	Addr       string
-	Password   string
-	TLSEnabled bool
-}
 
 // EmailConfig configures outbound email delivery.
 type EmailConfig struct {
@@ -50,7 +42,7 @@ type Config struct {
 	Env          Env
 	LogLevel     string
 	Headers      secure.HeadersConfig
-	KV           KVConfig
+	KV           cfgpkg.KVConfig
 	RateLimit    secure.RateLimitProfile
 	Server       serve.ServerConfig
 	Session      session.Settings
@@ -83,9 +75,9 @@ func Load() (*Config, error) {
 
 func defaultProduction() (Config, error) {
 	siteBaseURL := cfgpkg.ExpandEnv("SITE_BASE_URL", "")
-	kvTLS, err := strconv.ParseBool(cfgpkg.ExpandEnv("KV_TLS", "false"))
+	kvCfg, err := cfgpkg.ParseKVURL(cfgpkg.ExpandSecret("KV_URL"))
 	if err != nil {
-		return Config{}, fmt.Errorf("config: KV_TLS: %w", err)
+		return Config{}, err
 	}
 	csrf, err := defaultCSRF()
 	if err != nil {
@@ -122,16 +114,12 @@ func defaultProduction() (Config, error) {
 			APIKey:   cfgpkg.ExpandSecret("EMAIL_API_KEY"),
 			From:     cfgpkg.ExpandEnv("EMAIL_SEND_FROM", "noreply@example.com"),
 		},
-		CSP:      secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash),
-		CSRF:     csrf,
-		Env:      Production,
-		LogLevel: cfgpkg.ExpandEnv("LOG_LEVEL", "info"),
-		Headers:  secure.DefaultHeadersConfig(),
-		KV: KVConfig{
-			Addr:       cfgpkg.ExpandEnv("KV_HOST", "localhost") + ":" + cfgpkg.ExpandEnv("KV_PORT", "6379"),
-			Password:   cfgpkg.ExpandSecret("KV_PASSWORD"),
-			TLSEnabled: kvTLS,
-		},
+		CSP:          secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash),
+		CSRF:         csrf,
+		Env:          Production,
+		LogLevel:     cfgpkg.ExpandEnv("LOG_LEVEL", "info"),
+		Headers:      secure.DefaultHeadersConfig(),
+		KV:           kvCfg,
 		RateLimit:    secure.DefaultRateLimitProfile(),
 		Server:       serverCfg,
 		Session:      sessionCfg,

@@ -24,8 +24,8 @@ var (
 	ErrKVStoreUnavailable = errors.New("config: KV store is required but unavailable")
 
 	// ErrKVPasswordMissing is returned when SESSION_STORE=kv is selected in a
-	// non-test environment without KV_PASSWORD configured.
-	ErrKVPasswordMissing = errors.New("config: KV_PASSWORD is required for kv session store outside testing")
+	// non-test environment without a password in KV_URL.
+	ErrKVPasswordMissing = errors.New("config: KV_URL must include a password for kv session store outside testing")
 
 	// ErrKVSessionStoreUnsupported is returned when SESSION_STORE=kv is selected
 	// with a KV implementation that does not provide session primitives.

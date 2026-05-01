@@ -104,6 +104,8 @@ secrets:
     file: .secrets/PGPASSWORD
   KV_PASSWORD:
     file: .secrets/KV_PASSWORD
+  KV_URL:
+    file: .secrets/KV_URL
 
 networks:
   app_net:

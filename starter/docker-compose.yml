@@ -26,7 +26,7 @@ services:
       - DATABASE_URL
       - SECURITY_CSRF_KEY
       - SECURITY_AUTH_TOKEN_KEY
-      - KV_PASSWORD
+      - KV_URL
     depends_on:
       db:
         condition: service_healthy
@@ -51,6 +51,8 @@ secrets:
     file: .secrets/SECURITY_CSRF_KEY
   SECURITY_AUTH_TOKEN_KEY:
     file: .secrets/SECURITY_AUTH_TOKEN_KEY
+  KV_URL:
+    file: .secrets/KV_URL
 
 networks:
   app_net:

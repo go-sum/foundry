@@ -70,6 +70,7 @@ func run(composeFiles []string, envFile, outDir string) error {
 		return fmt.Errorf("read %s: %w", envFile, err)
 	}
 	cfgpkg.ExtractDSNComponents(env, seen)
+	cfgpkg.ExtractKVComponents(env, seen)
 
 	if err := os.MkdirAll(outDir, 0700); err != nil {
 		return fmt.Errorf("mkdir %s: %w", outDir, err)
