@@ -20,6 +20,7 @@
 - One exported function per exported concern — no multi-purpose helpers
 - Constructors accept dependencies as parameters (no global singletons outside config)
 - No pre-allocated slices/maps unless capacity is known at call site
+- Prefer declarative constructs over imperative loops — use `cmp.Or`, `slices`, `maps` stdlib when available
 
 ### External Module Imports
 Shared external modules are ordinary Go dependencies — import like any third-party package.
