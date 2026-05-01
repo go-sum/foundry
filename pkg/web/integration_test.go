@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/htmx"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/serve"
@@ -838,16 +839,27 @@ func TestIntegration_SessionDestroy(t *testing.T) {
 func TestIntegration_RateLimit(t *testing.T) {
 	t.Parallel()
 
-	store := secure.NewMemoryStore(secure.MemoryStoreConfig{
-		Rate:  1,
-		Burst: 2,
+	store := ratelimit.NewMemoryStore(ratelimit.MemoryStoreConfig{})
+	limiter, err := ratelimit.New(ratelimit.Config{
+		Store: store,
+		Profiles: map[string]ratelimit.Policy{
+			"test": {Capacity: 2, RefillPer: time.Second},
+		},
 	})
+	if err != nil {
+		t.Fatalf("ratelimit.New: %v", err)
+	}
+	mw, err := ratelimit.Middleware(ratelimit.MiddlewareConfig{
+		Limiter: limiter,
+		Profile: "test",
+		KeyFunc: func(_ *web.Context) (string, error) { return "test-client", nil },
+	})
+	if err != nil {
+		t.Fatalf("ratelimit.Middleware: %v", err)
+	}
 
 	r := router.New()
-	r.Use(secure.RateLimit(secure.RateLimitConfig{
-		Store:          store,
-		IdentifierFunc: func(_ *web.Context) string { return "test-client" },
-	}))
+	r.Use(mw)
 	r.GET("/ping", "ping", func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "pong"), nil
 	})

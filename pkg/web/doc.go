@@ -19,7 +19,8 @@
 //   - pkg/web/proxy — HTTP reverse proxy support
 //
 // Security:
-//   - pkg/web/secure — CSRF, CORS, OriginGuard, rate-limit, security headers
+//   - pkg/web/secure — CSRF, CORS, OriginGuard, security headers
+//   - pkg/web/ratelimit — token-bucket rate limiting with KV and in-memory stores
 //   - pkg/web/session — session management with fixation protection
 //   - pkg/web/auth — PKCE, OAuth transaction, SanitizeReturnTo
 //
