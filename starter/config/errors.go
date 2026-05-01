@@ -43,4 +43,8 @@ var (
 	// ErrAllowedHostsEmpty is returned when AllowedHosts is empty in production,
 	// which would silently disable host-header validation.
 	ErrAllowedHostsEmpty = errors.New("config: AllowedHosts must not be empty in production — set SITE_BASE_URL or SITE_ALLOWED_HOSTS")
+
+	// ErrRateLimitStoreUnsupported is returned when the shared KV store does not
+	// provide the rate-limit-specific backend methods required by pkg/web/ratelimit.
+	ErrRateLimitStoreUnsupported = errors.New("config: shared KV store does not support rate limiting")
 )

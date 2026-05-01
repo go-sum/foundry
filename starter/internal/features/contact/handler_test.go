@@ -13,6 +13,7 @@ import (
 	"github.com/go-sum/foundry/internal/view/page"
 	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/render"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
@@ -41,7 +42,7 @@ func newContactHandler(t *testing.T, svc Service) *Handler {
 	t.Helper()
 	rt := testContactRouter(t)
 	val := validate.New()
-	return NewHandler(rt, svc, val)
+	return NewHandler(rt, svc, val, ratelimit.RealIP)
 }
 
 func TestHandler_Form_RendersPage(t *testing.T) {

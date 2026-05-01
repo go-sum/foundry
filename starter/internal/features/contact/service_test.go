@@ -2,14 +2,13 @@ package contact
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"log/slog"
 	"testing"
 	"time"
 
-	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/queue"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 )
 
 // fakeRepo is a manual implementation of Repository for service tests.
@@ -25,85 +24,74 @@ func (f *fakeRepo) Create(_ context.Context, s *Submission) error {
 	if f.err != nil {
 		return f.err
 	}
-	// Simulate DB assigning an ID.
 	s.ID = "test-id-123"
 	s.CreatedAt = time.Now()
 	return nil
 }
 
-// fakeKV is a manual implementation of kv.Store for service tests.
-type fakeKV struct {
-	data    map[string][]byte
-	getErr  error
-	setErr  error
-	getCalled bool
-	setCalled bool
-	lastSetKey string
-	lastSetVal []byte
+type errorStore struct {
+	err error
 }
 
-func newFakeKV() *fakeKV {
-	return &fakeKV{data: make(map[string][]byte)}
-}
+const testRateLimitProfile = "contact.submit.email"
 
-func (f *fakeKV) Ping(_ context.Context) error { return nil }
-
-func (f *fakeKV) Get(_ context.Context, key string) ([]byte, error) {
-	f.getCalled = true
-	if f.getErr != nil {
-		return nil, f.getErr
-	}
-	v, ok := f.data[key]
-	if !ok {
-		return nil, kv.ErrNotFound
-	}
-	return v, nil
-}
-
-func (f *fakeKV) Set(_ context.Context, key string, value []byte, _ kv.SetOptions) error {
-	f.setCalled = true
-	f.lastSetKey = key
-	f.lastSetVal = value
-	if f.setErr != nil {
-		return f.setErr
-	}
-	f.data[key] = value
-	return nil
-}
-
-func (f *fakeKV) Delete(_ context.Context, _ ...string) error { return nil }
-func (f *fakeKV) Exists(_ context.Context, _ ...string) (int64, error) { return 0, nil }
-func (f *fakeKV) Close() error { return nil }
-
-// setCount stores n as a big-endian uint64 for the given key, mimicking
-// the encoding used by contactService.writeCount.
-func (f *fakeKV) setCount(key string, n int) {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(n))
-	f.data[key] = b
+func (s errorStore) Allow(_ context.Context, _ string, _ ratelimit.Policy) (ratelimit.Decision, error) {
+	return ratelimit.Decision{}, s.err
 }
 
 func defaultConfig() ServiceConfig {
 	return ServiceConfig{
-		RateLimit:  3,
-		RateWindow: time.Minute,
-		QueueName:  QueueName,
+		RateLimitProfile: testRateLimitProfile,
+		QueueName:        QueueName,
 	}
 }
 
-func newTestService(repo Repository, store kv.Store, q *queue.Dispatcher) Service {
-	return NewService(repo, store, q, defaultConfig(), slog.Default())
+func newLimiter(t *testing.T, store ratelimit.Store, capacity int) *ratelimit.Limiter {
+	t.Helper()
+	limiter, err := ratelimit.New(ratelimit.Config{
+		Store: store,
+		Profiles: map[string]ratelimit.Policy{
+			testRateLimitProfile: {
+				Capacity:  capacity,
+				RefillPer: time.Minute,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ratelimit.New() error = %v", err)
+	}
+	return limiter
 }
 
-// TestService_Submit_Success verifies the happy path: kv miss, repo creates, queue dispatches.
+func newMemoryLimiter(t *testing.T, capacity int) *ratelimit.Limiter {
+	t.Helper()
+	return newLimiter(t, ratelimit.NewMemoryStore(ratelimit.MemoryStoreConfig{}), capacity)
+}
+
+func newTestService(repo Repository, limiter *ratelimit.Limiter, q *queue.Dispatcher) Service {
+	return NewService(repo, limiter, q, defaultConfig(), slog.Default())
+}
+
+func exhaustLimiterKey(t *testing.T, limiter *ratelimit.Limiter, key string, capacity int) {
+	t.Helper()
+	for i := 0; i < capacity; i++ {
+		decision, err := limiter.Allow(context.Background(), testRateLimitProfile, key)
+		if err != nil {
+			t.Fatalf("limiter.Allow(%d) error = %v", i, err)
+		}
+		if !decision.Allowed {
+			t.Fatalf("limiter.Allow(%d) denied unexpectedly", i)
+		}
+	}
+}
+
 func TestService_Submit_Success(t *testing.T) {
 	repo := &fakeRepo{}
-	store := newFakeKV()
+	limiter := newMemoryLimiter(t, 3)
 	q := queue.NewDispatcher(nil)
-	// Register a no-op handler so sync-mode dispatch succeeds.
 	q.Register(QueueName, func(_ context.Context, _ queue.Job) error { return nil })
 
-	svc := newTestService(repo, store, q)
+	svc := newTestService(repo, limiter, q)
 
 	input := ContactInput{
 		Name:    "Alice",
@@ -129,51 +117,45 @@ func TestService_Submit_Success(t *testing.T) {
 	if repo.created.IPAddress != "127.0.0.1" {
 		t.Errorf("repo.Create IPAddress = %q, want %q", repo.created.IPAddress, "127.0.0.1")
 	}
-	if !store.setCalled {
-		t.Error("expected kv.Set to be called to increment rate-limit counter")
-	}
 }
 
-// TestService_Submit_RateLimited verifies that a kv count at the limit causes
-// ErrRateLimited to be returned before the repo is called.
 func TestService_Submit_RateLimited(t *testing.T) {
 	repo := &fakeRepo{}
-	store := newFakeKV()
+	limiter := newMemoryLimiter(t, 3)
 	q := queue.NewDispatcher(nil)
 
-	cfg := ServiceConfig{
-		RateLimit:  3,
-		RateWindow: time.Minute,
-		QueueName:  QueueName,
-	}
-	svc := NewService(repo, store, q, cfg, slog.Default())
+	exhaustLimiterKey(t, limiter, ratelimit.BuildKey("alice@example.com", "127.0.0.1"), 3)
 
-	// Seed the rate-limit counter at the limit.
+	svc := newTestService(repo, limiter, q)
 	input := ContactInput{
 		Name:    "Alice",
 		Email:   "alice@example.com",
 		Message: "Hello",
 	}
-	key := "contact:rate:alice@example.com"
-	store.setCount(key, cfg.RateLimit)
 
 	err := svc.Submit(context.Background(), input, "127.0.0.1")
 	if !errors.Is(err, ErrRateLimited) {
 		t.Fatalf("expected ErrRateLimited, got: %v", err)
+	}
+	var rlErr *RateLimitedError
+	if !errors.As(err, &rlErr) {
+		t.Fatalf("expected *RateLimitedError, got %T", err)
+	}
+	if rlErr.RetryAfter <= 0 {
+		t.Fatalf("RetryAfter = %v, want > 0", rlErr.RetryAfter)
 	}
 	if repo.called {
 		t.Error("repo.Create must NOT be called when rate limited")
 	}
 }
 
-// TestService_Submit_RepoError verifies that a repo failure is propagated.
 func TestService_Submit_RepoError(t *testing.T) {
 	repoErr := errors.New("db: connection refused")
 	repo := &fakeRepo{err: repoErr}
-	store := newFakeKV()
+	limiter := newMemoryLimiter(t, 3)
 	q := queue.NewDispatcher(nil)
 
-	svc := newTestService(repo, store, q)
+	svc := newTestService(repo, limiter, q)
 
 	input := ContactInput{
 		Name:    "Alice",
@@ -189,16 +171,12 @@ func TestService_Submit_RepoError(t *testing.T) {
 	}
 }
 
-// TestService_Submit_QueueError_StillSucceeds verifies that a queue dispatch
-// failure does NOT cause Submit to return an error (fire-and-forget).
 func TestService_Submit_QueueError_StillSucceeds(t *testing.T) {
 	repo := &fakeRepo{}
-	store := newFakeKV()
-	// Dispatcher with nil store (sync mode) but no handler registered for the
-	// queue name — DispatchPayload returns queue.ErrQueueUnknown.
+	limiter := newMemoryLimiter(t, 3)
 	q := queue.NewDispatcher(nil)
 
-	svc := newTestService(repo, store, q)
+	svc := newTestService(repo, limiter, q)
 
 	input := ContactInput{
 		Name:    "Alice",
@@ -209,22 +187,18 @@ func TestService_Submit_QueueError_StillSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Submit must return nil even when queue dispatch fails, got: %v", err)
 	}
-	// Repo must still have been called.
 	if !repo.called {
 		t.Error("expected repo.Create to be called despite queue error")
 	}
 }
 
-// TestService_Submit_KVError_FailsClosed verifies that a kv.Get error rejects
-// the submission instead of silently disabling rate limiting.
-func TestService_Submit_KVError_FailsClosed(t *testing.T) {
+func TestService_Submit_RateLimitUnavailable_FailsClosed(t *testing.T) {
 	repo := &fakeRepo{}
-	store := newFakeKV()
-	store.getErr = errors.New("kv: connection refused")
+	limiter := newLimiter(t, errorStore{err: errors.New("redis unavailable")}, 3)
 	q := queue.NewDispatcher(nil)
 	q.Register(QueueName, func(_ context.Context, _ queue.Job) error { return nil })
 
-	svc := newTestService(repo, store, q)
+	svc := newTestService(repo, limiter, q)
 
 	input := ContactInput{
 		Name:    "Alice",
@@ -240,55 +214,36 @@ func TestService_Submit_KVError_FailsClosed(t *testing.T) {
 	}
 }
 
-// TestService_Submit_EmailNormalized verifies that the rate-limit key uses a
-// lowercased, trimmed version of the email.
 func TestService_Submit_EmailNormalized(t *testing.T) {
 	repo := &fakeRepo{}
-	store := newFakeKV()
+	limiter := newMemoryLimiter(t, 3)
 	q := queue.NewDispatcher(nil)
 	q.Register(QueueName, func(_ context.Context, _ queue.Job) error { return nil })
 
-	cfg := ServiceConfig{
-		RateLimit:  3,
-		RateWindow: time.Minute,
-		QueueName:  QueueName,
-	}
-	svc := NewService(repo, store, q, cfg, slog.Default())
+	exhaustLimiterKey(t, limiter, ratelimit.BuildKey("alice@example.com", "127.0.0.1"), 3)
 
-	// Seed the count using the normalized key.
-	normalizedKey := "contact:rate:alice@example.com"
-	store.setCount(normalizedKey, cfg.RateLimit)
-
-	// Submit with mixed-case email — should still hit the rate limit.
+	svc := newTestService(repo, limiter, q)
 	input := ContactInput{
 		Name:    "Alice",
 		Email:   "  ALICE@EXAMPLE.COM  ",
 		Message: "Hello",
 	}
+
 	err := svc.Submit(context.Background(), input, "127.0.0.1")
 	if !errors.Is(err, ErrRateLimited) {
 		t.Errorf("expected ErrRateLimited for normalized email, got: %v", err)
 	}
 }
 
-// TestService_Submit_BelowRateLimit verifies that submission at count < limit succeeds.
 func TestService_Submit_BelowRateLimit(t *testing.T) {
 	repo := &fakeRepo{}
-	store := newFakeKV()
+	limiter := newMemoryLimiter(t, 3)
 	q := queue.NewDispatcher(nil)
 	q.Register(QueueName, func(_ context.Context, _ queue.Job) error { return nil })
 
-	cfg := ServiceConfig{
-		RateLimit:  3,
-		RateWindow: time.Minute,
-		QueueName:  QueueName,
-	}
-	svc := NewService(repo, store, q, cfg, slog.Default())
+	exhaustLimiterKey(t, limiter, ratelimit.BuildKey("alice@example.com", "127.0.0.1"), 2)
 
-	// Seed count one below the limit.
-	key := "contact:rate:alice@example.com"
-	store.setCount(key, cfg.RateLimit-1)
-
+	svc := newTestService(repo, limiter, q)
 	input := ContactInput{
 		Name:    "Alice",
 		Email:   "alice@example.com",
@@ -299,40 +254,41 @@ func TestService_Submit_BelowRateLimit(t *testing.T) {
 	}
 }
 
-func TestService_Submit_RateLimitKeyIsEmailOnly(t *testing.T) {
+func TestService_Submit_RateLimitKeyIsEmailAndIP(t *testing.T) {
 	repo := &fakeRepo{}
-	store := newFakeKV()
+	limiter := newMemoryLimiter(t, 1)
 	q := queue.NewDispatcher(nil)
 	q.Register(QueueName, func(_ context.Context, _ queue.Job) error { return nil })
 
-	cfg := ServiceConfig{
-		RateLimit:  1,
-		RateWindow: time.Minute,
-		QueueName:  QueueName,
-	}
-	svc := NewService(repo, store, q, cfg, slog.Default())
+	exhaustLimiterKey(t, limiter, ratelimit.BuildKey("alice@example.com", "127.0.0.1"), 1)
 
-	store.setCount("contact:rate:alice@example.com", cfg.RateLimit)
-
+	svc := newTestService(repo, limiter, q)
 	input := ContactInput{
 		Name:    "Alice",
 		Email:   "alice@example.com",
 		Message: "Hello",
 	}
+
+	// Same email but different IP — different composite key, should be allowed.
 	err := svc.Submit(context.Background(), input, "198.51.100.9")
+	if err != nil {
+		t.Fatalf("expected success for different IP, got: %v", err)
+	}
+
+	// Same email and same IP — same composite key, should be rate limited.
+	err = svc.Submit(context.Background(), input, "127.0.0.1")
 	if !errors.Is(err, ErrRateLimited) {
-		t.Fatalf("expected ErrRateLimited, got: %v", err)
+		t.Fatalf("expected ErrRateLimited for same IP, got: %v", err)
 	}
 }
 
 func TestService_Submit_PersistsCanonicalIP(t *testing.T) {
 	repo := &fakeRepo{}
-	store := newFakeKV()
+	limiter := newMemoryLimiter(t, 3)
 	q := queue.NewDispatcher(nil)
 	q.Register(QueueName, func(_ context.Context, _ queue.Job) error { return nil })
 
-	svc := newTestService(repo, store, q)
-
+	svc := newTestService(repo, limiter, q)
 	input := ContactInput{
 		Name:    "Alice",
 		Email:   "alice@example.com",

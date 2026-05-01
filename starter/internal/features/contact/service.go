@@ -2,15 +2,13 @@ package contact
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
-	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/queue"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/serve"
 )
 
@@ -21,34 +19,36 @@ type Service interface {
 
 // ServiceConfig controls rate limiting and queue routing.
 type ServiceConfig struct {
-	RateLimit  int
-	RateWindow time.Duration
-	QueueName  string
+	RateLimitProfile string
+	QueueName        string
 }
 
 type contactService struct {
-	repo   Repository
-	kv     kv.Store
-	queue  *queue.Dispatcher
-	cfg    ServiceConfig
-	logger *slog.Logger
+	repo    Repository
+	limiter *ratelimit.Limiter
+	queue   *queue.Dispatcher
+	cfg     ServiceConfig
+	logger  *slog.Logger
 }
 
 // NewService creates a Service with the given dependencies.
-func NewService(repo Repository, store kv.Store, q *queue.Dispatcher, cfg ServiceConfig, logger *slog.Logger) *contactService {
-	return &contactService{repo: repo, kv: store, queue: q, cfg: cfg, logger: logger}
+func NewService(repo Repository, limiter *ratelimit.Limiter, q *queue.Dispatcher, cfg ServiceConfig, logger *slog.Logger) *contactService {
+	return &contactService{repo: repo, limiter: limiter, queue: q, cfg: cfg, logger: logger}
 }
 
 func (s *contactService) Submit(ctx context.Context, input ContactInput, ipAddress string) error {
 	email := normalizeEmail(input.Email)
 	clientIP := canonicalizeIP(ipAddress)
-	key := rateLimitKey(email)
 
-	count, err := s.readCount(ctx, key)
+	if s.limiter == nil {
+		return ErrRateLimitUnavailable
+	}
+	decision, err := s.limiter.Allow(ctx, s.cfg.RateLimitProfile, ratelimit.BuildKey(email, clientIP))
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrRateLimitUnavailable, err)
-	} else if count >= s.cfg.RateLimit {
-		return ErrRateLimited
+		return errors.Join(ErrRateLimitUnavailable, err)
+	}
+	if !decision.Allowed {
+		return &RateLimitedError{RetryAfter: decision.RetryAfter}
 	}
 
 	sub := &Submission{
@@ -59,10 +59,6 @@ func (s *contactService) Submit(ctx context.Context, input ContactInput, ipAddre
 	}
 	if err := s.repo.Create(ctx, sub); err != nil {
 		return fmt.Errorf("contact: persist submission: %w", err)
-	}
-
-	if err := s.writeCount(ctx, key, count+1); err != nil {
-		s.logger.WarnContext(ctx, "contact: kv write failed", "err", err)
 	}
 
 	payload := NotificationPayload{
@@ -79,26 +75,6 @@ func (s *contactService) Submit(ctx context.Context, input ContactInput, ipAddre
 	return nil
 }
 
-func (s *contactService) readCount(ctx context.Context, key string) (int, error) {
-	b, err := s.kv.Get(ctx, key)
-	if err != nil {
-		if errors.Is(err, kv.ErrNotFound) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	if len(b) < 8 {
-		return 0, nil
-	}
-	return int(binary.BigEndian.Uint64(b)), nil
-}
-
-func (s *contactService) writeCount(ctx context.Context, key string, count int) error {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(count))
-	return s.kv.Set(ctx, key, b, kv.SetOptions{TTL: s.cfg.RateWindow})
-}
-
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
@@ -112,8 +88,4 @@ func canonicalizeIP(raw string) string {
 		return "unknown"
 	}
 	return raw
-}
-
-func rateLimitKey(email string) string {
-	return "contact:rate:" + email
 }

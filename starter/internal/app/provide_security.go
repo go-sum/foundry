@@ -3,15 +3,19 @@ package app
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/web/cookiecodec"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/session"
 
 	config "github.com/go-sum/foundry/config"
 )
+
+var ErrTrustedProxyCIDRInvalid = errors.New("app: invalid trusted proxy CIDR")
 
 func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, storeFactory func() session.Store) (Security, session.Store, error) {
 	cfg := runtime.Config
@@ -30,6 +34,10 @@ func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, store
 	serverOrigin := cfg.Site.BaseURL
 	csrf := cfg.CSRF
 	csrf.ServerOrigin = serverOrigin
+	rateLimitKey, err := rateLimitKeyFunc(cfg.Server.TrustedProxies)
+	if err != nil {
+		return Security{}, nil, fmt.Errorf("security: rate limit key: %w", err)
+	}
 
 	return Security{
 		CSRF:         csrf,
@@ -38,6 +46,7 @@ func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, store
 		Origins:      origins,
 		AllowedHosts: cfg.Site.AllowedHosts,
 		ServerOrigin: serverOrigin,
+		RateLimitKey: rateLimitKey,
 		Session:      sessCfg,
 	}, store, nil
 }
@@ -81,4 +90,15 @@ func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() sessi
 	}
 
 	return session.NewStoreFromConfig(cfg)
+}
+
+func rateLimitKeyFunc(trustedProxies []string) (ratelimit.KeyFunc, error) {
+	if len(trustedProxies) == 0 {
+		return ratelimit.RemoteAddrKey, nil
+	}
+	fn, err := ratelimit.RealIPFromTrustedXFF(trustedProxies...)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrTrustedProxyCIDRInvalid, err)
+	}
+	return fn, nil
 }

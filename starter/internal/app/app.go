@@ -10,12 +10,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/go-sum/foundry/pkg/auth/provider"
-	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
 	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/queue"
+	"github.com/go-sum/foundry/pkg/web/authn"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/serve"
@@ -79,18 +80,20 @@ type Security struct {
 	Origins      []string
 	AllowedHosts []string
 	ServerOrigin string
+	RateLimitKey ratelimit.KeyFunc
 	Session      session.Config
 }
 
 // Services holds application-level service instances.
 type Services struct {
-	DBPool    *pgxpool.Pool
-	KVStore   kv.Store
-	Queue     *queue.Dispatcher
-	Processor *queue.Processor
+	DBPool      *pgxpool.Pool
+	KVStore     kv.Store
+	RateLimiter *ratelimit.Limiter
+	Queue       *queue.Dispatcher
+	Processor   *queue.Processor
 	EmailSender email.Sender
-	Contact   *contact.Module
-	Auth      *authn.Module
+	Contact     *contact.Module
+	Auth        *authn.Module
 	// OAuthProvider is the built-in OAuth 2.0 Authorization Server.
 	OAuthProvider *provider.ProviderModule
 	// OAuthClient is the first-party OAuth 2.1 client handler.
@@ -110,6 +113,11 @@ func (s Services) Close() error {
 	if s.Processor != nil {
 		if err := s.Processor.Stop(); err != nil {
 			errs = append(errs, fmt.Errorf("processor: %w", err))
+		}
+	}
+	if s.RateLimiter != nil {
+		if err := s.RateLimiter.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("rate limiter: %w", err))
 		}
 	}
 	if s.KVStore != nil {
@@ -172,8 +180,20 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		return nil, fmt.Errorf("kv: %w", err)
 	}
 
+	limiter, err := provideRateLimiter(ctx, runtime, sharedKV)
+	if err != nil {
+		if sharedKV != nil {
+			_ = sharedKV.Close()
+		}
+		return nil, fmt.Errorf("rate limiter: %w", err)
+	}
+
 	security, store, err := provideSecurity(ctx, runtime, sharedKV, o.sessionStoreFactory)
 	if err != nil {
+		_ = limiter.Close()
+		if sharedKV != nil {
+			_ = sharedKV.Close()
+		}
 		return nil, fmt.Errorf("security: %w", err)
 	}
 
@@ -183,7 +203,8 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		router:       routing,
 		sessionStore: store,
 		Services: Services{
-			KVStore: sharedKV,
+			KVStore:     sharedKV,
+			RateLimiter: limiter,
 		},
 	}
 	defer func() {
@@ -195,9 +216,13 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		}
 	}()
 
-	routing.Use(coreMiddleware(routing, runtime, security)...)
+	coreMw, err := coreMiddleware(routing, runtime, security)
+	if err != nil {
+		return nil, fmt.Errorf("middleware: %w", err)
+	}
+	routing.Use(coreMw...)
 
-	services, err := provideServices(ctx, runtime, security, routing, pres, sharedKV, val)
+	services, err := provideServices(ctx, runtime, security, routing, pres, sharedKV, limiter, val)
 	if err != nil {
 		return nil, fmt.Errorf("services: %w", err)
 	}

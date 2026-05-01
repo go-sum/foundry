@@ -13,6 +13,7 @@ import (
 	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/queue"
 	"github.com/go-sum/foundry/pkg/queue/pgstore"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
 
@@ -22,9 +23,9 @@ import (
 	"github.com/go-sum/foundry/internal/features/oauthclient"
 )
 
-func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *router.Router, pres Presentation, kvStore kv.Store, val validate.Validator) (Services, error) {
+func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *router.Router, pres Presentation, kvStore kv.Store, limiter *ratelimit.Limiter, val validate.Validator) (Services, error) {
 	if runtime.Config.Env == config.Testing {
-		return Services{KVStore: kvStore}, nil
+		return Services{KVStore: kvStore, RateLimiter: limiter}, nil
 	}
 
 	var pool *pgxpool.Pool
@@ -71,16 +72,16 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 	}
 
 	contactMod := contact.NewModule(contact.ModuleConfig{
-		Pool:        pool,
-		KV:          kvStore,
-		Queue:       qDispatcher,
-		EmailSender: emailSender,
-		Router:      rt,
-		Validator:   val,
+		Pool:         pool,
+		RateLimiter:  limiter,
+		Queue:        qDispatcher,
+		EmailSender:  emailSender,
+		Router:       rt,
+		Validator:    val,
+		ClientIPFunc: sec.RateLimitKey,
 		Service: contact.ServiceConfig{
-			RateLimit:  runtime.Config.Contact.RateLimit,
-			RateWindow: runtime.Config.Contact.RateWindow,
-			QueueName:  contact.QueueName,
+			RateLimitProfile: string(config.RateLimitContactSubmitEmail),
+			QueueName:        contact.QueueName,
 		},
 		Worker: contact.WorkerConfig{
 			SendTo:   runtime.Config.Contact.SendTo,
@@ -109,6 +110,7 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 	return Services{
 		DBPool:         pool,
 		KVStore:        kvStore,
+		RateLimiter:    limiter,
 		Queue:          qDispatcher,
 		Processor:      processor,
 		EmailSender:    emailSender,

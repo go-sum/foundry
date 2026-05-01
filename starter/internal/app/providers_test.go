@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-sum/foundry/pkg/web/render"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
+	"github.com/go-sum/foundry/pkg/web/serve"
 	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/go-sum/foundry/pkg/web/site"
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
@@ -117,6 +119,36 @@ func TestProvideSecurity_EmptySessionStoreFailsFast(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `unsupported store type ""`) {
 		t.Fatalf("provideSecurity() error = %v, want unsupported empty store", err)
+	}
+}
+
+func TestProvideSecurity_InvalidTrustedProxyCIDR_ReturnsError(t *testing.T) {
+	cfg := &configpkg.Config{
+		Env:     configpkg.Testing,
+		CSRF:    secure.DefaultCSRFConfig(),
+		CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
+		Headers: secure.DefaultHeadersConfig(),
+		Session: session.Settings{
+			CookieName:   "app-session",
+			IdleTTL:      30 * time.Minute,
+			AbsoluteTTL:  12 * time.Hour,
+			CookieSecure: true,
+		},
+		SessionStore: "memory",
+		Server: serve.ServerConfig{
+			TrustedProxies: []string{"not-a-cidr"},
+		},
+		Site: site.Config{
+			BaseURL: "https://app.example.com",
+		},
+	}
+
+	_, _, err := provideSecurity(context.Background(), Runtime{Config: cfg}, nil, nil)
+	if err == nil {
+		t.Fatal("provideSecurity() error = nil, want invalid trusted proxy CIDR")
+	}
+	if !errors.Is(err, ErrTrustedProxyCIDRInvalid) {
+		t.Fatalf("provideSecurity() error = %v, want ErrTrustedProxyCIDRInvalid", err)
 	}
 }
 

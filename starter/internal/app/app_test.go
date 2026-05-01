@@ -21,6 +21,16 @@ import (
 	"github.com/go-sum/foundry/pkg/web/session"
 )
 
+type stubSessionStore struct {
+	stopCount int
+}
+
+type stubKVStore struct {
+	pingErr    error
+	closeErr   error
+	closeCount int
+}
+
 const (
 	testCSRFHexKey      = "0000000000000000000000000000000000000000000000000000000000000001" // for-tests-only
 	testAuthTokenHexKey = "0000000000000000000000000000000000000000000000000000000000000002" // for-tests-only
@@ -98,10 +108,6 @@ func sessionCookieValue(t *testing.T, resp *http.Response) string {
 	return ""
 }
 
-type stubSessionStore struct {
-	stopCount int
-}
-
 func (s *stubSessionStore) Read(context.Context, string) ([]byte, int64, error) {
 	return nil, 0, session.ErrSessionNotFound
 }
@@ -116,12 +122,6 @@ func (s *stubSessionStore) Delete(context.Context, string) error {
 
 func (s *stubSessionStore) Stop() {
 	s.stopCount++
-}
-
-type stubKVStore struct {
-	pingErr    error
-	closeErr   error
-	closeCount int
 }
 
 func (s *stubKVStore) Ping(context.Context) error { return s.pingErr }
@@ -495,7 +495,11 @@ func newOAuthRouteSeparationHarness(t *testing.T) http.Handler {
 	a := mustNew(t)
 	routes := provider.DefaultRouteConfig()
 	rt := router.New()
-	rt.Use(coreMiddleware(rt, a.Runtime, a.Security)...)
+	coreMw, err := coreMiddleware(rt, a.Runtime, a.Security)
+	if err != nil {
+		t.Fatalf("coreMiddleware() error = %v", err)
+	}
+	rt.Use(coreMw...)
 	router.Register(rt,
 		router.Layout(router.Nodes(
 			[]router.Node{router.Use(apiMiddleware(a.Security, routes.Token.Pattern)...)},
@@ -552,7 +556,11 @@ func TestApp_APIMiddleware_OriginGuardSkipsTokenRoute(t *testing.T) {
 	a := mustNew(t)
 	routes := provider.DefaultRouteConfig()
 	rt := router.New()
-	rt.Use(coreMiddleware(rt, a.Runtime, a.Security)...)
+	coreMw2, err := coreMiddleware(rt, a.Runtime, a.Security)
+	if err != nil {
+		t.Fatalf("coreMiddleware() error = %v", err)
+	}
+	rt.Use(coreMw2...)
 	router.Register(rt,
 		router.Layout(router.Nodes(
 			[]router.Node{router.Use(apiMiddleware(a.Security, routes.Token.Pattern)...)},

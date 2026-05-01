@@ -30,9 +30,31 @@ type NotificationPayload struct {
 	Message      string `json:"message"`
 }
 
+// RateLimitedError preserves retry metadata for contact-form limit denials.
+type RateLimitedError struct {
+	RetryAfter time.Duration
+}
+
 // ErrRateLimited is returned when a submitter has exceeded the allowed rate.
 var ErrRateLimited = errors.New("contact: rate limit exceeded")
 
 // ErrRateLimitUnavailable is returned when the backing store for rate limiting
 // cannot be consulted safely, so submissions are rejected temporarily.
 var ErrRateLimitUnavailable = errors.New("contact: rate limit unavailable")
+
+func (e *RateLimitedError) Error() string {
+	return ErrRateLimited.Error()
+}
+
+func (e *RateLimitedError) Unwrap() error {
+	return ErrRateLimited
+}
+
+// RateLimitRetryAfter extracts retry metadata from err when available.
+func RateLimitRetryAfter(err error) time.Duration {
+	var rateErr *RateLimitedError
+	if errors.As(err, &rateErr) {
+		return rateErr.RetryAfter
+	}
+	return 0
+}

@@ -7,6 +7,7 @@ import (
 	"github.com/go-sum/foundry/internal/view/page"
 	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/render"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
@@ -15,15 +16,19 @@ import (
 
 // Handler serves the contact form endpoints.
 type Handler struct {
-	rt      *router.Router
-	reqOpts []viewstate.RequestOption
-	svc     Service
-	val     validate.Validator
+	rt           *router.Router
+	reqOpts      []viewstate.RequestOption
+	svc          Service
+	val          validate.Validator
+	clientIPFunc ratelimit.KeyFunc
 }
 
 // NewHandler creates a contact Handler.
-func NewHandler(rt *router.Router, svc Service, val validate.Validator, opts ...viewstate.RequestOption) *Handler {
-	return &Handler{rt: rt, reqOpts: opts, svc: svc, val: val}
+func NewHandler(rt *router.Router, svc Service, val validate.Validator, clientIPFunc ratelimit.KeyFunc, opts ...viewstate.RequestOption) *Handler {
+	if clientIPFunc == nil {
+		clientIPFunc = ratelimit.RealIP
+	}
+	return &Handler{rt: rt, reqOpts: opts, svc: svc, val: val, clientIPFunc: clientIPFunc}
 }
 
 // Form renders the contact form page.
@@ -57,9 +62,17 @@ func (h *Handler) Submit(c *web.Context) (web.Response, error) {
 		return web.Response{}, err
 	}
 
-	if err := h.svc.Submit(c.Context(), input, c.Request.RemoteAddr()); err != nil {
+	clientIP, ipErr := h.clientIPFunc(c)
+	if ipErr != nil {
+		clientIP = c.Request.RemoteAddr()
+	}
+	if err := h.svc.Submit(c.Context(), input, clientIP); err != nil {
 		if errors.Is(err, ErrRateLimited) {
-			return web.Response{}, web.ErrTooManyRequests(time.Minute)
+			retryAfter := RateLimitRetryAfter(err)
+			if retryAfter <= 0 {
+				retryAfter = time.Minute
+			}
+			return web.Response{}, web.ErrTooManyRequests(retryAfter)
 		}
 		return web.Response{}, web.ErrUnavailable("Unable to send your message right now. Please try again later.", err)
 	}

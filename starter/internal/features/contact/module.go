@@ -4,9 +4,9 @@ import (
 	"log/slog"
 
 	coredb "github.com/go-sum/foundry/pkg/db"
-	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/queue"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
@@ -18,22 +18,24 @@ type Module struct {
 	QueueName    string
 	QueueHandler queue.HandlerFunc
 
-	svc Service
-	val validate.Validator
+	svc          Service
+	val          validate.Validator
+	clientIPFunc ratelimit.KeyFunc
 }
 
 // ModuleConfig holds all dependencies needed to wire the contact feature.
 type ModuleConfig struct {
-	Pool        coredb.DBTX
-	KV          kv.Store
-	Queue       *queue.Dispatcher
-	EmailSender email.Sender
-	Router      *router.Router
-	Validator   validate.Validator
-	Service     ServiceConfig
-	Worker      WorkerConfig
-	ViewOpts []viewstate.RequestOption
-	Logger   *slog.Logger
+	Pool         coredb.DBTX
+	RateLimiter  *ratelimit.Limiter
+	Queue        *queue.Dispatcher
+	EmailSender  email.Sender
+	Router       *router.Router
+	Validator    validate.Validator
+	Service      ServiceConfig
+	Worker       WorkerConfig
+	ViewOpts     []viewstate.RequestOption
+	Logger       *slog.Logger
+	ClientIPFunc ratelimit.KeyFunc
 }
 
 // NewModule wires the contact feature module.
@@ -43,7 +45,7 @@ func NewModule(cfg ModuleConfig) *Module {
 		logger = slog.Default()
 	}
 	repo := NewRepository(cfg.Pool)
-	svc := NewService(repo, cfg.KV, cfg.Queue, cfg.Service, logger)
+	svc := NewService(repo, cfg.RateLimiter, cfg.Queue, cfg.Service, logger)
 	worker := NewNotifyHandler(cfg.EmailSender, cfg.Worker)
 
 	m := &Module{
@@ -51,9 +53,10 @@ func NewModule(cfg ModuleConfig) *Module {
 		QueueHandler: worker,
 		svc:          svc,
 		val:          cfg.Validator,
+		clientIPFunc: cfg.ClientIPFunc,
 	}
 	if cfg.Router != nil {
-		m.Handler = NewHandler(cfg.Router, svc, cfg.Validator, cfg.ViewOpts...)
+		m.Handler = NewHandler(cfg.Router, svc, cfg.Validator, cfg.ClientIPFunc, cfg.ViewOpts...)
 	}
 	return m
 }
@@ -61,5 +64,5 @@ func NewModule(cfg ModuleConfig) *Module {
 // NewHandler creates a contact Handler using the module's already-wired service.
 // Call this after the router is available when NewModule was called without one.
 func (m *Module) NewHandler(rt *router.Router, opts ...viewstate.RequestOption) *Handler {
-	return NewHandler(rt, m.svc, m.val, opts...)
+	return NewHandler(rt, m.svc, m.val, m.clientIPFunc, opts...)
 }

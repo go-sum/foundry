@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"path/filepath"
-	"time"
 
 	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
@@ -24,10 +23,8 @@ type EmailConfig struct {
 
 // ContactConfig holds configuration for the contact feature.
 type ContactConfig struct {
-	SendTo     string
-	SendFrom   string
-	RateLimit  int
-	RateWindow time.Duration
+	SendTo   string
+	SendFrom string
 }
 
 // Config is the complete application configuration.
@@ -43,7 +40,7 @@ type Config struct {
 	LogLevel     string
 	Headers      secure.HeadersConfig
 	KV           cfgpkg.KVConfig
-	RateLimit    secure.RateLimitProfile
+	RateLimit    RateLimitsConfig
 	Server       serve.ServerConfig
 	Session      session.Settings
 	SessionStore string `validate:"oneof=memory cookie kv"`
@@ -104,10 +101,8 @@ func defaultProduction() (Config, error) {
 		Assets:    assets,
 		Auth:      authCfg,
 		Contact: ContactConfig{
-			SendTo:     cfgpkg.ExpandEnv("EMAIL_SEND_TO", "send@example.com"),
-			SendFrom:   cfgpkg.ExpandEnv("EMAIL_SEND_FROM", "noreply@example.com"),
-			RateLimit:  3,
-			RateWindow: time.Hour,
+			SendTo:   cfgpkg.ExpandEnv("EMAIL_SEND_TO", "send@example.com"),
+			SendFrom: cfgpkg.ExpandEnv("EMAIL_SEND_FROM", "noreply@example.com"),
 		},
 		Email: EmailConfig{
 			Provider: "log",
@@ -120,7 +115,7 @@ func defaultProduction() (Config, error) {
 		LogLevel:     cfgpkg.ExpandEnv("LOG_LEVEL", "info"),
 		Headers:      secure.DefaultHeadersConfig(),
 		KV:           kvCfg,
-		RateLimit:    secure.DefaultRateLimitProfile(),
+		RateLimit:    DefaultRateLimitsConfig(),
 		Server:       serverCfg,
 		Session:      sessionCfg,
 		SessionStore: cfgpkg.ExpandEnv("SESSION_STORE", "cookie"),

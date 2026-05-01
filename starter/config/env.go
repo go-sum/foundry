@@ -4,6 +4,7 @@ import (
 	"os"
 
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/site"
 )
 
@@ -69,6 +70,7 @@ func overlayTesting(cfg *Config) {
 	cfg.CSRF.AllowMissingOrigin = true
 	cfg.CSRF.CookieSecure = false
 	cfg.Session.CookieSecure = false
+	cfg.RateLimit.Store.Type = ratelimit.StoreTypeMemory
 	if dir := os.Getenv("TEST_STATIC_DIR"); dir != "" {
 		cfg.Assets.PublicDir = dir
 	}

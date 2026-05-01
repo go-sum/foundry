@@ -13,8 +13,8 @@ import (
 	"github.com/go-sum/foundry/pkg/web/session"
 )
 
-func coreMiddleware(rt *router.Router, runtime Runtime, security Security) []web.Middleware {
-	return []web.Middleware{
+func coreMiddleware(rt *router.Router, runtime Runtime, security Security) ([]web.Middleware, error) {
+	mw := []web.Middleware{
 		web.AsyncContext(),
 		otelweb.Middleware(runtime.Tracer),
 		web.WithRequestID(),
@@ -28,10 +28,13 @@ func coreMiddleware(rt *router.Router, runtime Runtime, security Security) []web
 		}),
 		secure.Headers(security.Headers),
 		secure.CSPNonce(security.CSP),
+	}
+	mw = append(mw,
 		session.Middleware(security.Session),
 		htmx.VaryMiddleware(),
 		authn.LoadSession(),
-	}
+	)
+	return mw, nil
 }
 
 func contentMiddleware(sec Security) []web.Middleware {

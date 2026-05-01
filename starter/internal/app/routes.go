@@ -2,21 +2,24 @@ package app
 
 import (
 	"cmp"
+	"fmt"
 
 	"github.com/go-sum/foundry/internal/features/home"
 	"github.com/go-sum/foundry/internal/features/oauthclient"
 	"github.com/go-sum/foundry/pkg/auth/provider"
-	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/docs"
 	"github.com/go-sum/foundry/pkg/showcase"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/health"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/site"
 	"github.com/go-sum/foundry/pkg/web/static"
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 
+	config "github.com/go-sum/foundry/config"
 	g "maragu.dev/gomponents"
 )
 
@@ -62,10 +65,14 @@ func RegisterRoutes(rt *router.Router, cfg RouteConfig, sec Security, svc Servic
 	if err := registerStaticRoutes(rt, assets); err != nil {
 		return err
 	}
+	apiNodes, err := APIRoutes(cfg, sec, svc, publicDir)
+	if err != nil {
+		return fmt.Errorf("api routes: %w", err)
+	}
 	router.Register(rt, router.Nodes(
 		HealthRoutes(cfg, svc),
 		PublicRoutes(rt, cfg, sec, svc, s, pres),
-		APIRoutes(cfg, sec, svc, publicDir),
+		apiNodes,
 	)...)
 	return nil
 }
@@ -117,10 +124,14 @@ func PublicRoutes(rt *router.Router, cfg RouteConfig, sec Security, svc Services
 }
 
 // APIRoutes returns the API-middleware tree: docs, OAuth public endpoints, and CSRF-protected auth.
-func APIRoutes(cfg RouteConfig, sec Security, svc Services, publicDir string) []router.Node {
+func APIRoutes(cfg RouteConfig, sec Security, svc Services, publicDir string) ([]router.Node, error) {
 	oauthCfg := provider.DefaultRouteConfig()
 	if svc.OAuthProvider != nil {
 		oauthCfg = svc.OAuthProvider.RouteConfig()
+	}
+	arlNodes, err := authRateLimitNodes(sec, svc)
+	if err != nil {
+		return nil, err
 	}
 	return []router.Node{
 		router.Layout(router.Nodes(
@@ -129,10 +140,26 @@ func APIRoutes(cfg RouteConfig, sec Security, svc Services, publicDir string) []
 			routesFrom(svc.OAuthProvider, provider.PublicRoutes),
 			[]router.Node{router.Layout(router.Nodes(
 				[]router.Node{router.Use(secure.CSRF(sec.CSRF))},
+				arlNodes,
 				AuthRoutes(cfg, svc),
 			)...)},
 		)...),
+	}, nil
+}
+
+func authRateLimitNodes(sec Security, svc Services) ([]router.Node, error) {
+	if svc.RateLimiter == nil {
+		return nil, nil
 	}
+	mw, err := ratelimit.Middleware(ratelimit.MiddlewareConfig{
+		Limiter: svc.RateLimiter,
+		Profile: string(config.RateLimitRoutesAuth),
+		KeyFunc: sec.RateLimitKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("auth rate limit middleware: %w", err)
+	}
+	return []router.Node{router.Use(mw)}, nil
 }
 
 // AuthRoutes returns CSRF-protected routes: auth, OAuth provider, OAuth client.
@@ -169,4 +196,3 @@ func routesFrom[T any](dep *T, fn func(*T) []router.Node) []router.Node {
 	}
 	return fn(dep)
 }
-
