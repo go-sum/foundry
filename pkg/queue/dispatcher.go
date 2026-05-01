@@ -57,7 +57,10 @@ func (d *Dispatcher) Dispatch(ctx context.Context, queue string, payload json.Ra
 
 	def, ok := d.queues[queue]
 	if !ok {
-		return ErrQueueUnknown
+		if d.store == nil {
+			return ErrQueueUnknown
+		}
+		def = newQueueDef(queue, nil)
 	}
 
 	var jcfg dispatchJobCfg

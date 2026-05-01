@@ -60,6 +60,7 @@ func overlayDevelopment(cfg *Config) {
 	cfg.Headers.CrossOriginOpenerPolicy = ""
 	cfg.Server.Addr = ":3000"
 	cfg.CSP = cfg.CSP.WithScriptHashes(airProxyCSPHash)
+	cfg.LogLevel = cfgpkg.ExpandEnv("LOG_LEVEL", "debug")
 }
 
 func overlayTesting(cfg *Config) {

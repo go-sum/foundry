@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/go-sum/foundry/pkg/assets/publish"
 	"github.com/go-sum/foundry/pkg/componentry/assets/iconset"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
+	"github.com/go-sum/foundry/pkg/web/logging"
 
 	config "github.com/go-sum/foundry/config"
 )
@@ -21,7 +23,7 @@ func provideRuntime(_ context.Context) (Runtime, error) {
 	}
 	return Runtime{
 		Config: cfg,
-		Logger: slog.Default(),
+		Logger: logging.New(logging.Config{Level: parseLogLevel(cfg.LogLevel)}),
 		Tracer: noop.NewTracerProvider().Tracer("app"),
 	}, nil
 }
@@ -46,4 +48,17 @@ func provideAssets(cfg *config.Config) (*publish.Manifest, *icons.Registry, erro
 	}
 	iconReg.RegisterSet(resolved)
 	return manifest, iconReg, nil
+}
+
+func parseLogLevel(s string) slog.Level {
+	switch strings.ToLower(s) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

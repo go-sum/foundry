@@ -4,13 +4,13 @@ import (
 	"errors"
 	"time"
 
-	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	"github.com/go-sum/foundry/internal/view/page"
 	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/render"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 )
 
 // Handler serves the contact form endpoints.
@@ -41,8 +41,7 @@ func (h *Handler) Submit(c *web.Context) (web.Response, error) {
 
 	var input ContactInput
 	if err := validate.Bind(h.val, c.Request, &input); err != nil {
-		var verrs validate.Errors
-		if errors.As(err, &verrs) {
+		if verrs, ok := errors.AsType[validate.Errors](err); ok {
 			fieldErrors := make(map[string][]string)
 			for _, fe := range verrs {
 				fieldErrors[fe.Field] = append(fieldErrors[fe.Field], fe.Message)

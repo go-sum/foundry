@@ -14,7 +14,7 @@ import (
 	"github.com/go-sum/foundry/pkg/componentry/icons"
 	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
-	"github.com/go-sum/foundry/pkg/notification"
+	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/queue"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
@@ -88,7 +88,7 @@ type Services struct {
 	KVStore   kv.Store
 	Queue     *queue.Dispatcher
 	Processor *queue.Processor
-	Notifier  *notification.Dispatcher
+	EmailSender email.Sender
 	Contact   *contact.Module
 	Auth      *authn.Module
 	// OAuthProvider is the built-in OAuth 2.0 Authorization Server.

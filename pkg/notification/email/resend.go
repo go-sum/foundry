@@ -1,64 +1,42 @@
 package email
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"time"
-
-	"github.com/go-sum/foundry/pkg/notification"
 )
 
-const (
-	defaultResendURL = "https://api.resend.com/emails"
-	defaultTimeout   = 10 * time.Second
-)
+// Monitor mail log at
+// https://resend.com/emails
+const defaultResendURL = "https://api.resend.com/emails"
 
-// ResendConfig configures the Resend email provider.
-type ResendConfig struct {
-	APIKey   string
-	FromAddr string
-	BaseURL  string        // empty defaults to https://api.resend.com/emails
-	Timeout  time.Duration // zero defaults to 10s
+type resendSender struct {
+	apiKey string
+	from   string
+	apiURL string
+	client *http.Client
 }
 
-// Resend delivers email via the Resend API.
-type Resend struct {
-	apiKey   string
-	fromAddr string
-	apiURL   string
-	client   *http.Client
-}
+// compile-time interface check
+var _ Sender = (*resendSender)(nil)
 
-// NewResend constructs a Resend sender. A nil client uses http.DefaultClient
-// with the configured timeout.
-func NewResend(cfg ResendConfig, client *http.Client) (*Resend, error) {
-	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("notification: email: resend: %w: APIKey is required", notification.ErrInvalidConfig)
+func newResend(cfg Config) (*resendSender, error) {
+	if cfg.From == "" {
+		return nil, fmt.Errorf("%w: resend: From is required", ErrInvalidConfig)
 	}
-	if cfg.FromAddr == "" {
-		return nil, fmt.Errorf("notification: email: resend: %w: FromAddr is required", notification.ErrInvalidConfig)
+	apiURL := cfg.BaseURL
+	if apiURL == "" {
+		apiURL = defaultResendURL
 	}
-	u := cfg.BaseURL
-	if u == "" {
-		u = defaultResendURL
+	if _, err := validateHTTPConfig("resend", cfg.APIKey, apiURL); err != nil {
+		return nil, err
 	}
-	timeout := cfg.Timeout
-	if timeout <= 0 {
-		timeout = defaultTimeout
-	}
-	if client == nil {
-		client = &http.Client{Timeout: timeout}
-	}
-	return &Resend{
-		apiKey:   cfg.APIKey,
-		fromAddr: cfg.FromAddr,
-		apiURL:   u,
-		client:   client,
+	return &resendSender{
+		apiKey: cfg.APIKey,
+		from:   cfg.From,
+		apiURL: apiURL,
+		client: httpClient(cfg.Timeout, nil),
 	}, nil
 }
 
@@ -70,49 +48,22 @@ type resendPayload struct {
 	Text    string   `json:"text,omitempty"`
 }
 
-// Send implements notification.Sender.
-// Extracts "to" and "from" from n.Metadata; falls back "from" to cfg.FromAddr.
-// Extracts "html" from n.Metadata for HTML body; uses n.Body for plain text.
-func (r *Resend) Send(ctx context.Context, n notification.Notification) error {
-	to := n.Metadata["to"]
-	if to == "" {
-		return fmt.Errorf("notification: email: resend: missing \"to\" in notification metadata")
-	}
-	from := n.Metadata["from"]
-	if from == "" {
-		from = r.fromAddr
+func (s *resendSender) Send(ctx context.Context, msg Message) error {
+	if msg.To == "" {
+		return fmt.Errorf("email: resend: To is required")
 	}
 	p := resendPayload{
-		From:    from,
-		To:      []string{to},
-		Subject: n.Subject,
-		HTML:    n.Metadata["html"],
-		Text:    n.Body,
+		From:    resolveFrom(msg, s.from),
+		To:      []string{msg.To},
+		Subject: msg.Subject,
+		HTML:    msg.HTML,
+		Text:    msg.Text,
 	}
 	body, err := json.Marshal(p)
 	if err != nil {
-		return fmt.Errorf("notification: email: resend: encoding payload: %w", err)
+		return fmt.Errorf("email: resend: encoding payload: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.apiURL, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("notification: email: resend: creating request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+r.apiKey)
-
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return errors.Join(notification.ErrTransient, fmt.Errorf("notification: email: resend: %w", err))
-	}
-	defer resp.Body.Close() //nolint:errcheck
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return nil
-	}
-	errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-	cause := fmt.Errorf("notification: email: resend: status %d: %s", resp.StatusCode, errBody)
-	if resp.StatusCode >= 500 {
-		return errors.Join(notification.ErrTransient, cause)
-	}
-	return cause
+	return doSend(ctx, s.client, s.apiURL, map[string]string{
+		"Authorization": "Bearer " + s.apiKey,
+	}, body)
 }

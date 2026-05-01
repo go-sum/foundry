@@ -22,6 +22,12 @@ func homeServiceChecks(svc Services) []home.Checker {
 			Fn:   svc.KVStore.Ping,
 		})
 	}
+	if svc.Processor != nil {
+		checks = append(checks, home.Checker{
+			Name: "Queue",
+			Fn:   svc.Processor.Ping,
+		})
+	}
 	return checks
 }
 

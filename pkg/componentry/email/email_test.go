@@ -63,6 +63,10 @@ func TestEmail(t *testing.T) {
 			name: "preview text",
 			node: email.PreviewText("Check this out"),
 		},
+		{
+			name: "preview text xss safety",
+			node: email.PreviewText("<script>alert('xss')</script>"),
+		},
 	}
 
 	for _, tc := range tests {

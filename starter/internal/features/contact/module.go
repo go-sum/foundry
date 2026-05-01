@@ -5,7 +5,7 @@ import (
 
 	coredb "github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
-	"github.com/go-sum/foundry/pkg/notification"
+	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/queue"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
@@ -27,7 +27,7 @@ type ModuleConfig struct {
 	Pool        coredb.DBTX
 	KV          kv.Store
 	Queue       *queue.Dispatcher
-	Notifier    *notification.Dispatcher
+	EmailSender email.Sender
 	Router      *router.Router
 	Validator   validate.Validator
 	Service     ServiceConfig
@@ -44,7 +44,7 @@ func NewModule(cfg ModuleConfig) *Module {
 	}
 	repo := NewRepository(cfg.Pool)
 	svc := NewService(repo, cfg.KV, cfg.Queue, cfg.Service, logger)
-	worker := NewNotifyHandler(cfg.Notifier, cfg.Worker)
+	worker := NewNotifyHandler(cfg.EmailSender, cfg.Worker)
 
 	m := &Module{
 		QueueName:    QueueName,

@@ -89,13 +89,21 @@ func (p *Processor) Start(ctx context.Context) {
 	p.wg.Add(1)
 	go p.runPurger(ctx)
 
-	p.logger.Info("queue processor started", "queues", len(p.queues))
+	for _, def := range p.queues {
+		p.logger.Info("queue registered", "queue", def.name, "workers", def.workers)
+	}
+	p.logger.Info("queue processor started", "queue_count", len(p.queues))
 }
 
 // Ready returns a channel that closes once all workers have entered their
 // poll loop. Use for test synchronization.
 func (p *Processor) Ready() <-chan struct{} {
 	return p.ready
+}
+
+// Ping checks the store's connectivity.
+func (p *Processor) Ping(ctx context.Context) error {
+	return p.store.Ping(ctx)
 }
 
 // Stop signals workers to cease and waits up to ShutdownWait for in-flight
@@ -108,6 +116,7 @@ func (p *Processor) Stop() error {
 	}
 	p.closed = true
 	p.mu.Unlock()
+	p.logger.Info("queue processor stopping")
 
 	if p.cancel != nil {
 		p.cancel()
@@ -121,6 +130,7 @@ func (p *Processor) Stop() error {
 
 	select {
 	case <-done:
+		p.logger.Info("queue processor stopped")
 		return nil
 	case <-time.After(p.cfg.shutdownWait):
 		return fmt.Errorf("queue: shutdown timed out after %s", p.cfg.shutdownWait)

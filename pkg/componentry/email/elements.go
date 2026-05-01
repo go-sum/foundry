@@ -1,8 +1,6 @@
 package email
 
 import (
-	"strings"
-
 	g "maragu.dev/gomponents"
 	h "maragu.dev/gomponents/html"
 )
@@ -88,12 +86,9 @@ const previewPadding = "&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n
 // the top of the body controls what snippet is shown. text should be 100
 // characters or fewer — the remainder is padded automatically.
 func PreviewText(text string) g.Node {
-	var sb strings.Builder
-	sb.WriteString(text)
-	sb.WriteString("&zwnj;&nbsp;")
-	sb.WriteString(previewPadding)
 	return g.El("div",
 		g.Attr("style", "display:none;max-height:0;overflow:hidden;mso-hide:all;"),
-		g.Raw(sb.String()),
+		g.Text(text),
+		g.Raw("&zwnj;&nbsp;"+previewPadding),
 	)
 }

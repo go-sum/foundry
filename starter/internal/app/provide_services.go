@@ -10,8 +10,7 @@ import (
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
-	"github.com/go-sum/foundry/pkg/notification"
-	"github.com/go-sum/foundry/pkg/notification/notifylog"
+	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/queue"
 	"github.com/go-sum/foundry/pkg/queue/pgstore"
 	"github.com/go-sum/foundry/pkg/web/router"
@@ -60,15 +59,22 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 	qStore := pgstore.New(pool)
 	qDispatcher := queue.NewDispatcher(qStore, queue.WithDispatcherLogger(runtime.Logger))
 
-	notifier := notification.NewDispatcher(map[notification.Channel]notification.Sender{
-		notification.ChannelLog: notifylog.New(runtime.Logger),
+	emailSender, err := email.New(email.Config{
+		Provider: email.Provider(runtime.Config.Email.Provider),
+		APIKey:   runtime.Config.Email.APIKey,
+		BaseURL:  runtime.Config.Email.BaseURL,
+		From:     runtime.Config.Email.From,
 	}, runtime.Logger)
+	if err != nil {
+		pool.Close()
+		return Services{}, fmt.Errorf("services: email: %w", err)
+	}
 
 	contactMod := contact.NewModule(contact.ModuleConfig{
 		Pool:        pool,
 		KV:          kvStore,
 		Queue:       qDispatcher,
-		Notifier:    notifier,
+		EmailSender: emailSender,
 		Router:      rt,
 		Validator:   val,
 		Service: contact.ServiceConfig{
@@ -105,7 +111,7 @@ func provideServices(ctx context.Context, runtime Runtime, _ Security, rt *route
 		KVStore:        kvStore,
 		Queue:          qDispatcher,
 		Processor:      processor,
-		Notifier:       notifier,
+		EmailSender:    emailSender,
 		Contact:        contactMod,
 		Auth:           authMod,
 		OAuthProvider:  oauthProvider,

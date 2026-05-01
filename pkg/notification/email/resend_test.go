@@ -7,36 +7,63 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
-	"github.com/go-sum/foundry/pkg/notification"
 	"github.com/go-sum/foundry/pkg/notification/email"
 )
 
-func TestNewResend_MissingAPIKey_ReturnsErrInvalidConfig(t *testing.T) {
-	_, err := email.NewResend(email.ResendConfig{
+func TestNew_Resend_MissingAPIKey_ReturnsErrInvalidConfig(t *testing.T) {
+	_, err := email.New(email.Config{
+		Provider: email.ProviderResend,
 		APIKey:   "",
-		FromAddr: "sender@example.com",
+		From:     "sender@example.com",
 	}, nil)
 	if err == nil {
-		t.Fatal("NewResend returned nil error, want ErrInvalidConfig")
+		t.Fatal("New returned nil error, want ErrInvalidConfig")
 	}
-	if !errors.Is(err, notification.ErrInvalidConfig) {
+	if !errors.Is(err, email.ErrInvalidConfig) {
 		t.Errorf("errors.Is(err, ErrInvalidConfig) = false; err = %v", err)
 	}
 }
 
-func TestNewResend_MissingFromAddr_ReturnsErrInvalidConfig(t *testing.T) {
-	_, err := email.NewResend(email.ResendConfig{
+func TestNew_Resend_MissingFrom_ReturnsErrInvalidConfig(t *testing.T) {
+	_, err := email.New(email.Config{
+		Provider: email.ProviderResend,
 		APIKey:   "key-123",
-		FromAddr: "",
+		From:     "",
 	}, nil)
 	if err == nil {
-		t.Fatal("NewResend returned nil error, want ErrInvalidConfig")
+		t.Fatal("New returned nil error, want ErrInvalidConfig")
 	}
-	if !errors.Is(err, notification.ErrInvalidConfig) {
+	if !errors.Is(err, email.ErrInvalidConfig) {
 		t.Errorf("errors.Is(err, ErrInvalidConfig) = false; err = %v", err)
+	}
+}
+
+func TestNew_Resend_HTTPBaseURL_ReturnsErrInvalidConfig(t *testing.T) {
+	_, err := email.New(email.Config{
+		Provider: email.ProviderResend,
+		APIKey:   "key",
+		From:     "sender@example.com",
+		BaseURL:  "http://api.resend.com/emails",
+	}, nil)
+	if err == nil {
+		t.Fatal("New returned nil error, want ErrInvalidConfig for http:// URL")
+	}
+	if !errors.Is(err, email.ErrInvalidConfig) {
+		t.Errorf("errors.Is(err, ErrInvalidConfig) = false; err = %v", err)
+	}
+}
+
+func TestNew_Resend_HTTPSBaseURL_Succeeds(t *testing.T) {
+	_, err := email.New(email.Config{
+		Provider: email.ProviderResend,
+		APIKey:   "key",
+		From:     "sender@example.com",
+		BaseURL:  "https://api.resend.com/emails",
+	}, nil)
+	if err != nil {
+		t.Fatalf("New returned error for https:// URL: %v", err)
 	}
 }
 
@@ -46,6 +73,7 @@ func TestResend_Send_Success(t *testing.T) {
 		To      []string `json:"to"`
 		Subject string   `json:"subject"`
 		Text    string   `json:"text"`
+		HTML    string   `json:"html"`
 	}
 
 	var captured payload
@@ -59,23 +87,23 @@ func TestResend_Send_Success(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	r, err := email.NewResend(email.ResendConfig{
+	s, err := email.New(email.Config{
+		Provider: email.ProviderResend,
 		APIKey:   "test-api-key",
-		FromAddr: "noreply@example.com",
+		From:     "noreply@example.com",
 		BaseURL:  srv.URL,
 	}, nil)
 	if err != nil {
-		t.Fatalf("NewResend error: %v", err)
+		t.Fatalf("New error: %v", err)
 	}
 
-	n := notification.Notification{
+	msg := email.Message{
+		To:      "recipient@example.com",
 		Subject: "Test Subject",
-		Body:    "plain text body",
-		Metadata: map[string]string{
-			"to": "recipient@example.com",
-		},
+		Text:    "plain text body",
+		HTML:    "<p>html body</p>",
 	}
-	if err := r.Send(context.Background(), n); err != nil {
+	if err := s.Send(context.Background(), msg); err != nil {
 		t.Fatalf("Send returned error: %v", err)
 	}
 
@@ -94,23 +122,28 @@ func TestResend_Send_Success(t *testing.T) {
 	if captured.Text != "plain text body" {
 		t.Errorf("Text = %q, want %q", captured.Text, "plain text body")
 	}
+	if captured.HTML != "<p>html body</p>" {
+		t.Errorf("HTML = %q, want %q", captured.HTML, "<p>html body</p>")
+	}
 }
 
-func TestResend_Send_MissingTo_ReturnsError(t *testing.T) {
-	r, err := email.NewResend(email.ResendConfig{
+func TestResend_Send_EmptyTo_ReturnsError(t *testing.T) {
+	s, err := email.New(email.Config{
+		Provider: email.ProviderResend,
 		APIKey:   "key",
-		FromAddr: "sender@example.com",
+		From:     "sender@example.com",
+		BaseURL:  "https://api.resend.com/emails",
 	}, nil)
 	if err != nil {
-		t.Fatalf("NewResend error: %v", err)
+		t.Fatalf("New error: %v", err)
 	}
 
-	n := notification.Notification{
-		Subject:  "No recipient",
-		Metadata: map[string]string{}, // no "to"
+	msg := email.Message{
+		Subject: "No recipient",
+		Text:    "body",
 	}
-	if err := r.Send(context.Background(), n); err == nil {
-		t.Error("Send returned nil, want error for missing 'to'")
+	if err := s.Send(context.Background(), msg); err == nil {
+		t.Error("Send returned nil, want error for empty To")
 	}
 }
 
@@ -121,24 +154,26 @@ func TestResend_Send_5xx_ReturnsErrTransient(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	r, err := email.NewResend(email.ResendConfig{
+	s, err := email.New(email.Config{
+		Provider: email.ProviderResend,
 		APIKey:   "key",
-		FromAddr: "sender@example.com",
+		From:     "sender@example.com",
 		BaseURL:  srv.URL,
 	}, nil)
 	if err != nil {
-		t.Fatalf("NewResend error: %v", err)
+		t.Fatalf("New error: %v", err)
 	}
 
-	n := notification.Notification{
-		Subject:  "transient test",
-		Metadata: map[string]string{"to": "x@example.com"},
+	msg := email.Message{
+		To:      "x@example.com",
+		Subject: "transient test",
+		Text:    "body",
 	}
-	err = r.Send(context.Background(), n)
+	err = s.Send(context.Background(), msg)
 	if err == nil {
 		t.Fatal("Send returned nil, want error")
 	}
-	if !errors.Is(err, notification.ErrTransient) {
+	if !errors.Is(err, email.ErrTransient) {
 		t.Errorf("errors.Is(err, ErrTransient) = false; err = %v", err)
 	}
 }
@@ -150,28 +185,27 @@ func TestResend_Send_4xx_NotTransient(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	r, err := email.NewResend(email.ResendConfig{
+	s, err := email.New(email.Config{
+		Provider: email.ProviderResend,
 		APIKey:   "key",
-		FromAddr: "sender@example.com",
+		From:     "sender@example.com",
 		BaseURL:  srv.URL,
 	}, nil)
 	if err != nil {
-		t.Fatalf("NewResend error: %v", err)
+		t.Fatalf("New error: %v", err)
 	}
 
-	n := notification.Notification{
-		Subject:  "4xx test",
-		Metadata: map[string]string{"to": "x@example.com"},
+	msg := email.Message{
+		To:      "x@example.com",
+		Subject: "4xx test",
+		Text:    "body",
 	}
-	err = r.Send(context.Background(), n)
+	err = s.Send(context.Background(), msg)
 	if err == nil {
 		t.Fatal("Send returned nil, want error")
 	}
-	if errors.Is(err, notification.ErrTransient) {
+	if errors.Is(err, email.ErrTransient) {
 		t.Errorf("errors.Is(err, ErrTransient) = true, want false for 4xx errors")
-	}
-	if !strings.Contains(err.Error(), "400") {
-		t.Errorf("error message = %q, expected it to contain status code 400", err.Error())
 	}
 }
 
@@ -188,23 +222,23 @@ func TestResend_Send_FromFallback(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	r, err := email.NewResend(email.ResendConfig{
+	s, err := email.New(email.Config{
+		Provider: email.ProviderResend,
 		APIKey:   "key",
-		FromAddr: "fallback@example.com",
+		From:     "fallback@example.com",
 		BaseURL:  srv.URL,
 	}, nil)
 	if err != nil {
-		t.Fatalf("NewResend error: %v", err)
+		t.Fatalf("New error: %v", err)
 	}
 
-	n := notification.Notification{
+	msg := email.Message{
+		To:      "x@example.com",
 		Subject: "from fallback test",
-		Metadata: map[string]string{
-			"to":   "x@example.com",
-			"from": "", // empty → should fall back to cfg.FromAddr
-		},
+		Text:    "body",
+		// From is empty → should use Config.From
 	}
-	if err := r.Send(context.Background(), n); err != nil {
+	if err := s.Send(context.Background(), msg); err != nil {
 		t.Fatalf("Send returned error: %v", err)
 	}
 

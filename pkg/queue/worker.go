@@ -57,21 +57,31 @@ func (p *Processor) runWorker(ctx context.Context, def *queueDef, id int, readyC
 }
 
 func (p *Processor) executeJob(ctx context.Context, def *queueDef, job *Job) {
+	start := time.Now()
+	p.logger.DebugContext(ctx, "queue: job started",
+		slog.String("job_id", job.ID),
+		slog.String("queue", job.Queue),
+		slog.Int("attempt", job.Attempts))
+
 	jobCtx, cancel := context.WithTimeout(ctx, def.timeout)
 	defer cancel()
 
 	err := safeExecute(jobCtx, def.handler, *job)
 
+	elapsed := time.Since(start)
 	storeCtx, storeCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer storeCancel()
 
-	// if NO error
 	if err == nil {
 		if completeErr := p.store.Complete(storeCtx, job.ID); completeErr != nil {
 			p.logger.ErrorContext(ctx, "queue: complete failed",
 				slog.String("job_id", job.ID),
 				slog.String("error", completeErr.Error()))
 		}
+		p.logger.DebugContext(ctx, "queue: job completed",
+			slog.String("job_id", job.ID),
+			slog.String("queue", job.Queue),
+			slog.Duration("duration", elapsed))
 		return
 	}
 
@@ -81,6 +91,12 @@ func (p *Processor) executeJob(ctx context.Context, def *queueDef, job *Job) {
 			slog.String("job_id", job.ID),
 			slog.String("error", failErr.Error()))
 	}
+	p.logger.DebugContext(ctx, "queue: job failed",
+		slog.String("job_id", job.ID),
+		slog.String("queue", job.Queue),
+		slog.Int("attempt", job.Attempts),
+		slog.Duration("duration", elapsed),
+		slog.String("error", err.Error()))
 }
 
 // safeExecute invokes handler with panic recovery.

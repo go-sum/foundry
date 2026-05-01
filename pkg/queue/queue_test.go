@@ -28,6 +28,7 @@ type fakeStore struct {
 	failErr     error
 	reapErr     error
 	purgeErr    error
+	pingErr     error
 
 	reapCount int
 	closed    bool
@@ -95,7 +96,7 @@ func (f *fakeStore) Purge(_ context.Context, _ time.Duration, _ int) (int, error
 	return 0, f.purgeErr
 }
 
-func (f *fakeStore) Ping(_ context.Context) error { return nil }
+func (f *fakeStore) Ping(_ context.Context) error { return f.pingErr }
 
 func (f *fakeStore) Close() error {
 	f.mu.Lock()
@@ -157,9 +158,7 @@ func TestDispatcher_Enqueue(t *testing.T) {
 }
 
 func TestDispatcher_UnknownQueue(t *testing.T) {
-	store := &fakeStore{}
-	d := NewDispatcher(store)
-
+	d := NewDispatcher(nil) // sync mode: unknown queue must fail
 	err := d.Dispatch(context.Background(), "nonexistent", json.RawMessage(`{}`))
 	if !errors.Is(err, ErrQueueUnknown) {
 		t.Errorf("err = %v, want ErrQueueUnknown", err)
@@ -336,6 +335,31 @@ func TestSyncDispatch_NoHandler(t *testing.T) {
 	err := d.Dispatch(context.Background(), "unregistered", json.RawMessage(`{}`))
 	if !errors.Is(err, ErrQueueUnknown) {
 		t.Errorf("err = %v, want ErrQueueUnknown", err)
+	}
+}
+
+func TestDispatcher_AsyncDispatchWithoutRegister(t *testing.T) {
+	store := &fakeStore{}
+	d := NewDispatcher(store)
+
+	payload := json.RawMessage(`{"key":"value"}`)
+	err := d.Dispatch(context.Background(), "unregistered", payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	job := store.lastEnqueued()
+	if job == nil {
+		t.Fatal("expected a job to be enqueued")
+	}
+	if job.Queue != "unregistered" {
+		t.Errorf("queue = %q, want %q", job.Queue, "unregistered")
+	}
+	if job.Priority != PriorityDefault {
+		t.Errorf("priority = %d, want %d", job.Priority, PriorityDefault)
+	}
+	if job.MaxAttempts != 3 {
+		t.Errorf("max_attempts = %d, want 3", job.MaxAttempts)
 	}
 }
 
@@ -532,6 +556,20 @@ func TestProcessor_Ready(t *testing.T) {
 
 	if err := proc.Stop(); err != nil {
 		t.Fatalf("proc.Stop: %v", err)
+	}
+}
+
+func TestProcessor_Ping(t *testing.T) {
+	store := &fakeStore{}
+	proc := newTestProcessor(store)
+
+	if err := proc.Ping(context.Background()); err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+
+	store.pingErr = errors.New("connection refused")
+	if err := proc.Ping(context.Background()); err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }
 

@@ -22,6 +22,14 @@ type KVConfig struct {
 	TLSEnabled bool
 }
 
+// EmailConfig configures outbound email delivery.
+type EmailConfig struct {
+	Provider string // "resend" | "mailchannels" | "log"
+	APIKey   string
+	BaseURL  string
+	From     string
+}
+
 // ContactConfig holds configuration for the contact feature.
 type ContactConfig struct {
 	SendTo     string
@@ -36,9 +44,11 @@ type Config struct {
 	Assets       static.AssetsConfig
 	Auth         AuthConfig
 	Contact      ContactConfig
+	Email        EmailConfig
 	CSP          secure.CSPNonceConfig
 	CSRF         secure.CSRFConfig
 	Env          Env
+	LogLevel     string
 	Headers      secure.HeadersConfig
 	KV           KVConfig
 	RateLimit    secure.RateLimitProfile
@@ -102,15 +112,21 @@ func defaultProduction() (Config, error) {
 		Assets:    assets,
 		Auth:      authCfg,
 		Contact: ContactConfig{
-			SendTo:     cfgpkg.ExpandEnv("CONTACT_SEND_TO", "admin@example.com"),
-			SendFrom:   cfgpkg.ExpandEnv("CONTACT_SEND_FROM", "noreply@example.com"),
+			SendTo:     cfgpkg.ExpandEnv("EMAIL_SEND_TO", "send@example.com"),
+			SendFrom:   cfgpkg.ExpandEnv("EMAIL_SEND_FROM", "noreply@example.com"),
 			RateLimit:  3,
 			RateWindow: time.Hour,
 		},
-		CSP:     secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash),
-		CSRF:    csrf,
-		Env:     Production,
-		Headers: secure.DefaultHeadersConfig(),
+		Email: EmailConfig{
+			Provider: "log",
+			APIKey:   cfgpkg.ExpandSecret("EMAIL_API_KEY"),
+			From:     cfgpkg.ExpandEnv("EMAIL_SEND_FROM", "noreply@example.com"),
+		},
+		CSP:      secure.DefaultCSPNonceConfig().WithScriptHashes(theme.InitScriptCSPHash),
+		CSRF:     csrf,
+		Env:      Production,
+		LogLevel: cfgpkg.ExpandEnv("LOG_LEVEL", "info"),
+		Headers:  secure.DefaultHeadersConfig(),
 		KV: KVConfig{
 			Addr:       cfgpkg.ExpandEnv("KV_HOST", "localhost") + ":" + cfgpkg.ExpandEnv("KV_PORT", "6379"),
 			Password:   cfgpkg.ExpandSecret("KV_PASSWORD"),

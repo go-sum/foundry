@@ -1,13 +1,12 @@
 package contact
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-sum/foundry/pkg/componentry/email"
-	"github.com/go-sum/foundry/pkg/notification"
+	compemail "github.com/go-sum/foundry/pkg/componentry/email"
+	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/queue"
 	g "maragu.dev/gomponents"
 )
@@ -21,101 +20,93 @@ type WorkerConfig struct {
 	SendFrom string
 }
 
+var adminEmailTemplate = compemail.Template[NotificationPayload]{
+	Subject: func(p NotificationPayload) string {
+		return "New contact form submission from " + p.Name
+	},
+	HTML: func(p NotificationPayload) g.Node {
+		return compemail.Layout(compemail.LayoutProps{Title: "New Contact Submission"}, g.Group([]g.Node{
+			compemail.H1("New contact form submission"),
+			compemail.P("Name: " + p.Name),
+			compemail.P("Email: " + p.Email),
+			compemail.P("Message:"),
+			compemail.P(p.Message),
+		}))
+	},
+	PlainText: func(p NotificationPayload) string {
+		return compemail.PlainText(
+			"New contact form submission",
+			"",
+			"Name: "+p.Name,
+			"Email: "+p.Email,
+			"",
+			"Message:",
+			p.Message,
+		)
+	},
+}
+
+var confirmEmailTemplate = compemail.Template[NotificationPayload]{
+	Subject: func(_ NotificationPayload) string {
+		return "Thanks for reaching out"
+	},
+	HTML: func(p NotificationPayload) g.Node {
+		return compemail.Layout(compemail.LayoutProps{Title: "Thanks for reaching out"}, g.Group([]g.Node{
+			compemail.H1("Thanks for reaching out, " + p.Name + "!"),
+			compemail.P("We've received your message and will get back to you soon."),
+			compemail.P("Your message:"),
+			compemail.P(p.Message),
+		}))
+	},
+	PlainText: func(p NotificationPayload) string {
+		return compemail.PlainText(
+			"Thanks for reaching out, "+p.Name+"!",
+			"",
+			"We've received your message and will get back to you soon.",
+			"",
+			"Your message:",
+			p.Message,
+		)
+	},
+}
+
 // NewNotifyHandler returns a queue.HandlerFunc that dispatches email notifications
 // for a submitted contact form.
-func NewNotifyHandler(notifier *notification.Dispatcher, cfg WorkerConfig) queue.HandlerFunc {
+func NewNotifyHandler(sender email.Sender, cfg WorkerConfig) queue.HandlerFunc {
 	return func(ctx context.Context, job queue.Job) error {
 		var payload NotificationPayload
 		if err := json.Unmarshal(job.Payload, &payload); err != nil {
 			return fmt.Errorf("contact: unmarshal payload: %w", err)
 		}
 
-		adminHTML, err := renderHTML(notificationBody(payload))
+		adminRendered, err := adminEmailTemplate.Render(payload)
 		if err != nil {
-			return fmt.Errorf("contact: render admin html: %w", err)
+			return fmt.Errorf("contact: render admin email: %w", err)
 		}
-		adminNotif := notification.Notification{
-			Subject:  "New contact form submission from " + payload.Name,
-			Body:     notificationText(payload),
-			Channels: []notification.Channel{notification.ChannelEmail},
-			Metadata: map[string]string{
-				"to":   cfg.SendTo,
-				"from": cfg.SendFrom,
-				"html": adminHTML,
-			},
-		}
-		if err := notifier.Send(ctx, adminNotif); err != nil {
+		if err := sender.Send(ctx, email.Message{
+			To:      cfg.SendTo,
+			From:    cfg.SendFrom,
+			Subject: adminRendered.Subject,
+			HTML:    adminRendered.HTML,
+			Text:    adminRendered.Text,
+		}); err != nil {
 			return fmt.Errorf("contact: send admin notification: %w", err)
 		}
 
-		confirmHTML, err := renderHTML(confirmationBody(payload))
+		confirmRendered, err := confirmEmailTemplate.Render(payload)
 		if err != nil {
-			return fmt.Errorf("contact: render confirmation html: %w", err)
+			return fmt.Errorf("contact: render confirmation email: %w", err)
 		}
-		confirmNotif := notification.Notification{
-			Subject:  "Thanks for reaching out",
-			Body:     confirmationText(payload),
-			Channels: []notification.Channel{notification.ChannelEmail},
-			Metadata: map[string]string{
-				"to":   payload.Email,
-				"from": cfg.SendFrom,
-				"html": confirmHTML,
-			},
-		}
-		if err := notifier.Send(ctx, confirmNotif); err != nil {
+		if err := sender.Send(ctx, email.Message{
+			To:      payload.Email,
+			From:    cfg.SendFrom,
+			Subject: confirmRendered.Subject,
+			HTML:    confirmRendered.HTML,
+			Text:    confirmRendered.Text,
+		}); err != nil {
 			return fmt.Errorf("contact: send confirmation: %w", err)
 		}
 
 		return nil
 	}
-}
-
-func renderHTML(node g.Node) (string, error) {
-	var buf bytes.Buffer
-	if err := node.Render(&buf); err != nil {
-		return "", fmt.Errorf("contact: render html: %w", err)
-	}
-	return buf.String(), nil
-}
-
-func notificationBody(p NotificationPayload) g.Node {
-	return email.Layout(email.LayoutProps{Title: "New Contact Submission"}, g.Group([]g.Node{
-		email.H1("New contact form submission"),
-		email.P("Name: " + p.Name),
-		email.P("Email: " + p.Email),
-		email.P("Message:"),
-		email.P(p.Message),
-	}))
-}
-
-func notificationText(p NotificationPayload) string {
-	return email.PlainText(
-		"New contact form submission",
-		"",
-		"Name: "+p.Name,
-		"Email: "+p.Email,
-		"",
-		"Message:",
-		p.Message,
-	)
-}
-
-func confirmationBody(p NotificationPayload) g.Node {
-	return email.Layout(email.LayoutProps{Title: "Thanks for reaching out"}, g.Group([]g.Node{
-		email.H1("Thanks for reaching out, " + p.Name + "!"),
-		email.P("We've received your message and will get back to you soon."),
-		email.P("Your message:"),
-		email.P(p.Message),
-	}))
-}
-
-func confirmationText(p NotificationPayload) string {
-	return email.PlainText(
-		"Thanks for reaching out, "+p.Name+"!",
-		"",
-		"We've received your message and will get back to you soon.",
-		"",
-		"Your message:",
-		p.Message,
-	)
 }
