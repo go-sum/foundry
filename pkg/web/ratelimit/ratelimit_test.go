@@ -182,7 +182,7 @@ func TestMiddleware_DefaultKeyUsesProfile(t *testing.T) {
 
 func TestMiddleware_FailOpenOnStoreError(t *testing.T) {
 	limiter, err := New(Config{
-		Store: errorStore{err: errors.New("backend down")},
+		Store: errorStore{err: errors.New("store down")},
 		Profiles: map[string]Policy{
 			testProfile: {Capacity: 1, RefillPer: time.Minute},
 		},
@@ -248,7 +248,7 @@ func TestRealIPFromTrustedXFF_UsesHeaderOnlyForTrustedProxy(t *testing.T) {
 
 func TestNewStoreFromConfig_KV(t *testing.T) {
 	store, err := NewStoreFromConfig(StoreConfig{
-		Type:      StoreTypeKV,
+		Type:    StoreTypeKV,
 		KVStore: fakeKVStore{},
 	})
 	if err != nil {
@@ -370,7 +370,7 @@ func TestMiddleware_EmptyProfile_ReturnsError(t *testing.T) {
 }
 
 func TestMiddleware_FailClosed_PreservesErrorCause(t *testing.T) {
-	sentinel := errors.New("backend down")
+	sentinel := errors.New("store down")
 	limiter, err := New(Config{
 		Store: errorStore{err: sentinel},
 		Profiles: map[string]Policy{
@@ -556,11 +556,11 @@ func TestRealIPFromForwarded(t *testing.T) {
 
 func TestRealIPFromTrustedXFF_RightToLeft(t *testing.T) {
 	tests := []struct {
-		name          string
-		trustedCIDRs  []string
-		remoteAddr    string
-		xff           string
-		want          string
+		name         string
+		trustedCIDRs []string
+		remoteAddr   string
+		xff          string
+		want         string
 	}{
 		{
 			name:         "spoofed leftmost ignored",
@@ -621,27 +621,27 @@ func TestRealIPFromTrustedXFF_RightToLeft(t *testing.T) {
 	}
 }
 
-type clockCapturingBackend struct {
+type clockCapturingStore struct {
 	capturedNow time.Time
 }
 
-func (b *clockCapturingBackend) RateLimitAllow(_ context.Context, _ string, _ int, _ time.Duration, now time.Time) (bool, time.Duration, int, time.Duration, error) {
+func (b *clockCapturingStore) RateLimitAllow(_ context.Context, _ string, _ int, _ time.Duration, now time.Time) (bool, time.Duration, int, time.Duration, error) {
 	b.capturedNow = now
 	return true, 0, 4, time.Second, nil
 }
 
 func TestKVStore_UsesInjectedClock(t *testing.T) {
 	fixed := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-	backend := &clockCapturingBackend{}
-	store := NewKVStore(backend, KVStoreConfig{
+	storage := &clockCapturingStore{}
+	store := NewKVStore(storage, KVStoreConfig{
 		Prefix: "test:",
 		Now:    func() time.Time { return fixed },
 	})
 
 	_, _ = store.Allow(context.Background(), "key", Policy{Capacity: 5, RefillPer: time.Second})
 
-	if !backend.capturedNow.Equal(fixed) {
-		t.Fatalf("backend received now = %v, want %v", backend.capturedNow, fixed)
+	if !storage.capturedNow.Equal(fixed) {
+		t.Fatalf("storage received now = %v, want %v", storage.capturedNow, fixed)
 	}
 }
 
@@ -679,6 +679,42 @@ func TestNewLimiter_InvalidStoreConfig(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("NewLimiter() error = nil, want non-nil for unsupported store type")
+	}
+}
+
+func TestKVStore_ErrorOmitsRawKey(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+	}{
+		{name: "email and IP composite", key: "alice@example.com:192.168.1.1"},
+		{name: "email only", key: "alice@example.com"},
+		{name: "IP only", key: "192.168.1.1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := NewKVStore(fakeKVStore{
+				err: errors.New("connection refused"),
+			}, KVStoreConfig{})
+
+			compositeKey := storageKey("routes.auth", tt.key)
+			_, err := store.Allow(context.Background(), compositeKey, Policy{
+				Capacity:  5,
+				RefillPer: time.Second,
+			})
+			if err == nil {
+				t.Fatal("Allow() error = nil, want non-nil")
+			}
+			errStr := err.Error()
+			if strings.Contains(errStr, tt.key) {
+				t.Fatalf("error string contains raw key %q:\n  %s", tt.key, errStr)
+			}
+			wantHash := keyHash(compositeKey)
+			if !strings.Contains(errStr, wantHash) {
+				t.Fatalf("error string missing hashed key %q:\n  %s", wantHash, errStr)
+			}
+		})
 	}
 }
 

@@ -55,7 +55,7 @@ func (s *kvStore) Allow(ctx context.Context, key string, policy Policy) (Decisio
 	}
 	allowed, retryAfter, remaining, resetAfter, err := s.kvs.RateLimitAllow(ctx, s.key(key), policy.Capacity, policy.RefillPer, s.now())
 	if err != nil {
-		return Decision{}, fmt.Errorf("web/ratelimit: kv store allow: %w", err)
+		return Decision{}, fmt.Errorf("web/ratelimit: kv store allow [key=%s]: %w", keyHash(key), err)
 	}
 	return Decision{
 		Allowed:    allowed,

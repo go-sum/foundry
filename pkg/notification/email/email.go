@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Provider identifies an email delivery backend.
+// Provider identifies an email delivery service.
 type Provider string
 
 const (

@@ -331,8 +331,8 @@ func TestDynamicHopHeaders(t *testing.T) {
 		},
 		{
 			name:       "multiple tokens",
-			connection: "Keep-Alive, X-Custom, X-Backend",
-			want:       map[string]bool{"keep-alive": true, "x-custom": true, "x-backend": true},
+			connection: "Keep-Alive, X-Custom, X-Storage",
+			want:       map[string]bool{"keep-alive": true, "x-custom": true, "x-storage": true},
 		},
 		{
 			name:       "lowercases names",
@@ -396,9 +396,9 @@ func TestReverse_DynamicHopByHop_RequestHeaders(t *testing.T) {
 
 func TestReverse_DynamicHopByHop_ResponseHeaders(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Upstream names X-Backend-Token as hop-by-hop via Connection.
-		w.Header().Set("Connection", "X-Backend-Token")
-		w.Header().Set("X-Backend-Token", "internal-value")
+		// Upstream names X-Storage-Token as hop-by-hop via Connection.
+		w.Header().Set("Connection", "X-Storage-Token")
+		w.Header().Set("X-Storage-Token", "internal-value")
 		w.Header().Set("X-Public", "visible")
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -414,8 +414,8 @@ func TestReverse_DynamicHopByHop_ResponseHeaders(t *testing.T) {
 		_ = resp.Body.Close()
 	}
 
-	if resp.Headers.Get("X-Backend-Token") != "" {
-		t.Errorf("X-Backend-Token present in response, want stripped (dynamic hop-by-hop)")
+	if resp.Headers.Get("X-Storage-Token") != "" {
+		t.Errorf("X-Storage-Token present in response, want stripped (dynamic hop-by-hop)")
 	}
 	if resp.Headers.Get("X-Public") != "visible" {
 		t.Errorf("X-Public = %q, want visible", resp.Headers.Get("X-Public"))
@@ -942,7 +942,6 @@ func TestReverse_TrustedProxy_InvalidForwardedStartsFresh(t *testing.T) {
 		t.Errorf("Forwarded = %q, want fresh hop emitted", gotForwarded)
 	}
 }
-
 
 // --- X-Forwarded-Host trust-gated preservation ---
 

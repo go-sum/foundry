@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestSessionBackend_RoundTrip(t *testing.T) {
+func TestSessionStore_RoundTrip(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	key := uniqueKey(t, "session")
@@ -46,7 +46,7 @@ func TestSessionBackend_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestSessionBackend_VersionConflict(t *testing.T) {
+func TestSessionStore_VersionConflict(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	key := uniqueKey(t, "conflict")
@@ -69,7 +69,7 @@ func TestSessionBackend_VersionConflict(t *testing.T) {
 	}
 }
 
-func TestSessionBackend_IdleExpiry(t *testing.T) {
+func TestSessionStore_IdleExpiry(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	key := uniqueKey(t, "idle")
@@ -89,7 +89,7 @@ func TestSessionBackend_IdleExpiry(t *testing.T) {
 	}
 }
 
-func TestSessionBackend_AbsoluteExpiry(t *testing.T) {
+func TestSessionStore_AbsoluteExpiry(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	key := uniqueKey(t, "absolute")
@@ -109,7 +109,7 @@ func TestSessionBackend_AbsoluteExpiry(t *testing.T) {
 	}
 }
 
-func TestSessionBackend_SaveAfterAbsoluteExpiry(t *testing.T) {
+func TestSessionStore_SaveAfterAbsoluteExpiry(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	key := uniqueKey(t, "expiry-save")

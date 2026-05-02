@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRespond(t *testing.T) {
@@ -331,6 +332,49 @@ func TestRedirect(t *testing.T) {
 	}
 	if resp.Body != nil {
 		t.Errorf("Body = %v, want nil", resp.Body)
+	}
+}
+
+func TestProblem_RetryAfterSubSecondRoundsUp(t *testing.T) {
+	readDoc := func(t *testing.T, resp Response) map[string]any {
+		t.Helper()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("reading body: %v", err)
+		}
+		var doc map[string]any
+		if err := json.Unmarshal(body, &doc); err != nil {
+			t.Fatalf("unmarshal body: %v (body=%q)", err, body)
+		}
+		return doc
+	}
+
+	tests := []struct {
+		name       string
+		retryAfter time.Duration
+		wantHeader string
+		wantDoc    float64
+	}{
+		{name: "1ms rounds up to 1", retryAfter: time.Millisecond, wantHeader: "1", wantDoc: 1},
+		{name: "500ms rounds up to 1", retryAfter: 500 * time.Millisecond, wantHeader: "1", wantDoc: 1},
+		{name: "1500ms rounds up to 2", retryAfter: 1500 * time.Millisecond, wantHeader: "2", wantDoc: 2},
+		{name: "exactly 1s stays 1", retryAfter: time.Second, wantHeader: "1", wantDoc: 1},
+		{name: "5s stays 5", retryAfter: 5 * time.Second, wantHeader: "5", wantDoc: 5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := ErrTooManyRequests(tt.retryAfter)
+			resp := Problem(nil, e)
+
+			if got := resp.Headers.Get("Retry-After"); got != tt.wantHeader {
+				t.Fatalf("Retry-After header = %q, want %q", got, tt.wantHeader)
+			}
+			doc := readDoc(t, resp)
+			if doc["retry_after"] != tt.wantDoc {
+				t.Fatalf("retry_after = %v, want %v", doc["retry_after"], tt.wantDoc)
+			}
+		})
 	}
 }
 

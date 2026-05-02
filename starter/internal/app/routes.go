@@ -3,6 +3,7 @@ package app
 import (
 	"cmp"
 	"fmt"
+	"log/slog"
 
 	"github.com/go-sum/foundry/internal/features/home"
 	"github.com/go-sum/foundry/internal/features/oauthclient"
@@ -152,9 +153,16 @@ func authRateLimitNodes(sec Security, svc Services) ([]router.Node, error) {
 		return nil, nil
 	}
 	mw, err := ratelimit.Middleware(ratelimit.MiddlewareConfig{
-		Limiter: svc.RateLimiter,
-		Profile: string(config.RateLimitRoutesAuth),
-		KeyFunc: sec.RateLimitKey,
+		Limiter:    svc.RateLimiter,
+		Profile:    string(config.RateLimitRoutesAuth),
+		KeyFunc:    sec.RateLimitKey,
+		FailClosed: true,
+		OnError: func(err error, c *web.Context) {
+			slog.ErrorContext(c.Context(), "auth rate limit store error",
+				"error", err,
+				"request_id", web.RequestID(c),
+			)
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("auth rate limit middleware: %w", err)

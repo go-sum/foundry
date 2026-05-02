@@ -44,7 +44,7 @@ type BoundaryConfig struct {
 
 	// OnError is an optional hook invoked after error classification and logging,
 	// but before rendering. It receives the request context and the classified
-	// *Error. Use it to record errors on observability backends (e.g., OTel spans).
+	// *Error. Use it to record errors on observability services (e.g., OTel spans).
 	// May be nil.
 	OnError func(ctx context.Context, e *Error)
 }

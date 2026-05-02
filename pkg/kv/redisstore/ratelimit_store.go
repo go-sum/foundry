@@ -32,29 +32,29 @@ func (s *RedisStore) RateLimitAllow(ctx context.Context, key string, capacity in
 		durationMillis(ttl),
 	).Result()
 	if err != nil {
-		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow %q: %w", key, err)
+		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow: %w", err)
 	}
 
 	items, ok := result.([]any)
 	if !ok || len(items) < 4 {
-		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow %q: unexpected result %T", key, result)
+		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow: unexpected result %T", result)
 	}
 
 	allowed, err := redisInt64(items[0])
 	if err != nil {
-		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow %q: %w", key, err)
+		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow: %w", err)
 	}
 	retryAfterMS, err := redisInt64(items[1])
 	if err != nil {
-		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow %q: %w", key, err)
+		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow: %w", err)
 	}
 	remaining, err := redisInt64(items[2])
 	if err != nil {
-		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow %q: %w", key, err)
+		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow: %w", err)
 	}
 	resetAfterMS, err := redisInt64(items[3])
 	if err != nil {
-		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow %q: %w", key, err)
+		return false, 0, 0, 0, fmt.Errorf("kv: ratelimit allow: %w", err)
 	}
 
 	return allowed == 1,

@@ -9,13 +9,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/health"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/site"
 	"github.com/go-sum/foundry/pkg/web/static"
+	configpkg "github.com/go-sum/foundry/config"
 )
 
 func testRouteContext(method, rawURL string) *web.Context {
@@ -149,6 +152,48 @@ func TestHealthHandler_ReturnsUnavailableWhenCheckerFails(t *testing.T) {
 	}
 	if got, want := webErr.Status, http.StatusServiceUnavailable; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
+	}
+}
+
+type failingRateLimitStore struct {
+	err error
+}
+
+func (s *failingRateLimitStore) Allow(_ context.Context, _ string, _ ratelimit.Policy) (ratelimit.Decision, error) {
+	return ratelimit.Decision{}, s.err
+}
+
+func TestAuthRateLimitNodes_FailsClosed(t *testing.T) {
+	limiter, err := ratelimit.New(ratelimit.Config{
+		Store: &failingRateLimitStore{err: errors.New("store unavailable")},
+		Profiles: map[string]ratelimit.Policy{
+			string(configpkg.RateLimitRoutesAuth): {Capacity: 10, RefillPer: time.Minute},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ratelimit.New() error = %v", err)
+	}
+
+	nodes, err := authRateLimitNodes(Security{
+		RateLimitKey: ratelimit.FixedKey("test"),
+	}, Services{RateLimiter: limiter})
+	if err != nil {
+		t.Fatalf("authRateLimitNodes() error = %v", err)
+	}
+
+	rt := router.New()
+	allNodes := append(nodes, router.GET("/auth/test", "auth.test", func(_ *web.Context) (web.Response, error) {
+		return web.Respond(http.StatusOK), nil
+	}))
+	router.Register(rt, router.Layout(allNodes...))
+
+	_, serveErr := rt.Serve(testRouteContext(http.MethodGet, "/auth/test"))
+	var webErr *web.Error
+	if !errors.As(serveErr, &webErr) {
+		t.Fatalf("expected *web.Error (fail-closed 503), got %T: %v", serveErr, serveErr)
+	}
+	if webErr.Status != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d (fail-closed should return 503)", webErr.Status, http.StatusServiceUnavailable)
 	}
 }
 

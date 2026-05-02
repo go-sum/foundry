@@ -1,4 +1,4 @@
-// Package kv defines a backend-agnostic key-value store contract.
+// Package kv defines a storage-agnostic key-value store contract.
 //
 // Implementations live in sub-packages (e.g. [redisstore]). The interface
 // is intentionally minimal: basic CRUD, TTL-based expiry, existence checks,

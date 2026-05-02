@@ -55,10 +55,10 @@ func provideKVStore(ctx context.Context, runtime Runtime, factory func(context.C
 
 // needsKV reports whether the application requires the shared KV dependency at
 // startup. Outside testing, starter services such as auth nonce storage and
-// the production rate-limit backend depend on the configured KV service
+// the production rate-limit store depend on the configured KV service
 // regardless of which session store implementation is selected. In testing,
 // only the explicit kv session store path requires bringing up the shared KV
-// dependency because rate limiting falls back to an in-memory backend.
+// dependency because rate limiting falls back to an in-memory store.
 func needsKV(cfg *config.Config) bool {
 	if cfg.Env != config.Testing {
 		return true

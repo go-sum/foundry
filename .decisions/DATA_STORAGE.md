@@ -78,7 +78,7 @@ weight: 28
 
 **sqlx** is appropriate when:
 
-- multi-database backend support is a requirement
+- multi-database store support is a requirement
 - the project already depends on `database/sql` and benefits from `sqlx`
   extensions (`NamedExec`, `StructScan`, `Select`, `Get`)
 

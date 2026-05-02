@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Response models the W3C Response API. It is a value type returned from handlers.
@@ -140,7 +141,7 @@ func Problem(c *Context, e *Error) Response {
 	}
 
 	if e.RetryAfter > 0 {
-		doc["retry_after"] = int(e.RetryAfter.Seconds())
+		doc["retry_after"] = retryAfterCeil(e.RetryAfter)
 	}
 
 	var buf bytes.Buffer
@@ -149,13 +150,29 @@ func Problem(c *Context, e *Error) Response {
 	h := NewHeaders()
 	h.Set("Content-Type", "application/problem+json")
 	if e.RetryAfter > 0 {
-		h.Set("Retry-After", strconv.Itoa(int(e.RetryAfter.Seconds())))
+		h.Set("Retry-After", strconv.Itoa(retryAfterCeil(e.RetryAfter)))
 	}
 	return Response{
 		Status:  e.Status,
 		Headers: h,
 		Body:    io.NopCloser(&buf),
 	}
+}
+
+// retryAfterCeil converts a positive duration to whole seconds using ceiling
+// division with a minimum of 1. Zero or negative durations return 0.
+func retryAfterCeil(d time.Duration) int {
+	if d <= 0 {
+		return 0
+	}
+	secs := int(d / time.Second)
+	if d%time.Second != 0 {
+		secs++
+	}
+	if secs < 1 {
+		return 1
+	}
+	return secs
 }
 
 // Redirect returns a redirect response with the given status and location.
