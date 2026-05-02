@@ -9,6 +9,31 @@ import (
 	"testing"
 )
 
+// TestParseLogLevel verifies every case-sensitive and default branch.
+func TestParseLogLevel(t *testing.T) {
+	tests := []struct {
+		input string
+		want  slog.Level
+	}{
+		{"debug", slog.LevelDebug},
+		{"warn", slog.LevelWarn},
+		{"error", slog.LevelError},
+		{"info", slog.LevelInfo},
+		{"INFO", slog.LevelInfo},
+		{"", slog.LevelInfo},
+		{"unknown", slog.LevelInfo},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			got := ParseLogLevel(tc.input)
+			if got != tc.want {
+				t.Errorf("ParseLogLevel(%q) = %v, want %v", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestNew_DefaultsToTextInfoStderr verifies that a zero-value Config produces
 // a text-format logger at Info level. Info records appear; Debug records are
 // absent.

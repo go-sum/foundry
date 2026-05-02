@@ -3,8 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"strings"
 
 	"go.opentelemetry.io/otel/trace/noop"
 
@@ -23,7 +21,7 @@ func provideRuntime(_ context.Context) (Runtime, error) {
 	}
 	return Runtime{
 		Config: cfg,
-		Logger: logging.New(logging.Config{Level: parseLogLevel(cfg.LogLevel)}),
+		Logger: logging.New(logging.Config{Level: logging.ParseLogLevel(cfg.LogLevel)}),
 		Tracer: noop.NewTracerProvider().Tracer("app"),
 	}, nil
 }
@@ -50,15 +48,3 @@ func provideAssets(cfg *config.Config) (*publish.Manifest, *icons.Registry, erro
 	return manifest, iconReg, nil
 }
 
-func parseLogLevel(s string) slog.Level {
-	switch strings.ToLower(s) {
-	case "debug":
-		return slog.LevelDebug
-	case "warn":
-		return slog.LevelWarn
-	case "error":
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
-}
