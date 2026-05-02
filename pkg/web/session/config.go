@@ -12,11 +12,6 @@ import (
 	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 )
 
-const (
-	defaultTTL     = 24 * time.Hour
-	defaultMaxSize = 4096
-)
-
 // Settings is the env-facing shape for session configuration.
 type Settings struct {
 	CookieName   string `validate:"required"`
@@ -26,6 +21,70 @@ type Settings struct {
 	KVPrefix     string
 	CookieKey    []byte
 }
+
+// Config configures the session Middleware.
+type Config struct {
+	// Store handles session persistence. Required.
+	// Use NewMemoryStore for test-only server-side sessions.
+	// Use NewKVStore for server-side sessions.
+	// Use NewCookieStore for client-side AEAD-encrypted sessions.
+	Store Store `validate:"required"`
+
+	// CookieTemplate defines the attributes of the session cookie.
+	// CookieTemplate.Name is required.
+	CookieTemplate web.Cookie
+
+	// TTL is the absolute session lifetime. Defaults to 24 hours.
+	TTL time.Duration
+
+	// IdleTTL is the idle-inactivity timeout. Zero disables idle expiry.
+	IdleTTL time.Duration
+
+	// MaxCookieBytes is the maximum serialized Set-Cookie size. Defaults to 4096.
+	MaxCookieBytes int
+}
+
+// StoreConfig specifies how to construct a session.Store.
+// Build the appropriate fields based on Type before calling NewStoreFromConfig.
+type StoreConfig struct {
+	// Type selects the backing store: "cookie", "kv", or "memory".
+	Type string
+	// Env is the application environment name. The "memory" store type is only
+	// permitted when Env equals TestingEnv; any other environment returns an error.
+	Env string
+	// TestingEnv is the environment name that permits the memory store.
+	// Defaults to "testing" if empty.
+	TestingEnv string
+	// Settings provides cookie name, TTL, and other session settings.
+	Settings Settings
+	// Codec is required when Type is "cookie".
+	Codec *cookiecodec.Codec
+	// KVStore is required when Type is "kv".
+	KVStore KVStore
+	// KVPrefix is an optional key prefix applied to all KV session keys.
+	KVPrefix string
+	// TestFactory overrides the memory store constructor. Used in tests to
+	// inject a pre-configured store instead of creating a new MemoryStore.
+	TestFactory func() Store
+}
+
+// KVStoreConfig controls how server-side sessions are keyed in the backing KV
+// store.
+type KVStoreConfig struct {
+	Prefix string
+}
+
+const (
+	defaultTTL     = 24 * time.Hour
+	defaultMaxSize = 4096
+)
+
+// StoreType constants for use with NewStoreFromConfig.
+const (
+	StoreTypeCookie = "cookie"
+	StoreTypeKV     = "kv"
+	StoreTypeMemory = "memory"
+)
 
 // CookieKeyFromHex decodes a hex-encoded session cookie key.
 // Trims whitespace, hex-decodes, and checks that the key is at least 32 bytes.
@@ -58,26 +117,14 @@ func InitialSessionSettings(kvPrefix string) Settings {
 	}
 }
 
-// Config configures the session Middleware.
-type Config struct {
-	// Store handles session persistence. Required.
-	// Use NewMemoryStore for test-only server-side sessions.
-	// Use NewKVStore for server-side sessions.
-	// Use NewCookieStore for client-side AEAD-encrypted sessions.
-	Store Store `validate:"required"`
-
-	// CookieTemplate defines the attributes of the session cookie.
-	// CookieTemplate.Name is required.
-	CookieTemplate web.Cookie
-
-	// TTL is the absolute session lifetime. Defaults to 24 hours.
-	TTL time.Duration
-
-	// IdleTTL is the idle-inactivity timeout. Zero disables idle expiry.
-	IdleTTL time.Duration
-
-	// MaxCookieBytes is the maximum serialized Set-Cookie size. Defaults to 4096.
-	MaxCookieBytes int
+// CookieCodecFromSettings constructs the AEAD cookie codec for cookie-backed
+// sessions using the configured cookie name and key material.
+func NewCookieCodec(s Settings) (*cookiecodec.Codec, error) {
+	return cookiecodec.New(cookiecodec.Config{
+		Name:    s.CookieName,
+		Secrets: [][]byte{s.CookieKey},
+		Mode:    cookiecodec.AEAD,
+	})
 }
 
 // NewConfig builds a session Config from Settings and a Store.
@@ -95,13 +142,6 @@ func NewConfig(s Settings, store Store) Config {
 		IdleTTL: s.IdleTTL,
 	}
 }
-
-// StoreType constants for use with NewStoreFromConfig.
-const (
-	StoreTypeCookie = "cookie"
-	StoreTypeKV     = "kv"
-	StoreTypeMemory = "memory"
-)
 
 // ValidationRules returns a registrar that enforces session store constraints.
 // The memory store is only permitted in the testing environment; the kv store
@@ -121,30 +161,6 @@ func ValidationRules(storeType, env, kvPassword string, cookieKey []byte) func(*
 			}
 		}, Settings{})
 	}
-}
-
-// StoreConfig specifies how to construct a session.Store.
-// Build the appropriate fields based on Type before calling NewStoreFromConfig.
-type StoreConfig struct {
-	// Type selects the backing store: "cookie", "kv", or "memory".
-	Type string
-	// Env is the application environment name. The "memory" store type is only
-	// permitted when Env equals TestingEnv; any other environment returns an error.
-	Env string
-	// TestingEnv is the environment name that permits the memory store.
-	// Defaults to "testing" if empty.
-	TestingEnv string
-	// Settings provides cookie name, TTL, and other session settings.
-	Settings Settings
-	// Codec is required when Type is "cookie".
-	Codec *cookiecodec.Codec
-	// KVStore is required when Type is "kv".
-	KVStore KVStore
-	// KVPrefix is an optional key prefix applied to all KV session keys.
-	KVPrefix string
-	// TestFactory overrides the memory store constructor. Used in tests to
-	// inject a pre-configured store instead of creating a new MemoryStore.
-	TestFactory func() Store
 }
 
 // NewStoreFromConfig constructs a session Store and its middleware Config from
@@ -182,12 +198,6 @@ func NewStoreFromConfig(cfg StoreConfig) (Config, Store, error) {
 	}
 
 	return NewConfig(cfg.Settings, store), store, nil
-}
-
-// KVStoreConfig controls how server-side sessions are keyed in the backing KV
-// store.
-type KVStoreConfig struct {
-	Prefix string
 }
 
 // InitialKVStoreConfig returns the production default key namespace for KV

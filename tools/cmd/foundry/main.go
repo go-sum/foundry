@@ -12,6 +12,7 @@ func main() {
 		Short:        "Foundry monorepo toolset",
 		SilenceUsage: true,
 	}
+	root.AddCommand(newGoOrderCommand())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)

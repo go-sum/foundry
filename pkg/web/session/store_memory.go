@@ -19,17 +19,6 @@ type memEntry struct {
 	lastAccess time.Time
 }
 
-func (e memEntry) expired() bool {
-	now := time.Now()
-	if !e.absolute.IsZero() && now.After(e.absolute) {
-		return true
-	}
-	if e.idleTTL > 0 && now.After(e.lastAccess.Add(e.idleTTL)) {
-		return true
-	}
-	return false
-}
-
 // MemoryStore is an in-memory Store kept primarily for tests.
 // It exists so tests can exercise large server-side session payloads without
 // hitting cookie-size limits in CookieStore or depending on a real KV service.
@@ -41,6 +30,17 @@ type MemoryStore struct {
 	entries  map[string]memEntry
 	stopCh   chan struct{}
 	stopOnce sync.Once
+}
+
+func (e memEntry) expired() bool {
+	now := time.Now()
+	if !e.absolute.IsZero() && now.After(e.absolute) {
+		return true
+	}
+	if e.idleTTL > 0 && now.After(e.lastAccess.Add(e.idleTTL)) {
+		return true
+	}
+	return false
 }
 
 // NewMemoryStore creates a test-oriented in-memory session store and starts its

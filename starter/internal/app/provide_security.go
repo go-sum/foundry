@@ -5,22 +5,14 @@ import (
 	"fmt"
 
 	"github.com/go-sum/foundry/pkg/kv"
-	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/session"
 
 	config "github.com/go-sum/foundry/config"
 )
 
-
 func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, storeFactory func() session.Store) (Security, session.Store, error) {
 	cfg := runtime.Config
-
-	origins := make([]string, 0, 1+len(cfg.Site.OriginAllowlist))
-	if cfg.Site.BaseURL != "" {
-		origins = append(origins, cfg.Site.BaseURL)
-	}
-	origins = append(origins, cfg.Site.OriginAllowlist...)
 
 	sessCfg, store, err := provideSession(runtime, kvStore, storeFactory)
 	if err != nil {
@@ -30,16 +22,16 @@ func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, store
 	serverOrigin := cfg.Site.BaseURL
 	csrf := cfg.Web.Secure.CSRF
 	csrf.ServerOrigin = serverOrigin
-	rateLimitKey, err := rateLimitKeyFunc(cfg.Web.Server.TrustedProxies)
+	rateLimitKey, err := ratelimit.KeyFuncFromTrustedProxies(cfg.Web.Server.TrustedProxies)
 	if err != nil {
-		return Security{}, nil, fmt.Errorf("security: rate limit key: %w", err)
+		return Security{}, nil, fmt.Errorf("security: rate limit key: %w: %w", ErrTrustedProxyCIDRInvalid, err)
 	}
 
 	return Security{
 		CSRF:         csrf,
 		Headers:      cfg.Web.Secure.Headers,
 		CSP:          cfg.Web.Secure.CSP,
-		Origins:      origins,
+		Origins:      trustedOrigins(cfg),
 		AllowedHosts: cfg.Site.AllowedHosts,
 		ServerOrigin: serverOrigin,
 		RateLimitKey: rateLimitKey,
@@ -57,11 +49,7 @@ func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() sessi
 
 	switch runtime.Config.Web.SessionStore {
 	case session.StoreTypeCookie:
-		codec, err := cookiecodec.New(cookiecodec.Config{
-			Name:    runtime.Config.Web.Session.CookieName,
-			Secrets: [][]byte{runtime.Config.Web.Session.CookieKey},
-			Mode:    cookiecodec.AEAD,
-		})
+		codec, err := session.NewCookieCodec(runtime.Config.Web.Session)
 		if err != nil {
 			return session.Config{}, nil, fmt.Errorf("session: cookie store: %w", err)
 		}
@@ -80,13 +68,10 @@ func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() sessi
 	return session.NewStoreFromConfig(cfg)
 }
 
-func rateLimitKeyFunc(trustedProxies []string) (ratelimit.KeyFunc, error) {
-	if len(trustedProxies) == 0 {
-		return ratelimit.RemoteAddrKey, nil
+func trustedOrigins(cfg *config.Config) []string {
+	origins := make([]string, 0, 1+len(cfg.Site.OriginAllowlist))
+	if cfg.Site.BaseURL != "" {
+		origins = append(origins, cfg.Site.BaseURL)
 	}
-	fn, err := ratelimit.RealIPFromTrustedXFF(trustedProxies...)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrTrustedProxyCIDRInvalid, err)
-	}
-	return fn, nil
+	return append(origins, cfg.Site.OriginAllowlist...)
 }

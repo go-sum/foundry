@@ -84,10 +84,10 @@ func TestFromHTTPRequest(t *testing.T) {
 
 func TestFromHTTPRequest_AbsoluteURL(t *testing.T) {
 	cases := []struct {
-		name        string
-		setupReq    func(r *http.Request)
-		wantScheme  string
-		wantHost    string
+		name       string
+		setupReq   func(r *http.Request)
+		wantScheme string
+		wantHost   string
 	}{
 		{
 			name:       "plain HTTP defaults to http scheme",

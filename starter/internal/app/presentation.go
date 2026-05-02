@@ -1,4 +1,4 @@
-package config
+package app
 
 import (
 	"cmp"
@@ -8,22 +8,22 @@ import (
 	"github.com/go-sum/foundry/pkg/componentry/icons/render"
 	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
 	"github.com/go-sum/foundry/pkg/componentry/ui/core"
+	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/router"
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
+	g "maragu.dev/gomponents"
+	h "maragu.dev/gomponents/html"
 )
 
-const maxLen = 12
+const navAccountLabelMaxLen = 12
 
-// DefaultNav returns a viewstate.RequestOption that builds the nav on each request.
-// Route URL reversal is deferred until request time so this option is safe to
-// construct before routes are registered. The CSRF token for the signout form
-// is injected from the per-request viewstate.Request.
-func DefaultNav(rt *router.Router, authRoute string) viewstate.RequestOption {
+// primaryNav builds the starter navigation on each request.
+func primaryNav(rt *router.Router, authRoute string) viewstate.RequestOption {
 	return func(r *viewstate.Request) {
 		name := r.Auth.DisplayName
-		if runes := []rune(name); len(runes) > maxLen {
-			name = string(runes[:maxLen])
+		if runes := []rune(name); len(runes) > navAccountLabelMaxLen {
+			name = string(runes[:navAccountLabelMaxLen])
 		}
 		accountLabel := cmp.Or(name, "Account")
 		r.NavConfig = compound.NavConfig{
@@ -91,5 +91,23 @@ func DefaultNav(rt *router.Router, authRoute string) viewstate.RequestOption {
 				})),
 			},
 		}
+	}
+}
+
+func pageRenderer(opts []viewstate.RequestOption) func(c *web.Context, title string, content g.Node) (web.Response, error) {
+	return func(c *web.Context, title string, content g.Node) (web.Response, error) {
+		vr := viewstate.NewRequest(c, opts...)
+		return viewstate.Render(vr, vr.Page(title, content), nil)
+	}
+}
+
+func centeredAuthPageRenderer(opts []viewstate.RequestOption) func(c *web.Context, title string, content g.Node) (web.Response, error) {
+	return func(c *web.Context, title string, content g.Node) (web.Response, error) {
+		vr := viewstate.NewRequest(c, opts...)
+		centered := h.Div(
+			h.Class("flex min-h-[calc(100vh-4rem)] items-center justify-center px-4"),
+			h.Div(h.Class("w-full max-w-sm"), content),
+		)
+		return viewstate.Render(vr, vr.Page(title, centered), content)
 	}
 }

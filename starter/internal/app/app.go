@@ -171,7 +171,7 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		ViewOpts: []viewstate.RequestOption{
 			viewstate.WithIconRegistry(iconReg),
 			viewstate.WithPathFunc(manifest.Path),
-			config.DefaultNav(routing, routes.OAuthConnect.Name),
+			primaryNav(routing, routes.OAuthConnect.Name),
 		},
 		Icons: iconReg,
 	}
@@ -232,7 +232,11 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 
 	s := site.New(runtime.Config.Site)
 	publicDir := filepath.Dir(runtime.Config.Assets.PublicDir)
-	if err := RegisterRoutes(routing, routes, security, services, runtime.Config.Assets, publicDir, s, pres); err != nil {
+	routeDeps, err := buildRouteDeps(routing, routes, security, services, publicDir, s, pres)
+	if err != nil {
+		return nil, fmt.Errorf("route deps: %w", err)
+	}
+	if err := RegisterRoutes(routing, routes, runtime.Config.Assets, routeDeps); err != nil {
 		return nil, fmt.Errorf("routes: %w", err)
 	}
 	routing.Freeze()

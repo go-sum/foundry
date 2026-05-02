@@ -15,11 +15,6 @@ import (
 	"github.com/go-sum/foundry/pkg/web"
 )
 
-// defaultMaxRequestBodyBytes is the default body size ceiling applied by
-// ToHTTPHandler when no explicit limit is configured. Callers may raise this
-// limit via Config.MaxRequestBodyBytes.
-const defaultMaxRequestBodyBytes = 32 * 1024 * 1024 // 32 MiB
-
 // Config configures the HTTP adapter.
 type Config struct {
 	// MaxRequestBodyBytes limits the size of incoming request bodies.
@@ -37,6 +32,11 @@ type Config struct {
 	// TLS state only. Build this slice via ParseTrustedProxies.
 	TrustedProxies []*net.IPNet
 }
+
+// defaultMaxRequestBodyBytes is the default body size ceiling applied by
+// ToHTTPHandler when no explicit limit is configured. Callers may raise this
+// limit via Config.MaxRequestBodyBytes.
+const defaultMaxRequestBodyBytes = 32 * 1024 * 1024 // 32 MiB
 
 // ToHTTPHandler wraps a web.Handler as an http.Handler with default config.
 func ToHTTPHandler(h web.Handler) http.Handler {

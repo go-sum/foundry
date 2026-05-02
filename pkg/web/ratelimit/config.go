@@ -117,3 +117,12 @@ func NewStoreFromConfig(cfg StoreConfig) (Store, error) {
 		return nil, fmt.Errorf("ratelimit: unsupported store type %q", cfg.Type)
 	}
 }
+
+// KeyFuncFromTrustedProxies returns RemoteAddrKey when no proxies are trusted,
+// otherwise it trusts X-Forwarded-For from the configured proxy CIDRs.
+func KeyFuncFromTrustedProxies(trustedProxies []string) (KeyFunc, error) {
+	if len(trustedProxies) == 0 {
+		return RemoteAddrKey, nil
+	}
+	return RealIPFromTrustedXFF(trustedProxies...)
+}

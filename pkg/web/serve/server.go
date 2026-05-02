@@ -16,6 +16,11 @@ import (
 	"golang.org/x/net/http2/h2c"
 )
 
+// logWriter bridges the ErrorLog interface to log.Logger's io.Writer interface.
+type logWriter struct {
+	l interface{ Printf(format string, v ...any) }
+}
+
 // NewServer creates a *http.Server with handler adapted via ToHTTPHandler, using
 // production-safe timeouts and the given config. cfg.Addr defaults to ":8080".
 //
@@ -120,11 +125,6 @@ func ListenAndServe(ctx context.Context, handler web.Handler, cfg ServerConfig) 
 		return fmt.Errorf("web/serve: listen: %w", err)
 	}
 	return nil
-}
-
-// logWriter bridges the ErrorLog interface to log.Logger's io.Writer interface.
-type logWriter struct {
-	l interface{ Printf(format string, v ...any) }
 }
 
 func (w logWriter) Write(p []byte) (int, error) {

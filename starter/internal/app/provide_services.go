@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
+	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 
 	config "github.com/go-sum/foundry/config"
 	appdb "github.com/go-sum/foundry/db"
@@ -28,28 +30,9 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 		return Services{KVStore: kvStore, RateLimiter: limiter}, nil
 	}
 
-	var pool *pgxpool.Pool
-	if err := cfgpkg.ConnectWithRetry(ctx, "db", runtime.Logger, 3, func() error {
-		var err error
-		pool, err = db.ConnectDSN(ctx, runtime.Config.DB.DSN,
-			db.WithProductionDefaults(),
-			db.WithSlowQueryLogger(runtime.Logger, 500*time.Millisecond),
-		)
-		return err
-	}); err != nil {
-		return Services{}, fmt.Errorf("services: db: %w", err)
-	}
-	db.LogPoolStats(ctx, pool, runtime.Logger, 60*time.Second)
-
-	schemaReg, err := db.LoadRegistryFromYAML(appdb.ConfigYAML, appdb.SchemaFiles,
-		db.WithResolver(appdb.ExternalSchemas()),
-	)
+	pool, schemaReg, err := provideDatabase(ctx, runtime)
 	if err != nil {
-		return Services{}, fmt.Errorf("services: schema registry: %w", err)
-	}
-	if err := db.VerifyFingerprint(ctx, pool, schemaReg.Fingerprint()); err != nil {
-		pool.Close()
-		return Services{}, fmt.Errorf("services: schema not ready (run 'task db:migrate'): %w", err)
+		return Services{}, err
 	}
 
 	if kvStore == nil {
@@ -57,39 +40,14 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 		return Services{}, fmt.Errorf("services: kv: missing shared store")
 	}
 
-	qStore := pgstore.New(pool)
-	qDispatcher := queue.NewDispatcher(qStore, queue.WithDispatcherLogger(runtime.Logger))
-
-	emailSender, err := email.New(email.Config{
-		Provider: email.Provider(runtime.Config.App.Email.Provider),
-		APIKey:   runtime.Config.App.Email.APIKey,
-		BaseURL:  runtime.Config.App.Email.BaseURL,
-		From:     runtime.Config.App.Email.From,
-	}, runtime.Logger)
+	qStore, qDispatcher := provideQueue(pool, runtime.Logger)
+	emailSender, err := provideEmailSender(runtime.Config.App.Email, runtime.Logger)
 	if err != nil {
 		pool.Close()
 		return Services{}, fmt.Errorf("services: email: %w", err)
 	}
 
-	contactMod := contact.NewModule(contact.ModuleConfig{
-		Pool:         pool,
-		RateLimiter:  limiter,
-		Queue:        qDispatcher,
-		EmailSender:  emailSender,
-		Router:       rt,
-		Validator:    val,
-		ClientIPFunc: sec.RateLimitKey,
-		Service: contact.ServiceConfig{
-			RateLimitProfile: config.RateLimitContactSubmitEmail,
-			QueueName:        contact.QueueName,
-		},
-		Worker: contact.WorkerConfig{
-			SendTo:   runtime.Config.App.Contact.SendTo,
-			SendFrom: runtime.Config.App.Contact.SendFrom,
-		},
-		ViewOpts: pres.ViewOpts,
-		Logger:   runtime.Logger,
-	})
+	contactMod := provideContactModule(pool, limiter, qDispatcher, emailSender, rt, val, sec.RateLimitKey, runtime.Config.App.Contact, pres.ViewOpts, runtime.Logger)
 
 	authMod, oauthProvider, err := provideAuth(runtime.Config, runtime.Logger, pool, kvStore, rt, pres.ViewOpts, val)
 	if err != nil {
@@ -98,14 +56,7 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 	}
 
 	oauthClientH := oauthclient.New(runtime.Config.Auth.OAuthClient)
-
-	processor := queue.NewProcessor(qStore, queue.WithLogger(runtime.Logger))
-	processor.Register(contact.QueueName, contactMod.QueueHandler,
-		queue.WithWorkers(2),
-		queue.WithMaxAttempts(5),
-		queue.WithTimeout(30*time.Second),
-	)
-	processor.Start(ctx)
+	processor := startBackgroundWorkers(ctx, qStore, contactMod, runtime.Logger)
 
 	return Services{
 		DBPool:         pool,
@@ -120,4 +71,74 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 		OAuthClient:    oauthClientH,
 		SchemaRegistry: schemaReg,
 	}, nil
+}
+
+func provideDatabase(ctx context.Context, runtime Runtime) (*pgxpool.Pool, *db.Registry, error) {
+	var pool *pgxpool.Pool
+	if err := cfgpkg.ConnectWithRetry(ctx, "db", runtime.Logger, 3, func() error {
+		var err error
+		pool, err = db.ConnectDSN(ctx, runtime.Config.DB.DSN,
+			db.WithProductionDefaults(),
+			db.WithSlowQueryLogger(runtime.Logger, 500*time.Millisecond),
+		)
+		return err
+	}); err != nil {
+		return nil, nil, fmt.Errorf("services: db: %w", err)
+	}
+	db.LogPoolStats(ctx, pool, runtime.Logger, 60*time.Second)
+
+	schemaReg, err := db.LoadRegistryFromYAML(appdb.ConfigYAML, appdb.SchemaFiles,
+		db.WithResolver(appdb.ExternalSchemas()),
+	)
+	if err != nil {
+		pool.Close()
+		return nil, nil, fmt.Errorf("services: schema registry: %w", err)
+	}
+	if err := db.VerifyFingerprint(ctx, pool, schemaReg.Fingerprint()); err != nil {
+		pool.Close()
+		return nil, nil, fmt.Errorf("services: schema not ready (run 'task db:migrate'): %w", err)
+	}
+	return pool, schemaReg, nil
+}
+
+func provideQueue(pool *pgxpool.Pool, logger *slog.Logger) (*pgstore.Store, *queue.Dispatcher) {
+	qStore := pgstore.New(pool)
+	return qStore, queue.NewDispatcher(qStore, queue.WithDispatcherLogger(logger))
+}
+
+func provideEmailSender(cfg email.Config, logger *slog.Logger) (email.Sender, error) {
+	return email.New(cfg, logger)
+}
+
+func provideContactModule(pool *pgxpool.Pool, limiter *ratelimit.Limiter, qDispatcher *queue.Dispatcher, emailSender email.Sender, rt *router.Router, val validate.Validator, rateLimitKey ratelimit.KeyFunc, cfg config.ContactConfig, viewOpts []viewstate.RequestOption, logger *slog.Logger) *contact.Module {
+	return contact.NewModule(contact.ModuleConfig{
+		Pool:         pool,
+		RateLimiter:  limiter,
+		Queue:        qDispatcher,
+		EmailSender:  emailSender,
+		Router:       rt,
+		Validator:    val,
+		ClientIPFunc: rateLimitKey,
+		Service: contact.ServiceConfig{
+			RateLimitProfile: config.RateLimitContactSubmitEmail,
+			QueueName:        contact.QueueName,
+		},
+		Worker: contact.WorkerConfig{
+			SendTo:   cfg.SendTo,
+			SendFrom: cfg.SendFrom,
+		},
+		ViewOpts: viewOpts,
+		Logger:   logger,
+	})
+}
+
+func startBackgroundWorkers(ctx context.Context, qStore *pgstore.Store, contactMod *contact.Module, logger *slog.Logger) *queue.Processor {
+	processor := queue.NewProcessor(qStore, queue.WithLogger(logger))
+	processor.Register(contact.QueueName, contactMod.QueueHandler,
+		queue.WithWorkers(2),
+		queue.WithMaxAttempts(5),
+		queue.WithTimeout(30*time.Second),
+	)
+	processor.Start(ctx)
+	return processor
 }

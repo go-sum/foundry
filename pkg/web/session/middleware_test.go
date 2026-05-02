@@ -22,6 +22,27 @@ type fakeErrorStore struct {
 	deleteErr error
 }
 
+type failNthSaveStore struct {
+	base       *MemoryStore
+	failOnCall int
+	saveErr    error
+	saveCalls  int
+}
+
+type failDeleteTokenStore struct {
+	base            *MemoryStore
+	failDeleteToken string
+	deleteErr       error
+}
+
+type recordingSaveStore struct {
+	savedAbsolute time.Time
+}
+
+// wrappedNotFoundStore returns a wrapped ErrSessionNotFound from Read so that
+// a raw == comparison would fail while errors.Is succeeds — exercising the G1 fix.
+type wrappedNotFoundStore struct{}
+
 func (f *fakeErrorStore) Read(_ context.Context, _ string) ([]byte, int64, error) {
 	return nil, 0, ErrSessionNotFound
 }
@@ -32,13 +53,6 @@ func (f *fakeErrorStore) Save(_ context.Context, _ string, _ []byte, _ time.Time
 
 func (f *fakeErrorStore) Delete(_ context.Context, _ string) error {
 	return f.deleteErr
-}
-
-type failNthSaveStore struct {
-	base       *MemoryStore
-	failOnCall int
-	saveErr    error
-	saveCalls  int
 }
 
 func (s *failNthSaveStore) Read(ctx context.Context, token string) ([]byte, int64, error) {
@@ -57,12 +71,6 @@ func (s *failNthSaveStore) Delete(ctx context.Context, token string) error {
 	return s.base.Delete(ctx, token)
 }
 
-type failDeleteTokenStore struct {
-	base            *MemoryStore
-	failDeleteToken string
-	deleteErr       error
-}
-
 func (s *failDeleteTokenStore) Read(ctx context.Context, token string) ([]byte, int64, error) {
 	return s.base.Read(ctx, token)
 }
@@ -76,10 +84,6 @@ func (s *failDeleteTokenStore) Delete(ctx context.Context, token string) error {
 		return s.deleteErr
 	}
 	return s.base.Delete(ctx, token)
-}
-
-type recordingSaveStore struct {
-	savedAbsolute time.Time
 }
 
 func (s *recordingSaveStore) Read(context.Context, string) ([]byte, int64, error) {
@@ -666,10 +670,6 @@ func cookieValue(setCookie, name string) string {
 // ---------------------------------------------------------------------------
 // G1 — errors.Is for ErrSessionNotFound (not == comparison)
 // ---------------------------------------------------------------------------
-
-// wrappedNotFoundStore returns a wrapped ErrSessionNotFound from Read so that
-// a raw == comparison would fail while errors.Is succeeds — exercising the G1 fix.
-type wrappedNotFoundStore struct{}
 
 func (w *wrappedNotFoundStore) Read(_ context.Context, _ string) ([]byte, int64, error) {
 	// Wrap ErrSessionNotFound — a bare == check would NOT match this.

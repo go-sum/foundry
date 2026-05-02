@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	configpkg "github.com/go-sum/foundry/config"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/health"
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
@@ -18,7 +19,6 @@ import (
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/site"
 	"github.com/go-sum/foundry/pkg/web/static"
-	configpkg "github.com/go-sum/foundry/config"
 )
 
 func testRouteContext(method, rawURL string) *web.Context {
@@ -72,11 +72,10 @@ func TestRegisterStaticRoutes_ServesFilesFromConfiguredPrefix(t *testing.T) {
 
 func TestRegisterRoutes_ReturnsErrorWhenStaticRootCannotBeOpened(t *testing.T) {
 	rt := router.New()
-	s := site.New(site.Config{BaseURL: "http://test.local"})
-	err := RegisterRoutes(rt, DefaultRouteConfig(), Security{}, Services{}, static.AssetsConfig{
+	err := RegisterRoutes(rt, DefaultRouteConfig(), static.AssetsConfig{
 		PublicDir: filepath.Join(t.TempDir(), "missing"),
 		URLPrefix: "/assets",
-	}, t.TempDir(), s, Presentation{})
+	}, RouteDeps{})
 	if err == nil {
 		t.Fatal("RegisterRoutes() error = nil, want non-nil")
 	}
@@ -87,11 +86,15 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 	rt := router.New()
 	s := site.New(site.Config{BaseURL: "http://test.local"})
 	csrf := secure.CSRFConfigFromHex(testCSRFHexKey)
+	deps, err := buildRouteDeps(rt, DefaultRouteConfig(), Security{CSRF: csrf, Origins: []string{"http://test.local"}}, Services{}, dir, s, Presentation{})
+	if err != nil {
+		t.Fatalf("buildRouteDeps() error = %v", err)
+	}
 
-	err := RegisterRoutes(rt, DefaultRouteConfig(), Security{CSRF: csrf, Origins: []string{"http://test.local"}}, Services{}, static.AssetsConfig{
+	err = RegisterRoutes(rt, DefaultRouteConfig(), static.AssetsConfig{
 		PublicDir: dir,
 		URLPrefix: "/assets",
-	}, dir, s, Presentation{})
+	}, deps)
 	if err != nil {
 		t.Fatalf("RegisterRoutes() error = %v", err)
 	}
@@ -171,17 +174,20 @@ func TestAuthRateLimitNodes_FailsClosed(t *testing.T) {
 		t.Fatalf("ratelimit.New() error = %v", err)
 	}
 
-	nodes, err := authRateLimitNodes(Security{
+	mw, err := authRateLimitMiddleware(Security{
 		RateLimitKey: ratelimit.FixedKey("test"),
 	}, Services{RateLimiter: limiter})
 	if err != nil {
-		t.Fatalf("authRateLimitNodes() error = %v", err)
+		t.Fatalf("authRateLimitMiddleware() error = %v", err)
 	}
 
 	rt := router.New()
-	allNodes := append(nodes, router.GET("/auth/test", "auth.test", func(_ *web.Context) (web.Response, error) {
-		return web.Respond(http.StatusOK), nil
-	}))
+	allNodes := []router.Node{
+		router.Use(mw),
+		router.GET("/auth/test", "auth.test", func(_ *web.Context) (web.Response, error) {
+			return web.Respond(http.StatusOK), nil
+		}),
+	}
 	router.Register(rt, router.Layout(allNodes...))
 
 	_, serveErr := rt.Serve(testRouteContext(http.MethodGet, "/auth/test"))

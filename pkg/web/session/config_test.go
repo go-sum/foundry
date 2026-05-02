@@ -60,3 +60,16 @@ func TestNewConfig(t *testing.T) {
 		t.Fatalf("IdleTTL = %v, want %v", got, want)
 	}
 }
+
+func TestNewCookieCodec(t *testing.T) {
+	codec, err := NewCookieCodec(Settings{
+		CookieName: "app-session",
+		CookieKey:  []byte("01234567890123456789012345678901"),
+	})
+	if err != nil {
+		t.Fatalf("CookieCodecFromSettings() error = %v", err)
+	}
+	if codec == nil {
+		t.Fatal("CookieCodecFromSettings() = nil, want non-nil codec")
+	}
+}

@@ -40,6 +40,8 @@ type Session struct {
 	regenerated  bool                       // true when Regenerate was called
 }
 
+const flashKey = "flash"
+
 // ID returns the opaque session token (store key or encoded blob).
 func (s *Session) ID() string {
 	if s == nil {
@@ -208,8 +210,6 @@ func FlashPop[T any](s *Session, key string) (T, bool, error) {
 	}
 	return zero, true, nil
 }
-
-const flashKey = "flash"
 
 // FlashMessages stores a slice of user-facing messages for the next request.
 func FlashMessages(s *Session, msgs []string) error {

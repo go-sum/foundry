@@ -9,14 +9,6 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-const (
-	defaultReadHeaderTimeout = 10 * time.Second
-	defaultReadTimeout       = 30 * time.Second
-	defaultWriteTimeout      = 60 * time.Second
-	defaultIdleTimeout       = 120 * time.Second
-	defaultMaxHeaderBytes    = 1 << 20 // 1 MiB
-)
-
 // ServerConfig configures NewServer.
 type ServerConfig struct {
 	// Addr is the TCP address for the server to listen on. Defaults to ":8080".
@@ -44,6 +36,14 @@ type ServerConfig struct {
 	// ErrorLog is used for http.Server.ErrorLog. If nil, output goes to stderr via log package.
 	ErrorLog interface{ Printf(format string, v ...any) }
 }
+
+const (
+	defaultReadHeaderTimeout = 10 * time.Second
+	defaultReadTimeout       = 30 * time.Second
+	defaultWriteTimeout      = 60 * time.Second
+	defaultIdleTimeout       = 120 * time.Second
+	defaultMaxHeaderBytes    = 1 << 20 // 1 MiB
+)
 
 // InitialServerConfig returns production-grade server defaults.
 func InitialServerConfig() ServerConfig {

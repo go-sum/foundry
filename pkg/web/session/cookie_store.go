@@ -8,8 +8,6 @@ import (
 	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 )
 
-const defaultMaxCookieBytes = 3800
-
 // CookieStore is a Store that encodes session data directly in the client cookie using
 // the provided Codec. It requires no server-side storage.
 //
@@ -19,6 +17,8 @@ type CookieStore struct {
 	codec   *cookiecodec.Codec
 	maxSize int
 }
+
+const defaultMaxCookieBytes = 3800
 
 // NewCookieStore returns a CookieStore backed by the given Codec.
 // Panics if codec is nil.

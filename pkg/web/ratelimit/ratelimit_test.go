@@ -246,6 +246,22 @@ func TestRealIPFromTrustedXFF_UsesHeaderOnlyForTrustedProxy(t *testing.T) {
 	}
 }
 
+func TestKeyFuncFromTrustedProxies_EmptyUsesRemoteAddr(t *testing.T) {
+	keyFunc, err := KeyFuncFromTrustedProxies(nil)
+	if err != nil {
+		t.Fatalf("KeyFuncFromTrustedProxies() error = %v", err)
+	}
+	req := web.NewRequest(http.MethodGet, &url.URL{Path: "/"})
+	req.SetRemoteAddr("203.0.113.10:1234")
+	got, err := keyFunc(web.NewContext(context.Background(), req))
+	if err != nil {
+		t.Fatalf("keyFunc() error = %v", err)
+	}
+	if want := "203.0.113.10"; got != want {
+		t.Fatalf("key = %q, want %q", got, want)
+	}
+}
+
 func TestNewStoreFromConfig_KV(t *testing.T) {
 	store, err := NewStoreFromConfig(StoreConfig{
 		Type:    StoreTypeKV,

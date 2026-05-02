@@ -2,26 +2,8 @@ package app
 
 import (
 	"cmp"
-	"fmt"
-	"log/slog"
-
-	"github.com/go-sum/foundry/internal/features/home"
-	"github.com/go-sum/foundry/internal/features/oauthclient"
-	"github.com/go-sum/foundry/pkg/auth/provider"
-	"github.com/go-sum/foundry/pkg/docs"
-	"github.com/go-sum/foundry/pkg/showcase"
-	"github.com/go-sum/foundry/pkg/web"
-	"github.com/go-sum/foundry/pkg/web/authn"
-	"github.com/go-sum/foundry/pkg/web/health"
-	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
-	"github.com/go-sum/foundry/pkg/web/secure"
-	"github.com/go-sum/foundry/pkg/web/site"
 	"github.com/go-sum/foundry/pkg/web/static"
-	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
-
-	config "github.com/go-sum/foundry/config"
-	g "maragu.dev/gomponents"
 )
 
 // RouteSpec pairs a URL pattern with its named route.
@@ -59,148 +41,50 @@ func applyRouteDefaults(r RouteConfig) RouteConfig {
 	}
 }
 
-// RegisterRoutes registers all application routes on the router.
-// cfg is the route configuration; pass DefaultRouteConfig() for conventional paths.
-func RegisterRoutes(rt *router.Router, cfg RouteConfig, sec Security, svc Services, assets static.AssetsConfig, publicDir string, s *site.Site, pres Presentation) error {
+// RegisterRoutes registers the assembled application route trees on the router.
+func RegisterRoutes(rt *router.Router, cfg RouteConfig, assets static.AssetsConfig, deps RouteDeps) error {
 	cfg = applyRouteDefaults(cfg)
 	if err := registerStaticRoutes(rt, assets); err != nil {
 		return err
 	}
-	apiNodes, err := APIRoutes(cfg, sec, svc, publicDir)
-	if err != nil {
-		return fmt.Errorf("api routes: %w", err)
-	}
 	router.Register(rt, router.Nodes(
-		HealthRoutes(cfg, svc),
-		PublicRoutes(rt, cfg, sec, svc, s, pres),
-		apiNodes,
+		HealthRoutes(cfg, deps),
+		PublicRoutes(deps),
+		APIRoutes(deps),
 	)...)
 	return nil
 }
 
 // HealthRoutes returns the health-check route (no middleware applied).
-func HealthRoutes(cfg RouteConfig, svc Services) []router.Node {
+func HealthRoutes(cfg RouteConfig, deps RouteDeps) []router.Node {
 	return []router.Node{
-		router.GET(cfg.Health.Pattern, cfg.Health.Name, health.Handler(healthCheckers(svc)...)),
+		router.GET(cfg.Health.Pattern, cfg.Health.Name, deps.HealthHandler),
 	}
 }
 
-// PublicRoutes returns browser-facing routes wrapped in content + CSRF middleware.
-func PublicRoutes(rt *router.Router, cfg RouteConfig, sec Security, svc Services, s *site.Site, pres Presentation) []router.Node {
-	metaH := site.NewHandlers(s, rt,
-		site.RobotsConfig{DefaultAllow: true},
-		site.SitemapConfig{
-			Routes: []site.RouteEntry{
-				{Name: cfg.Home.Name},
-				{Name: "demos.showcase"},
-				{Name: cfg.ContactForm.Name},
-			},
-			DefaultChangeFreq: "weekly",
-		},
-	)
-
-	contactForm, contactSubmit := contactHandlers(svc)
-
+// PublicRoutes returns browser-facing routes wrapped in the assembled middleware tree.
+func PublicRoutes(deps RouteDeps) []router.Node {
 	return []router.Node{
 		router.Layout(router.Nodes(
-			[]router.Node{router.Use(contentMiddleware(sec)...)},
-			[]router.Node{router.Use(secure.CSRF(sec.CSRF))},
-			site.Routes(metaH),
-			[]router.Node{
-				router.GET(cfg.Home.Pattern, cfg.Home.Name, home.NewHandler(homeServiceChecks(svc), pres.ViewOpts...).Show),
-				router.GET(cfg.ContactForm.Pattern, cfg.ContactForm.Name, contactForm),
-				router.POST(cfg.ContactSubmit.Pattern, cfg.ContactSubmit.Name, contactSubmit),
-			},
-			showcase.Routes(showcase.Config{
-				Icons: pres.Icons,
-				DB:    svc.DBPool,
-				KV:    svc.KVStore,
-				Page: func(c *web.Context, title string, content g.Node) (web.Response, error) {
-					vr := viewstate.NewRequest(c, pres.ViewOpts...)
-					return viewstate.Render(vr, vr.Page(title, content), nil)
-				},
-			}),
+			[]router.Node{router.Use(deps.Public.Middleware...)},
+			[]router.Node{router.Use(deps.Public.CSRFMiddleware)},
+			deps.Public.MetaNodes,
+			deps.Public.FeatureNodes,
+			deps.Public.PackageNodes,
 		)...),
 	}
 }
 
-// APIRoutes returns the API-middleware tree: docs, OAuth public endpoints, and CSRF-protected auth.
-func APIRoutes(cfg RouteConfig, sec Security, svc Services, publicDir string) ([]router.Node, error) {
-	oauthCfg := provider.DefaultRouteConfig()
-	if svc.OAuthProvider != nil {
-		oauthCfg = svc.OAuthProvider.RouteConfig()
-	}
-	arlNodes, err := authRateLimitNodes(sec, svc)
-	if err != nil {
-		return nil, err
-	}
+// APIRoutes returns the assembled API route tree.
+func APIRoutes(deps RouteDeps) []router.Node {
 	return []router.Node{
 		router.Layout(router.Nodes(
-			[]router.Node{router.Use(apiMiddleware(sec, oauthCfg.Token.Pattern)...)},
-			protectedDocs(svc.Auth, publicDir),
-			routesFrom(svc.OAuthProvider, provider.PublicRoutes),
+			[]router.Node{router.Use(deps.API.Middleware...)},
+			deps.API.PublicNodes,
 			[]router.Node{router.Layout(router.Nodes(
-				[]router.Node{router.Use(secure.CSRF(sec.CSRF))},
-				arlNodes,
-				AuthRoutes(cfg, svc),
+				[]router.Node{router.Use(deps.API.ProtectedMiddleware...)},
+				deps.API.ProtectedNodes,
 			)...)},
 		)...),
-	}, nil
-}
-
-func authRateLimitNodes(sec Security, svc Services) ([]router.Node, error) {
-	if svc.RateLimiter == nil {
-		return nil, nil
 	}
-	mw, err := ratelimit.Middleware(ratelimit.MiddlewareConfig{
-		Limiter:    svc.RateLimiter,
-		Profile:    config.RateLimitRoutesAuth,
-		KeyFunc:    sec.RateLimitKey,
-		FailClosed: true,
-		OnError: func(err error, c *web.Context) {
-			slog.ErrorContext(c.Context(), "auth rate limit store error",
-				"error", err,
-				"request_id", web.RequestID(c),
-			)
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("auth rate limit middleware: %w", err)
-	}
-	return []router.Node{router.Use(mw)}, nil
-}
-
-// AuthRoutes returns CSRF-protected routes: auth, OAuth provider, OAuth client.
-func AuthRoutes(cfg RouteConfig, svc Services) []router.Node {
-	return router.Nodes(
-		routesFrom(svc.Auth, authn.Routes),
-		routesFrom(svc.OAuthProvider, provider.ProtectedRoutes),
-		OAuthClientRoutes(cfg, svc.OAuthClient),
-	)
-}
-
-// OAuthClientRoutes returns routes for the first-party OAuth client handler.
-func OAuthClientRoutes(cfg RouteConfig, h *oauthclient.Handler) []router.Node {
-	if h == nil {
-		return nil
-	}
-	return []router.Node{
-		router.GET(cfg.OAuthConnect.Pattern, cfg.OAuthConnect.Name, h.Connect),
-		router.GET(cfg.OAuthCallback.Pattern, cfg.OAuthCallback.Name, h.Callback),
-	}
-}
-
-func protectedDocs(auth *authn.Module, publicDir string) []router.Node {
-	routes := docs.Routes(docs.DefaultConfig(publicDir))
-	if auth == nil {
-		return routes
-	}
-	return []router.Node{router.Scope(auth.RequireAuth(), routes...)}
-}
-
-func routesFrom[T any](dep *T, fn func(*T) []router.Node) []router.Node {
-	if dep == nil {
-		return nil
-	}
-	return fn(dep)
 }
