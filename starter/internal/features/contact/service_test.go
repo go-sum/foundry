@@ -50,7 +50,7 @@ func newLimiter(t *testing.T, store ratelimit.Store, capacity int) *ratelimit.Li
 	t.Helper()
 	limiter, err := ratelimit.New(ratelimit.Config{
 		Store: store,
-		Profiles: map[string]ratelimit.Policy{
+		Profiles: map[ratelimit.RateLimitProfile]ratelimit.Policy{
 			testRateLimitProfile: {
 				Capacity:  capacity,
 				RefillPer: time.Minute,

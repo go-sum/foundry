@@ -2,26 +2,9 @@ package logging
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"os"
-	"strings"
 )
-
-// Format controls the log output format.
-type Format string
-
-const (
-	FormatText Format = "text"
-	FormatJSON Format = "json"
-)
-
-// Config controls the logger factory.
-type Config struct {
-	Level  slog.Level
-	Format Format
-	Output io.Writer
-}
 
 type ctxKey struct{}
 
@@ -55,22 +38,6 @@ func FromContext(ctx context.Context) *slog.Logger {
 		return slog.Default()
 	}
 	return l
-}
-
-// ParseLogLevel converts a case-insensitive string to a slog.Level.
-// Recognises "debug", "warn", and "error". Any other value — including empty
-// string — returns slog.LevelInfo.
-func ParseLogLevel(s string) slog.Level {
-	switch strings.ToLower(s) {
-	case "debug":
-		return slog.LevelDebug
-	case "warn":
-		return slog.LevelWarn
-	case "error":
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
 }
 
 // WithRequestID returns l with a "request_id" attribute added. Returns l

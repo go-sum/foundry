@@ -10,7 +10,7 @@ import (
 )
 
 func TestHeaders_SetsAllConfiguredHeaders(t *testing.T) {
-	cfg := DefaultHeadersConfig()
+	cfg := InitialHeadersConfig()
 	mw := Headers(cfg)
 
 	handler := mw(func(c *web.Context) (web.Response, error) {
@@ -74,7 +74,7 @@ func TestHeaders_EmptyConfigValuesAreNotSet(t *testing.T) {
 }
 
 func TestDefaultHeadersConfig_AllFieldsNonEmpty(t *testing.T) {
-	cfg := DefaultHeadersConfig()
+	cfg := InitialHeadersConfig()
 
 	if cfg.ContentSecurityPolicy == "" {
 		t.Error("ContentSecurityPolicy is empty")
@@ -103,7 +103,7 @@ func TestDefaultHeadersConfig_AllFieldsNonEmpty(t *testing.T) {
 }
 
 func TestHeaders_SetOnResponse_NotRequest(t *testing.T) {
-	cfg := DefaultHeadersConfig()
+	cfg := InitialHeadersConfig()
 	mw := Headers(cfg)
 
 	var capturedReq web.Request
@@ -130,7 +130,7 @@ func TestHeaders_SetOnResponse_NotRequest(t *testing.T) {
 }
 
 func TestHeaders_PreservesResponseStatus(t *testing.T) {
-	mw := Headers(DefaultHeadersConfig())
+	mw := Headers(InitialHeadersConfig())
 	handler := mw(func(c *web.Context) (web.Response, error) {
 		return web.Respond(http.StatusCreated), nil
 	})

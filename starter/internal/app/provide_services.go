@@ -31,7 +31,7 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 	var pool *pgxpool.Pool
 	if err := cfgpkg.ConnectWithRetry(ctx, "db", runtime.Logger, 3, func() error {
 		var err error
-		pool, err = db.ConnectDSN(ctx, cfgpkg.ExpandSecret("DATABASE_URL"),
+		pool, err = db.ConnectDSN(ctx, runtime.Config.DB.DSN,
 			db.WithProductionDefaults(),
 			db.WithSlowQueryLogger(runtime.Logger, 500*time.Millisecond),
 		)
@@ -61,10 +61,10 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 	qDispatcher := queue.NewDispatcher(qStore, queue.WithDispatcherLogger(runtime.Logger))
 
 	emailSender, err := email.New(email.Config{
-		Provider: email.Provider(runtime.Config.Email.Provider),
-		APIKey:   runtime.Config.Email.APIKey,
-		BaseURL:  runtime.Config.Email.BaseURL,
-		From:     runtime.Config.Email.From,
+		Provider: email.Provider(runtime.Config.App.Email.Provider),
+		APIKey:   runtime.Config.App.Email.APIKey,
+		BaseURL:  runtime.Config.App.Email.BaseURL,
+		From:     runtime.Config.App.Email.From,
 	}, runtime.Logger)
 	if err != nil {
 		pool.Close()
@@ -80,12 +80,12 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 		Validator:    val,
 		ClientIPFunc: sec.RateLimitKey,
 		Service: contact.ServiceConfig{
-			RateLimitProfile: string(config.RateLimitContactSubmitEmail),
+			RateLimitProfile: config.RateLimitContactSubmitEmail,
 			QueueName:        contact.QueueName,
 		},
 		Worker: contact.WorkerConfig{
-			SendTo:   runtime.Config.Contact.SendTo,
-			SendFrom: runtime.Config.Contact.SendFrom,
+			SendTo:   runtime.Config.App.Contact.SendTo,
+			SendFrom: runtime.Config.App.Contact.SendFrom,
 		},
 		ViewOpts: pres.ViewOpts,
 		Logger:   runtime.Logger,
@@ -97,7 +97,7 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 		return Services{}, fmt.Errorf("services: %w", err)
 	}
 
-	oauthClientH := oauthclient.New(runtime.Config.Auth.FirstPartyClientConfig())
+	oauthClientH := oauthclient.New(runtime.Config.Auth.OAuthClient)
 
 	processor := queue.NewProcessor(qStore, queue.WithLogger(runtime.Logger))
 	processor.Register(contact.QueueName, contactMod.QueueHandler,

@@ -25,8 +25,8 @@ type kvStore struct {
 	now    func() time.Time
 }
 
-// DefaultKVStoreConfig returns the production default key namespace for KV-backed rate limits.
-func DefaultKVStoreConfig() KVStoreConfig {
+// InitialKVStoreConfig returns the production default key namespace for KV-backed rate limits.
+func InitialKVStoreConfig() KVStoreConfig {
 	return KVStoreConfig{Prefix: "ratelimit:"}
 }
 
@@ -36,7 +36,7 @@ func NewKVStore(kvs KVStore, cfg KVStoreConfig) Store {
 		panic("web/ratelimit: KVStore must not be nil")
 	}
 	if cfg.Prefix == "" {
-		cfg.Prefix = DefaultKVStoreConfig().Prefix
+		cfg.Prefix = InitialKVStoreConfig().Prefix
 	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now

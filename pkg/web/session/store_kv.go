@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-// KVStoreConfig controls how server-side sessions are keyed in the backing KV
-// store.
-type KVStoreConfig struct {
-	Prefix string
-}
-
 // KVStore is the minimal session-specific contract required by the KV-backed store.
 // It is consumer-owned by pkg/web/session rather than producer-owned by the
 // generic KV module.
@@ -34,18 +28,12 @@ type kvStore struct {
 // (⌈32×8/6⌉ = 43 characters).
 const tokenEncodedLen = 43
 
-// DefaultKVStoreConfig returns the production default key namespace for KV
-// backed sessions.
-func DefaultKVStoreConfig() KVStoreConfig {
-	return KVStoreConfig{Prefix: "session:"}
-}
-
 // NewKVStore builds a session store over a session-capable KV store.
 func NewKVStore(kvs KVStore, cfgs ...KVStoreConfig) Store {
 	if kvs == nil {
 		panic("web/session: KVStore must not be nil")
 	}
-	cfg := DefaultKVStoreConfig()
+	cfg := InitialKVStoreConfig()
 	if len(cfgs) > 0 && cfgs[0].Prefix != "" {
 		cfg = cfgs[0]
 	}

@@ -108,12 +108,11 @@ func TestExtractDSNComponents(t *testing.T) {
 
 func TestParseKVURL(t *testing.T) {
 	tests := []struct {
-		name       string
-		raw        string
-		wantAddr   string
-		wantPass   string
-		wantTLS    bool
-		wantErrStr string
+		name     string
+		raw      string
+		wantAddr string
+		wantPass string
+		wantTLS  bool
 	}{
 		{
 			name:     "parses redis URL with password",
@@ -154,16 +153,7 @@ func TestParseKVURL(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ParseKVURL(tc.raw)
-			if tc.wantErrStr != "" {
-				if err == nil || err.Error() != tc.wantErrStr {
-					t.Fatalf("ParseKVURL(%q) error = %v, want %q", tc.raw, err, tc.wantErrStr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("ParseKVURL(%q) unexpected error: %v", tc.raw, err)
-			}
+			got := ParseKVURL(tc.raw)
 			if got.Addr != tc.wantAddr {
 				t.Errorf("Addr = %q, want %q", got.Addr, tc.wantAddr)
 			}

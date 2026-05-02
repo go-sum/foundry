@@ -46,32 +46,39 @@ type TokenConfig struct {
 	TTL     time.Duration
 }
 
-var defaultConfig = Config{
-	Preferred: MethodEmailTOTP,
-	EmailTOTP: EmailTOTPConfig{
-		PeriodSeconds: 300,
-	},
-	Passkey: PasskeyConfig{
-		ResidentKey:           "required",
-		UserVerification:      "required",
-		RegistrationTimeout:   5 * time.Minute,
-		AuthenticationTimeout: 2 * time.Minute,
-	},
+// InitialAuthConfig returns the package's sane defaults for Config.
+// Use this as the starting point and override individual fields as needed.
+func InitialAuthConfig() Config {
+	return Config{
+		Preferred: MethodEmailTOTP,
+		EmailTOTP: EmailTOTPConfig{
+			PeriodSeconds: 300,
+		},
+		Passkey: PasskeyConfig{
+			ResidentKey:           "required",
+			UserVerification:      "required",
+			RegistrationTimeout:   5 * time.Minute,
+			AuthenticationTimeout: 2 * time.Minute,
+		},
+		Token: TokenConfig{
+			TTL: 300 * time.Second,
+		},
+	}
 }
 
-// ApplyDefaults returns cfg with zero-valued fields filled from defaultConfig.
-// Call this once at the composition-root boundary before any consumer reads
-// the values (handlers, renderers, services).
+// ApplyDefaults returns cfg with zero-valued fields filled from InitialAuthConfig.
+// Deprecated: use InitialAuthConfig and override fields directly.
 func ApplyDefaults(cfg Config) Config {
-	cfg.Preferred = cmp.Or(cfg.Preferred, defaultConfig.Preferred)
-	cfg.EmailTOTP.PeriodSeconds = cmp.Or(cfg.EmailTOTP.PeriodSeconds, defaultConfig.EmailTOTP.PeriodSeconds)
-	cfg.Passkey.ResidentKey = cmp.Or(cfg.Passkey.ResidentKey, defaultConfig.Passkey.ResidentKey)
-	cfg.Passkey.UserVerification = cmp.Or(cfg.Passkey.UserVerification, defaultConfig.Passkey.UserVerification)
+	defaults := InitialAuthConfig()
+	cfg.Preferred = cmp.Or(cfg.Preferred, defaults.Preferred)
+	cfg.EmailTOTP.PeriodSeconds = cmp.Or(cfg.EmailTOTP.PeriodSeconds, defaults.EmailTOTP.PeriodSeconds)
+	cfg.Passkey.ResidentKey = cmp.Or(cfg.Passkey.ResidentKey, defaults.Passkey.ResidentKey)
+	cfg.Passkey.UserVerification = cmp.Or(cfg.Passkey.UserVerification, defaults.Passkey.UserVerification)
 	if cfg.Passkey.RegistrationTimeout == 0 {
-		cfg.Passkey.RegistrationTimeout = defaultConfig.Passkey.RegistrationTimeout
+		cfg.Passkey.RegistrationTimeout = defaults.Passkey.RegistrationTimeout
 	}
 	if cfg.Passkey.AuthenticationTimeout == 0 {
-		cfg.Passkey.AuthenticationTimeout = defaultConfig.Passkey.AuthenticationTimeout
+		cfg.Passkey.AuthenticationTimeout = defaults.Passkey.AuthenticationTimeout
 	}
 	if cfg.Token.TTL == 0 {
 		cfg.Token.TTL = time.Duration(cfg.EmailTOTP.PeriodSeconds) * time.Second
@@ -80,9 +87,9 @@ func ApplyDefaults(cfg Config) Config {
 }
 
 // PreferredMethod resolves the preferred (top-of-page) auth method for rendering.
-// Falls back to defaultConfig.Preferred when unset.
+// Falls back to MethodEmailTOTP when unset.
 func (c Config) PreferredMethod() MethodName {
-	return cmp.Or(c.Preferred, defaultConfig.Preferred)
+	return cmp.Or(c.Preferred, MethodEmailTOTP)
 }
 
 // RegisterValidationRules registers cross-field validation rules for Config on v.

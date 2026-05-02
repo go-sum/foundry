@@ -31,9 +31,11 @@ func TestRun_ShutsDownCleanlyOnContextCancel(t *testing.T) {
 	a := &App{
 		Runtime: Runtime{
 			Config: &configpkg.Config{
-				Server: serve.ServerConfig{
-					Addr:            addr,
-					ShutdownTimeout: 5 * time.Second,
+				Web: configpkg.WebConfig{
+					Server: serve.ServerConfig{
+						Addr:            addr,
+						ShutdownTimeout: 5 * time.Second,
+					},
 				},
 			},
 		},
@@ -96,9 +98,11 @@ func TestRun_ContextCanceledImmediately(t *testing.T) {
 	a := &App{
 		Runtime: Runtime{
 			Config: &configpkg.Config{
-				Server: serve.ServerConfig{
-					Addr:            addr,
-					ShutdownTimeout: 5 * time.Second,
+				Web: configpkg.WebConfig{
+					Server: serve.ServerConfig{
+						Addr:            addr,
+						ShutdownTimeout: 5 * time.Second,
+					},
 				},
 			},
 		},

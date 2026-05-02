@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-func TestDefaultSettings(t *testing.T) {
-	got := DefaultSettings()
+func TestInitialSessionSettings(t *testing.T) {
+	got := InitialSessionSettings("")
 	if got.CookieName != "session" {
 		t.Fatalf("CookieName = %q, want %q", got.CookieName, "session")
 	}

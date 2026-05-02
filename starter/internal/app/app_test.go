@@ -81,7 +81,7 @@ func newSecurityHarness(t *testing.T) (http.Handler, *App) {
 		secure.CSRF(a.CSRF),
 		secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: a.Origins, ServerOrigin: a.ServerOrigin}),
 	)
-	srv, err := serve.NewServer(handler, a.Config.Server)
+	srv, err := serve.NewServer(handler, a.Config.Web.Server)
 	if err != nil {
 		t.Fatalf("serve.NewServer: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestApp_SecurityHarness_TrustedProxyAcceptsHTTPSOrigin(t *testing.T) {
 	setupTestEnv(t)
 	t.Setenv("SERVER_TRUSTED_PROXIES", "192.0.2.0/24")
 	a := mustNew(t)
-	if got := len(a.Config.Server.TrustedProxies); got != 1 {
+	if got := len(a.Config.Web.Server.TrustedProxies); got != 1 {
 		t.Fatalf("TrustedProxies length = %d, want 1", got)
 	}
 
@@ -345,7 +345,7 @@ func TestApp_SecurityHarness_TrustedProxyAcceptsHTTPSOrigin(t *testing.T) {
 		secure.CSRF(a.CSRF),
 		secure.OriginGuard(secure.OriginGuardConfig{TrustedOrigins: a.Origins, ServerOrigin: a.ServerOrigin}),
 	)
-	srv, err := serve.NewServer(handler, a.Config.Server)
+	srv, err := serve.NewServer(handler, a.Config.Web.Server)
 	if err != nil {
 		t.Fatalf("serve.NewServer: %v", err)
 	}
@@ -393,7 +393,7 @@ func TestApp_SecurityHarness_UntrustedProxy_SchemeMismatch(t *testing.T) {
 	setupTestEnv(t)
 	t.Setenv("SERVER_TRUSTED_PROXIES", "192.0.2.0/24")
 	h, a := newSecurityHarness(t)
-	if got := len(a.Config.Server.TrustedProxies); got != 1 {
+	if got := len(a.Config.Web.Server.TrustedProxies); got != 1 {
 		t.Fatalf("TrustedProxies length = %d, want 1", got)
 	}
 

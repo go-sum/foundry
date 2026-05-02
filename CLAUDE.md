@@ -25,6 +25,7 @@
 - Use native `rg` (ripgrep) for content search and `find` for file search
 - NEVER use bash `grep`, `find`, or `Read` on `.decisions/` files when MCP is available
 - NEVER load a full `.decisions/` file via `Read` — always use the section-aware tools below
+- NEVER provide any deprecation, shims or backward-copatable patterns during this initial development phase; prior to v1.0.0 release
 
 **Go symbol navigation — in order:**
 1. `mcp__gomcp__lsp_workspace_symbols` — find any symbol by name (fast, indexed)

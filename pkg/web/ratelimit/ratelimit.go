@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,42 +21,6 @@ import (
 // storageKeySeparator is a null byte — guaranteed not to appear in profile names or
 // IP addresses, so profile+key composites can never collide across namespaces.
 const storageKeySeparator = "\x00"
-
-// Policy defines the bucket capacity and token refill cadence for a profile.
-// Capacity is the maximum number of tokens in the bucket.
-// RefillPer is the time required to replenish one token.
-type Policy struct {
-	Capacity  int           `validate:"gte=1"`
-	RefillPer time.Duration `validate:"gt=0"`
-}
-
-// RateLimitProfile is a stable profile name bound to a limiter policy.
-type RateLimitProfile string
-
-// RateLimitConfig binds a stable profile name to its token-bucket policy.
-type RateLimitConfig struct {
-	Profile RateLimitProfile `validate:"required"`
-	Policy  Policy           `validate:"required"`
-}
-
-// RateLimitProfiles is a configured set of named rate-limit profiles.
-type RateLimitProfiles []RateLimitConfig
-
-func (p Policy) validate() error {
-	switch {
-	case p.Capacity < 1:
-		return fmt.Errorf("%w: capacity must be >= 1", ErrPolicyInvalid)
-	case p.RefillPer <= 0:
-		return fmt.Errorf("%w: refill period must be > 0", ErrPolicyInvalid)
-	default:
-		return nil
-	}
-}
-
-// Validate reports whether the policy is usable.
-func (p Policy) Validate() error {
-	return p.validate()
-}
 
 // Decision is the result of a rate-limit check.
 type Decision struct {
@@ -72,31 +36,11 @@ type Store interface {
 	Allow(ctx context.Context, key string, policy Policy) (Decision, error)
 }
 
-// Config builds a Limiter from a shared store and named profiles.
-type Config struct {
-	Store    Store
-	Profiles map[string]Policy
-	Logger   *slog.Logger
-}
-
 // Limiter resolves named profiles and delegates token accounting to a store.
 type Limiter struct {
 	store    Store
-	profiles map[string]Policy
+	profiles map[RateLimitProfile]Policy
 	logger   *slog.Logger
-}
-
-// KeyFunc derives the limiter key for a request.
-type KeyFunc func(c *web.Context) (string, error)
-
-// MiddlewareConfig configures request-time rate limiting by named profile.
-type MiddlewareConfig struct {
-	Limiter    *Limiter
-	Profile    string
-	KeyFunc    KeyFunc
-	FailClosed bool
-	OnError    func(err error, c *web.Context)
-	Skipper    func(c *web.Context) bool
 }
 
 var (
@@ -112,9 +56,9 @@ func New(cfg Config) (*Limiter, error) {
 	if cfg.Store == nil {
 		return nil, ErrStoreRequired
 	}
-	profiles := make(map[string]Policy, len(cfg.Profiles))
+	profiles := make(map[RateLimitProfile]Policy, len(cfg.Profiles))
 	for name, policy := range cfg.Profiles {
-		if strings.TrimSpace(name) == "" {
+		if name == "" {
 			return nil, ErrProfileRequired
 		}
 		if err := policy.validate(); err != nil {
@@ -132,11 +76,11 @@ func New(cfg Config) (*Limiter, error) {
 }
 
 // Allow checks whether key may consume one token from the named profile.
-func (l *Limiter) Allow(ctx context.Context, profile, key string) (Decision, error) {
+func (l *Limiter) Allow(ctx context.Context, profile RateLimitProfile, key string) (Decision, error) {
 	if l == nil || l.store == nil {
 		return Decision{}, ErrStoreRequired
 	}
-	if strings.TrimSpace(profile) == "" {
+	if profile == "" {
 		return Decision{}, ErrProfileRequired
 	}
 	if strings.TrimSpace(key) == "" {
@@ -176,8 +120,8 @@ func (l *Limiter) Close() error {
 	return nil
 }
 
-func storageKey(profile, key string) string {
-	return profile + storageKeySeparator + key
+func storageKey(profile RateLimitProfile, key string) string {
+	return string(profile) + storageKeySeparator + key
 }
 
 func fullWindow(policy Policy) time.Duration {
@@ -197,16 +141,16 @@ func (l *Limiter) logStartup() {
 	if l == nil || l.logger == nil {
 		return
 	}
-	profiles := make([]string, 0, len(l.profiles))
+	profiles := make([]RateLimitProfile, 0, len(l.profiles))
 	for profile := range l.profiles {
 		profiles = append(profiles, profile)
 	}
-	sort.Strings(profiles)
+	slices.Sort(profiles)
 	for _, profile := range profiles {
 		policy := l.profiles[profile]
 		l.logger.Debug(
 			"rate limit profile started",
-			"profile", profile,
+			"profile", string(profile),
 			"capacity", policy.Capacity,
 			"refill_per", policy.RefillPer,
 			"window", fullWindow(policy),
@@ -214,14 +158,14 @@ func (l *Limiter) logStartup() {
 	}
 }
 
-func (l *Limiter) logHit(ctx context.Context, profile, key string, policy Policy, decision Decision) {
+func (l *Limiter) logHit(ctx context.Context, profile RateLimitProfile, key string, policy Policy, decision Decision) {
 	if l == nil || l.logger == nil {
 		return
 	}
 	l.logger.DebugContext(
 		ctx,
 		"rate limit hit",
-		"profile", profile,
+		"profile", string(profile),
 		"key_hash", keyHash(key),
 		"allowed", decision.Allowed,
 		"hits", hitCount(decision),
@@ -238,11 +182,11 @@ func Middleware(cfg MiddlewareConfig) (web.Middleware, error) {
 	if cfg.Limiter == nil {
 		return nil, ErrStoreRequired
 	}
-	if strings.TrimSpace(cfg.Profile) == "" {
+	if cfg.Profile == "" {
 		return nil, ErrProfileRequired
 	}
 	if cfg.KeyFunc == nil {
-		cfg.KeyFunc = FixedKey(cfg.Profile)
+		cfg.KeyFunc = FixedKey(string(cfg.Profile))
 	}
 
 	return func(next web.Handler) web.Handler {

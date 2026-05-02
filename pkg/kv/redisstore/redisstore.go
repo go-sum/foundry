@@ -3,7 +3,6 @@ package redisstore
 import (
 	"cmp"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"time"
@@ -11,19 +10,6 @@ import (
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/redis/go-redis/v9"
 )
-
-// Config holds connection parameters for a Redis-protocol server.
-type Config struct {
-	Addr         string        `validate:"required"      help:"host:port of the Redis-protocol server"`
-	Password     string        `                         help:"authentication password (empty for no auth)"`
-	DB           int           `validate:"min=0,max=15"  help:"database number (default 0)"`
-	PoolSize     int           `validate:"min=0"         help:"maximum connections (0 uses default of 10)"`
-	MinIdleConns int           `validate:"min=0"         help:"minimum idle connections"`
-	DialTimeout  time.Duration `                         help:"connection dial timeout (default 5s)"`
-	ReadTimeout  time.Duration `                         help:"read timeout (default 3s)"`
-	WriteTimeout time.Duration `                         help:"write timeout (default 3s)"`
-	TLSConfig    *tls.Config   `                         help:"optional TLS config for managed Redis services"`
-}
 
 // RedisStore implements kv.Store and kv.Scanner backed by a Redis-protocol server.
 type RedisStore struct {

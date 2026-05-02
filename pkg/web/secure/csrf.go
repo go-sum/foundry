@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	neturl "net/url"
 	"strings"
@@ -15,70 +14,6 @@ import (
 	"github.com/go-sum/foundry/pkg/web"
 	websession "github.com/go-sum/foundry/pkg/web/session"
 )
-
-// CSRFConfig configures CSRF protection middleware.
-type CSRFConfig struct {
-	// Key is the HMAC-SHA256 signing key for stateless fallback mode.
-	Key []byte `validate:"required,min=32" help:"set SECURITY_CSRF_KEY — generate with 'openssl rand -hex 32' and place in starter/.env"`
-
-	// TokenTTL is the stateless token lifetime.
-	TokenTTL time.Duration
-
-	// ContextKey is the context/session key under which the token is stored.
-	// Defaults to "csrf".
-	ContextKey string
-
-	// HeaderName is the header name checked for the token.
-	// Defaults to "X-CSRF-Token".
-	HeaderName string
-
-	// FormField is the form body field checked for the token on
-	// application/x-www-form-urlencoded and multipart/form-data requests.
-	// The body is peeked via Clone so the downstream handler still receives
-	// the full original body. Defaults to "_csrf".
-	// This matches the field name emitted by render.CSRFField.
-	FormField string
-
-	// SafeMethods are HTTP methods that do not require CSRF validation.
-	// Defaults to GET, HEAD, OPTIONS.
-	SafeMethods []string
-
-	// AllowMissingOrigin controls whether unsafe requests without Origin or
-	// Referer are allowed. Defaults to false — requests that omit both headers
-	// are rejected. Set to true only in development or when clients are known
-	// to omit origin headers (e.g. some native HTTP clients).
-	AllowMissingOrigin bool
-
-	// AllowedOrigins are additional trusted origins for unsafe requests.
-	AllowedOrigins []string
-
-	// AllowedOriginFunc performs dynamic origin checks for unsafe requests.
-	AllowedOriginFunc func(origin string, c *web.Context) bool
-
-	// ServerOrigin is the server-owned origin (e.g. "https://example.com")
-	// used for same-origin comparison instead of deriving it from the request
-	// Host header. When empty, falls back to the request-derived origin.
-	ServerOrigin string
-
-	// TokenLookup overrides default submitted-token extraction.
-	TokenLookup func(c *web.Context) string
-
-	// Skipper returns true to skip CSRF validation for the request.
-	Skipper func(c *web.Context) bool
-
-	// CookieName is the name of the double-submit CSRF cookie used in
-	// stateless mode. Defaults to "csrf". For production over HTTPS, use
-	// "__Host-csrf" with CookieSecure set to true.
-	CookieName string
-
-	// CookieSecure sets the Secure attribute on the stateless CSRF cookie.
-	// Set to true in production (HTTPS-only). Defaults to false.
-	CookieSecure bool
-
-	// CookieSameSite controls the SameSite attribute of the CSRF cookie.
-	// Accepted values: "Lax" (default), "Strict", "None". Empty string defaults to "Lax".
-	CookieSameSite string
-}
 
 type csrfContextKey struct{}
 
@@ -127,31 +62,21 @@ func applyCSRFDefaults(c *CSRFConfig) {
 	}
 }
 
-// DefaultCSRFConfig returns a CSRFConfig with all defaults applied.
-// Key is zero-length; the caller must supply a key before use.
-// AllowMissingOrigin defaults to false; set it to true in development overlays
-// or when clients are known to omit Origin/Referer headers.
-func DefaultCSRFConfig() CSRFConfig {
-	var c CSRFConfig
-	applyCSRFDefaults(&c)
-	return c
-}
 
-// NewCSRFConfigFromHex returns a CSRFConfig populated with defaults plus the
-// supplied hex-encoded key. An empty keyHex leaves Key zero-length (the
-// caller or validator decides whether that is acceptable).
-//
-// Errors are namespaced: "csrf key: ...".
-func NewCSRFConfigFromHex(keyHex string) (CSRFConfig, error) {
-	cfg := DefaultCSRFConfig()
-	if keyHex != "" {
-		k, err := decodeHexKey(keyHex)
-		if err != nil {
-			return CSRFConfig{}, fmt.Errorf("csrf key: %w", err)
-		}
-		cfg.Key = k
+// CSRFConfigFromHex returns a CSRFConfig with defaults and the decoded key.
+// On empty, invalid hex, or short key input the Key field is left nil;
+// validation catches this via the required,min=32 struct tag on Key.
+func CSRFConfigFromHex(keyHex string) CSRFConfig {
+	cfg := InitialCSRFConfig()
+	if keyHex == "" {
+		return cfg
 	}
-	return cfg, nil
+	k, err := decodeHexKey(keyHex)
+	if err != nil {
+		return cfg
+	}
+	cfg.Key = k
+	return cfg
 }
 
 // CSRF returns middleware that validates CSRF tokens on unsafe HTTP methods

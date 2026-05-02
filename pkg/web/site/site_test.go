@@ -2,8 +2,8 @@ package site
 
 import "testing"
 
-func TestDefaultConfig(t *testing.T) {
-	got := DefaultConfig()
+func TestInitialSiteConfig(t *testing.T) {
+	got := InitialSiteConfig()
 	if got.BaseURL != "" {
 		t.Fatalf("BaseURL = %q, want empty", got.BaseURL)
 	}

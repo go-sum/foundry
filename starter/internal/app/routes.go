@@ -154,7 +154,7 @@ func authRateLimitNodes(sec Security, svc Services) ([]router.Node, error) {
 	}
 	mw, err := ratelimit.Middleware(ratelimit.MiddlewareConfig{
 		Limiter:    svc.RateLimiter,
-		Profile:    string(config.RateLimitRoutesAuth),
+		Profile:    config.RateLimitRoutesAuth,
 		KeyFunc:    sec.RateLimitKey,
 		FailClosed: true,
 		OnError: func(err error, c *web.Context) {

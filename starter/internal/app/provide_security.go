@@ -2,11 +2,8 @@ package app
 
 import (
 	"context"
-	"encoding/hex"
-	"errors"
 	"fmt"
 
-	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/web/cookiecodec"
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
@@ -15,7 +12,6 @@ import (
 	config "github.com/go-sum/foundry/config"
 )
 
-var ErrTrustedProxyCIDRInvalid = errors.New("app: invalid trusted proxy CIDR")
 
 func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, storeFactory func() session.Store) (Security, session.Store, error) {
 	cfg := runtime.Config
@@ -32,17 +28,17 @@ func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, store
 	}
 
 	serverOrigin := cfg.Site.BaseURL
-	csrf := cfg.CSRF
+	csrf := cfg.Web.Secure.CSRF
 	csrf.ServerOrigin = serverOrigin
-	rateLimitKey, err := rateLimitKeyFunc(cfg.Server.TrustedProxies)
+	rateLimitKey, err := rateLimitKeyFunc(cfg.Web.Server.TrustedProxies)
 	if err != nil {
 		return Security{}, nil, fmt.Errorf("security: rate limit key: %w", err)
 	}
 
 	return Security{
 		CSRF:         csrf,
-		Headers:      cfg.Headers,
-		CSP:          cfg.CSP,
+		Headers:      cfg.Web.Secure.Headers,
+		CSP:          cfg.Web.Secure.CSP,
 		Origins:      origins,
 		AllowedHosts: cfg.Site.AllowedHosts,
 		ServerOrigin: serverOrigin,
@@ -53,25 +49,17 @@ func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, store
 
 func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() session.Store) (session.Config, session.Store, error) {
 	cfg := session.StoreConfig{
-		Type:       runtime.Config.SessionStore,
+		Type:       runtime.Config.Web.SessionStore,
 		Env:        string(runtime.Config.Env),
 		TestingEnv: string(config.Testing),
-		Settings:   runtime.Config.Session,
+		Settings:   runtime.Config.Web.Session,
 	}
 
-	switch runtime.Config.SessionStore {
+	switch runtime.Config.Web.SessionStore {
 	case session.StoreTypeCookie:
-		keyHex := cfgpkg.ExpandSecret("SECURITY_SESSION_KEY")
-		if keyHex == "" {
-			return session.Config{}, nil, config.ErrSessionKeyMissing
-		}
-		key, err := hex.DecodeString(keyHex)
-		if err != nil {
-			return session.Config{}, nil, fmt.Errorf("%w: %w", config.ErrSessionKeyInvalid, err)
-		}
 		codec, err := cookiecodec.New(cookiecodec.Config{
-			Name:    runtime.Config.Session.CookieName,
-			Secrets: [][]byte{key},
+			Name:    runtime.Config.Web.Session.CookieName,
+			Secrets: [][]byte{runtime.Config.Web.Session.CookieKey},
 			Mode:    cookiecodec.AEAD,
 		})
 		if err != nil {
@@ -81,10 +69,10 @@ func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() sessi
 	case session.StoreTypeKV:
 		kvs, ok := kvStore.(session.KVStore)
 		if !ok {
-			return session.Config{}, nil, config.ErrKVSessionStoreUnsupported
+			return session.Config{}, nil, ErrKVSessionStoreUnsupported
 		}
 		cfg.KVStore = kvs
-		cfg.KVPrefix = runtime.Config.Session.KVPrefix
+		cfg.KVPrefix = runtime.Config.Web.Session.KVPrefix
 	case session.StoreTypeMemory:
 		cfg.TestFactory = storeFactory
 	}

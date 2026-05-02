@@ -75,8 +75,8 @@ func newSessionRouter(t *testing.T, csrfCfg secure.CSRFConfig) *router.Router {
 	r := router.New()
 	r.Use(
 		web.AsyncContext(),
-		secure.Headers(secure.DefaultHeadersConfig()),
-		secure.CSPNonce(secure.DefaultCSPNonceConfig()),
+		secure.Headers(secure.InitialHeadersConfig()),
+		secure.CSPNonce(secure.InitialCSPNonceConfig()),
 	)
 	r.Use(session.Middleware(session.Config{
 		Store: store,
@@ -215,14 +215,8 @@ func mustGenerateKeyHex(t *testing.T) string {
 	return keyHex
 }
 
-func mustCSRFConfig(t *testing.T, keyHex string) secure.CSRFConfig {
-	t.Helper()
-
-	cfg, err := secure.NewCSRFConfigFromHex(keyHex)
-	if err != nil {
-		t.Fatalf("secure.NewCSRFConfigFromHex: %v", err)
-	}
-	return cfg
+func mustCSRFConfig(_ *testing.T, keyHex string) secure.CSRFConfig {
+	return secure.CSRFConfigFromHex(keyHex)
 }
 
 func mustFetchFormPage(t *testing.T, app integrationApp) formPage {
@@ -842,7 +836,7 @@ func TestIntegration_RateLimit(t *testing.T) {
 	store := ratelimit.NewMemoryStore(ratelimit.MemoryStoreConfig{})
 	limiter, err := ratelimit.New(ratelimit.Config{
 		Store: store,
-		Profiles: map[string]ratelimit.Policy{
+		Profiles: map[ratelimit.RateLimitProfile]ratelimit.Policy{
 			"test": {Capacity: 2, RefillPer: time.Second},
 		},
 	})
@@ -956,8 +950,8 @@ func TestIntegration_CSPNonceUniqueness(t *testing.T) {
 	r := router.New()
 	r.Use(
 		web.AsyncContext(),
-		secure.Headers(secure.DefaultHeadersConfig()),
-		secure.CSPNonce(secure.DefaultCSPNonceConfig()),
+		secure.Headers(secure.InitialHeadersConfig()),
+		secure.CSPNonce(secure.InitialCSPNonceConfig()),
 	)
 	r.GET("/page", "page", func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "hello"), nil
@@ -1012,8 +1006,8 @@ func TestIntegration_SecurityHeaders(t *testing.T) {
 	r := router.New()
 	r.Use(
 		web.AsyncContext(),
-		secure.Headers(secure.DefaultHeadersConfig()),
-		secure.CSPNonce(secure.DefaultCSPNonceConfig()),
+		secure.Headers(secure.InitialHeadersConfig()),
+		secure.CSPNonce(secure.InitialCSPNonceConfig()),
 	)
 	r.GET("/check", "check", func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "ok"), nil

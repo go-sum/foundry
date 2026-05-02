@@ -37,7 +37,7 @@ func provideKVStore(ctx context.Context, runtime Runtime, factory func(context.C
 		return nil, err
 	}
 	if store == nil {
-		return nil, fmt.Errorf("%w: no store returned", config.ErrKVStoreUnavailable)
+		return nil, fmt.Errorf("%w: no store returned", ErrKVStoreUnavailable)
 	}
 
 	attempts := 3
@@ -48,7 +48,7 @@ func provideKVStore(ctx context.Context, runtime Runtime, factory func(context.C
 		return store.Ping(ctx)
 	}); err != nil {
 		_ = store.Close() // secondary error during startup failure; primary error returned below
-		return nil, errors.Join(config.ErrKVStoreUnavailable, fmt.Errorf("kv: ping: %w", err))
+		return nil, errors.Join(ErrKVStoreUnavailable, fmt.Errorf("kv: ping: %w", err))
 	}
 	return store, nil
 }
@@ -63,5 +63,5 @@ func needsKV(cfg *config.Config) bool {
 	if cfg.Env != config.Testing {
 		return true
 	}
-	return cfg.SessionStore == "kv"
+	return cfg.Web.SessionStore == "kv"
 }

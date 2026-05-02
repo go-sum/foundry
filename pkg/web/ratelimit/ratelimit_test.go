@@ -32,7 +32,7 @@ func newTestLimiter(t *testing.T, capacity int) *Limiter {
 	t.Helper()
 	limiter, err := New(Config{
 		Store: NewMemoryStore(MemoryStoreConfig{}),
-		Profiles: map[string]Policy{
+		Profiles: map[RateLimitProfile]Policy{
 			testProfile: {
 				Capacity:  capacity,
 				RefillPer: time.Minute,
@@ -183,7 +183,7 @@ func TestMiddleware_DefaultKeyUsesProfile(t *testing.T) {
 func TestMiddleware_FailOpenOnStoreError(t *testing.T) {
 	limiter, err := New(Config{
 		Store: errorStore{err: errors.New("store down")},
-		Profiles: map[string]Policy{
+		Profiles: map[RateLimitProfile]Policy{
 			testProfile: {Capacity: 1, RefillPer: time.Minute},
 		},
 	})
@@ -313,7 +313,7 @@ func TestLimiter_DebugLogsStartupAndHits(t *testing.T) {
 	limiter, err := New(Config{
 		Store:  NewMemoryStore(MemoryStoreConfig{}),
 		Logger: newDebugLogger(&buf),
-		Profiles: map[string]Policy{
+		Profiles: map[RateLimitProfile]Policy{
 			testProfile: {
 				Capacity:  2,
 				RefillPer: time.Minute,
@@ -373,7 +373,7 @@ func TestMiddleware_FailClosed_PreservesErrorCause(t *testing.T) {
 	sentinel := errors.New("store down")
 	limiter, err := New(Config{
 		Store: errorStore{err: sentinel},
-		Profiles: map[string]Policy{
+		Profiles: map[RateLimitProfile]Policy{
 			testProfile: {Capacity: 1, RefillPer: time.Minute},
 		},
 	})
@@ -656,7 +656,7 @@ func (b fakeKVStore) RateLimitAllow(_ context.Context, _ string, _ int, _ time.D
 func TestNewLimiter_MemoryStore(t *testing.T) {
 	limiter, err := NewLimiter(
 		StoreConfig{Type: StoreTypeMemory},
-		map[string]Policy{"test": {Capacity: 5, RefillPer: time.Second}},
+		map[RateLimitProfile]Policy{"test": {Capacity: 5, RefillPer: time.Second}},
 		nil,
 	)
 	if err != nil {
@@ -674,7 +674,7 @@ func TestNewLimiter_MemoryStore(t *testing.T) {
 func TestNewLimiter_InvalidStoreConfig(t *testing.T) {
 	_, err := NewLimiter(
 		StoreConfig{Type: "unsupported"},
-		map[string]Policy{"test": {Capacity: 1, RefillPer: time.Second}},
+		map[RateLimitProfile]Policy{"test": {Capacity: 1, RefillPer: time.Second}},
 		nil,
 	)
 	if err == nil {

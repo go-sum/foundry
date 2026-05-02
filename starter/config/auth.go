@@ -1,10 +1,8 @@
 package config
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/go-sum/foundry/pkg/auth"
+	"github.com/go-sum/foundry/pkg/auth/provider"
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	webauth "github.com/go-sum/foundry/pkg/web/auth"
 )
@@ -22,46 +20,21 @@ type AuthConfig struct {
 	Identity auth.Config
 
 	// Provider configures the built-in OAuth 2.0 Authorization Server (pkg/auth/provider).
-	Provider ProviderAuthConfig
+	Provider provider.Config
 
-	// FirstParty configures the app's own built-in OAuth 2.1 client.
-	FirstParty FirstPartyConfig
+	// OAuthClient is the pre-built OAuth 2.0 client configuration for this application.
+	// All endpoint URLs are derived from Provider.Issuer; rebuild via
+	// provider.BuildOAuthClient whenever Provider.Issuer changes.
+	OAuthClient webauth.ProviderConfig
 }
 
-// ProviderAuthConfig configures the built-in OAuth 2.0 Authorization Server.
-type ProviderAuthConfig struct {
-	// Issuer is the publicly reachable base URL of this authorization server.
-	// Defaults to Site.BaseURL when empty. Override with AUTH_ISSUER env var.
-	Issuer string
-}
-
-// FirstPartyConfig configures the app's own first-party OAuth 2.1 client.
-// The client is a public client (PKCE-only, no secret) because it runs on
-// the same origin as the Authorization Server.
-type FirstPartyConfig struct {
-	// ClientID is the OAuth 2.0 client_id registered for this app.
-	// Override with AUTH_FIRST_PARTY_CLIENT_ID env var. Default: "starter-app".
-	ClientID string
-
-	// RedirectPath is the path-only callback URL (e.g. "/auth/callback").
-	RedirectPath string
-}
-
-// DefaultAuth builds the default AuthConfig for production, reading secrets
-// from environment variables. The siteBaseURL is used as the default OAuth
-// issuer when AUTH_ISSUER is not explicitly set.
-func DefaultAuth(siteBaseURL string) (AuthConfig, error) {
-	masterKeys, err := auth.ParseTokenKeys(cfgpkg.ExpandSecret("SECURITY_AUTH_TOKEN_KEY"))
-	if err != nil {
-		if errors.Is(err, auth.ErrTokenKeyMissing) {
-			return AuthConfig{}, fmt.Errorf("%w: set SECURITY_AUTH_TOKEN_KEY environment variable", ErrAuthTokenKeyMissing)
-		}
-		return AuthConfig{}, fmt.Errorf("%w", ErrAuthTokenKeyInvalid)
-	}
-	verifyKeys, identityKeys, err := auth.DeriveTokenSubkeys(masterKeys)
-	if err != nil {
-		return AuthConfig{}, fmt.Errorf("%w: %w", ErrAuthTokenKeyInvalid, err)
-	}
+// productionAuth builds the AuthConfig from environment variables and secrets.
+// On missing or invalid SECURITY_AUTH_TOKEN_KEY the returned AuthConfig has nil
+// token keys; validation catches this via the required,min=1 tag on Token.Secrets.
+func productionAuth(siteBaseURL string) AuthConfig {
+	masterKeys, _ := auth.ParseTokenKeys(cfgpkg.ExpandSecret("SECURITY_AUTH_TOKEN_KEY"))
+	verifyKeys, identityKeys, _ := auth.DeriveTokenSubkeys(masterKeys)
+	issuer := cfgpkg.ExpandEnv("AUTH_ISSUER", siteBaseURL)
 	return AuthConfig{
 		TokenKeys: verifyKeys,
 		Identity: auth.Config{
@@ -73,37 +46,7 @@ func DefaultAuth(siteBaseURL string) (AuthConfig, error) {
 				Secrets: identityKeys,
 			},
 		},
-		Provider: ProviderAuthConfig{
-			Issuer: cfgpkg.ExpandEnv("AUTH_ISSUER", siteBaseURL),
-		},
-		FirstParty: FirstPartyConfig{
-			ClientID:     cfgpkg.ExpandEnv("AUTH_FIRST_PARTY_CLIENT_ID", "starter-app"),
-			RedirectPath: "/auth/callback",
-		},
-	}, nil
-}
-
-// ClientConfig returns a pkg/web/auth ProviderConfig pre-filled for the local
-// OAuth 2.0 provider. Endpoints are derived from the Issuer and the well-known
-// OAuth route paths registered by pkg/auth/provider.
-func (c AuthConfig) ClientConfig(clientID, clientSecret, redirectURL string) webauth.ProviderConfig {
-	issuer := c.Provider.Issuer
-	return webauth.ProviderConfig{
-		Issuer:                issuer,
-		ClientID:              clientID,
-		ClientSecret:          clientSecret,
-		AuthorizationEndpoint: issuer + "/oauth/authorize",
-		TokenEndpoint:         issuer + "/oauth/token",
-		UserinfoEndpoint:      issuer + "/oauth/userinfo",
-		RedirectURL:           redirectURL,
-		Scopes:                []string{"openid", "email", "profile"},
+		Provider:    provider.Config{Issuer: issuer},
+		OAuthClient: provider.BuildOAuthClient(issuer, cfgpkg.ExpandEnv("AUTH_FIRST_PARTY_CLIENT_ID", "starter-app"), "/auth/callback"),
 	}
-}
-
-// FirstPartyClientConfig returns the ProviderConfig for the built-in first-party
-// OAuth client. The redirect URL is derived from the Issuer and the configured
-// RedirectPath. The first-party client is always a public client (no secret).
-func (c AuthConfig) FirstPartyClientConfig() webauth.ProviderConfig {
-	redirectURL := c.Provider.Issuer + c.FirstParty.RedirectPath
-	return c.ClientConfig(c.FirstParty.ClientID, "", redirectURL)
 }

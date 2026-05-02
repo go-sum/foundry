@@ -24,7 +24,7 @@ func testCSRFKey() []byte {
 }
 
 func testCSRFConfig() CSRFConfig {
-	cfg := DefaultCSRFConfig()
+	cfg := InitialCSRFConfig()
 	cfg.Key = testCSRFKey()
 	cfg.TokenTTL = time.Hour
 	cfg.AllowMissingOrigin = true // token-focused tests; origin tests use explicit configs

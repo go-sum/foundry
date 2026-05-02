@@ -19,7 +19,7 @@ type Service interface {
 
 // ServiceConfig controls rate limiting and queue routing.
 type ServiceConfig struct {
-	RateLimitProfile string
+	RateLimitProfile ratelimit.RateLimitProfile
 	QueueName        string
 }
 

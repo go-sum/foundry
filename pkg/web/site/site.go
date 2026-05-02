@@ -7,40 +7,6 @@ import (
 	"strings"
 )
 
-// BuildAllowedHosts returns the list of hostnames the server should accept.
-// It extracts the hostname from baseURL (if valid) and appends any
-// comma-separated entries from extra. The config layer passes raw env values;
-// all assembly logic lives here.
-func BuildAllowedHosts(baseURL, extra string) []string {
-	var hosts []string
-	if baseURL != "" {
-		u, err := url.Parse(baseURL)
-		if err == nil && u.Host != "" {
-			hosts = append(hosts, u.Hostname())
-		}
-	}
-	for _, h := range strings.Split(extra, ",") {
-		if h = strings.TrimSpace(h); h != "" {
-			hosts = append(hosts, h)
-		}
-	}
-	return hosts
-}
-
-// Config holds site-identity configuration.
-type Config struct {
-	BaseURL         string   `validate:"required,url"`
-	OriginAllowlist []string
-	// AllowedHosts lists hostnames the server accepts. Built by
-	// BuildAllowedHosts from the BaseURL hostname and additional entries.
-	// Environment overlays may append further hosts (e.g. localhost for
-	// dev proxies).
-	AllowedHosts []string
-}
-
-// DefaultConfig returns an empty site config. BaseURL must come from env.
-func DefaultConfig() Config { return Config{} }
-
 // Site provides site-identity helpers built from a Config.
 type Site struct {
 	cfg    Config

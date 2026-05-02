@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"net/url"
 )
 
@@ -66,7 +65,7 @@ func ExtractKVComponents(env map[string]string, needed map[string]struct{}) {
 
 // KVConfig holds the parsed connection parameters from a KV_URL.
 type KVConfig struct {
-	Addr       string
+	Addr       string `validate:"required"`
 	Password   string
 	TLSEnabled bool
 }
@@ -74,13 +73,14 @@ type KVConfig struct {
 // ParseKVURL parses a redis:// or rediss:// URL into KV connection parameters.
 // An empty raw string returns a config with the default address localhost:6379.
 // The rediss:// scheme sets TLSEnabled; the password is URL-decoded automatically.
-func ParseKVURL(raw string) (KVConfig, error) {
+// An unparseable URL returns a zero KVConfig; validation catches the empty Addr.
+func ParseKVURL(raw string) KVConfig {
 	if raw == "" {
-		return KVConfig{Addr: "localhost:6379"}, nil
+		return KVConfig{Addr: "localhost:6379"}
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return KVConfig{}, fmt.Errorf("KV_URL: %w", err)
+		return KVConfig{}
 	}
 	cfg := KVConfig{Addr: u.Host}
 	if cfg.Addr == "" {
@@ -90,5 +90,5 @@ func ParseKVURL(raw string) (KVConfig, error) {
 		cfg.Password, _ = u.User.Password()
 	}
 	cfg.TLSEnabled = u.Scheme == "rediss"
-	return cfg, nil
+	return cfg
 }

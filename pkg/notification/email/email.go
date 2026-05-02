@@ -12,21 +12,10 @@ import (
 	"time"
 )
 
-// Provider identifies an email delivery service.
-type Provider string
-
-const (
-	ProviderResend       Provider = "resend"
-	ProviderMailChannels Provider = "mailchannels"
-	ProviderLog          Provider = "log"
-)
-
 var (
 	ErrInvalidConfig = errors.New("email: invalid configuration")
 	ErrTransient     = errors.New("email: transient failure")
 )
-
-const defaultTimeout = 10 * time.Second
 
 // Message is the email to deliver.
 type Message struct {
@@ -40,17 +29,6 @@ type Message struct {
 // Sender delivers an email.
 type Sender interface {
 	Send(ctx context.Context, msg Message) error
-}
-
-// Config configures an email Sender. Provider selects the implementation;
-// APIKey and BaseURL are provider-specific. From is the default sender address
-// used when Message.From is empty.
-type Config struct {
-	Provider Provider
-	APIKey   string
-	BaseURL  string        // optional; each provider has its own default URL
-	From     string        // default sender address
-	Timeout  time.Duration // HTTP timeout; defaults to 10s
 }
 
 // New constructs a Sender from cfg. logger is used only by the "log" provider;

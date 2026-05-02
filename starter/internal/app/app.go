@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 
 	"go.opentelemetry.io/otel/trace"
 
@@ -181,7 +182,7 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 	}
 
 	rlCfg := runtime.Config.RateLimit
-	limiter, err := ratelimit.NewLimiter(rlCfg.Store.WithKVStore(sharedKV), rlCfg.Profiles(), runtime.Logger)
+	limiter, err := ratelimit.NewLimiter(rlCfg.Store.WithKVStore(sharedKV), rlCfg.Policies, runtime.Logger)
 	if err != nil {
 		if sharedKV != nil {
 			_ = sharedKV.Close()
@@ -230,7 +231,8 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 	app.Services = services
 
 	s := site.New(runtime.Config.Site)
-	if err := RegisterRoutes(routing, routes, security, services, runtime.Config.Assets, runtime.Config.PublicDir, s, pres); err != nil {
+	publicDir := filepath.Dir(runtime.Config.Assets.PublicDir)
+	if err := RegisterRoutes(routing, routes, security, services, runtime.Config.Assets, publicDir, s, pres); err != nil {
 		return nil, fmt.Errorf("routes: %w", err)
 	}
 	routing.Freeze()
@@ -241,5 +243,5 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 // Run starts the HTTP server, waits for ctx to be cancelled, then gracefully
 // shuts down within the configured shutdown timeout.
 func (a *App) Run(ctx context.Context) error {
-	return serve.ListenAndServe(ctx, a.router.Serve, a.Config.Server)
+	return serve.ListenAndServe(ctx, a.router.Serve, a.Config.Web.Server)
 }

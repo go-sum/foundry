@@ -12,6 +12,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// DBConfig holds database connection configuration.
+type DBConfig struct {
+	DSN string
+}
+
 // Option configures pool creation.
 type Option func(*pgxpool.Config)
 

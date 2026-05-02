@@ -35,17 +35,21 @@ func testAppContext(method, rawURL string) *web.Context {
 
 func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env:     configpkg.Testing,
-		CSRF:    secure.DefaultCSRFConfig(),
-		CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
-		Headers: secure.DefaultHeadersConfig(),
-		Session: session.Settings{
-			CookieName:   "app-session",
-			IdleTTL:      30 * time.Minute,
-			AbsoluteTTL:  12 * time.Hour,
-			CookieSecure: true,
+		Env: configpkg.Testing,
+		Web: configpkg.WebConfig{
+			Secure: secure.SecureConfig{
+				CSRF:    secure.InitialCSRFConfig(),
+				CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
+				Headers: secure.InitialHeadersConfig(),
+			},
+			Session: session.Settings{
+				CookieName:   "app-session",
+				IdleTTL:      30 * time.Minute,
+				AbsoluteTTL:  12 * time.Hour,
+				CookieSecure: true,
+			},
+			SessionStore: "memory",
 		},
-		SessionStore: "memory",
 		Site: site.Config{
 			BaseURL:         "https://app.example.com",
 			OriginAllowlist: []string{"https://admin.example.com", "https://cdn.example.com"},
@@ -97,17 +101,21 @@ func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 
 func TestProvideSecurity_EmptySessionStoreFailsFast(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env:     configpkg.Testing,
-		CSRF:    secure.DefaultCSRFConfig(),
-		CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
-		Headers: secure.DefaultHeadersConfig(),
-		Session: session.Settings{
-			CookieName:   "app-session",
-			IdleTTL:      30 * time.Minute,
-			AbsoluteTTL:  12 * time.Hour,
-			CookieSecure: true,
+		Env: configpkg.Testing,
+		Web: configpkg.WebConfig{
+			Secure: secure.SecureConfig{
+				CSRF:    secure.InitialCSRFConfig(),
+				CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
+				Headers: secure.InitialHeadersConfig(),
+			},
+			Session: session.Settings{
+				CookieName:   "app-session",
+				IdleTTL:      30 * time.Minute,
+				AbsoluteTTL:  12 * time.Hour,
+				CookieSecure: true,
+			},
+			SessionStore: "",
 		},
-		SessionStore: "",
 		Site: site.Config{
 			BaseURL: "https://app.example.com",
 		},
@@ -124,19 +132,23 @@ func TestProvideSecurity_EmptySessionStoreFailsFast(t *testing.T) {
 
 func TestProvideSecurity_InvalidTrustedProxyCIDR_ReturnsError(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env:     configpkg.Testing,
-		CSRF:    secure.DefaultCSRFConfig(),
-		CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
-		Headers: secure.DefaultHeadersConfig(),
-		Session: session.Settings{
-			CookieName:   "app-session",
-			IdleTTL:      30 * time.Minute,
-			AbsoluteTTL:  12 * time.Hour,
-			CookieSecure: true,
-		},
-		SessionStore: "memory",
-		Server: serve.ServerConfig{
-			TrustedProxies: []string{"not-a-cidr"},
+		Env: configpkg.Testing,
+		Web: configpkg.WebConfig{
+			Secure: secure.SecureConfig{
+				CSRF:    secure.InitialCSRFConfig(),
+				CSP:     secure.CSPNonceConfig{CSPTemplate: "default-src 'self'"},
+				Headers: secure.InitialHeadersConfig(),
+			},
+			Session: session.Settings{
+				CookieName:   "app-session",
+				IdleTTL:      30 * time.Minute,
+				AbsoluteTTL:  12 * time.Hour,
+				CookieSecure: true,
+			},
+			SessionStore: "memory",
+			Server: serve.ServerConfig{
+				TrustedProxies: []string{"not-a-cidr"},
+			},
 		},
 		Site: site.Config{
 			BaseURL: "https://app.example.com",

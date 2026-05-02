@@ -86,12 +86,9 @@ func TestRegisterRoutes_RegistersPublicAndStaticNamedRoutes(t *testing.T) {
 	dir := t.TempDir()
 	rt := router.New()
 	s := site.New(site.Config{BaseURL: "http://test.local"})
-	csrf, err := secure.NewCSRFConfigFromHex(testCSRFHexKey)
-	if err != nil {
-		t.Fatalf("secure.NewCSRFConfigFromHex() error = %v", err)
-	}
+	csrf := secure.CSRFConfigFromHex(testCSRFHexKey)
 
-	err = RegisterRoutes(rt, DefaultRouteConfig(), Security{CSRF: csrf, Origins: []string{"http://test.local"}}, Services{}, static.AssetsConfig{
+	err := RegisterRoutes(rt, DefaultRouteConfig(), Security{CSRF: csrf, Origins: []string{"http://test.local"}}, Services{}, static.AssetsConfig{
 		PublicDir: dir,
 		URLPrefix: "/assets",
 	}, dir, s, Presentation{})
@@ -166,8 +163,8 @@ func (s *failingRateLimitStore) Allow(_ context.Context, _ string, _ ratelimit.P
 func TestAuthRateLimitNodes_FailsClosed(t *testing.T) {
 	limiter, err := ratelimit.New(ratelimit.Config{
 		Store: &failingRateLimitStore{err: errors.New("store unavailable")},
-		Profiles: map[string]ratelimit.Policy{
-			string(configpkg.RateLimitRoutesAuth): {Capacity: 10, RefillPer: time.Minute},
+		Profiles: map[ratelimit.RateLimitProfile]ratelimit.Policy{
+			configpkg.RateLimitRoutesAuth: {Capacity: 10, RefillPer: time.Minute},
 		},
 	})
 	if err != nil {

@@ -8,47 +8,6 @@ import (
 	"github.com/go-sum/foundry/pkg/web"
 )
 
-// DefaultCSPTemplate is the default Content-Security-Policy template. It includes
-// 'nonce-{nonce}' placeholders that CSPNonce replaces with a fresh per-request value.
-const DefaultCSPTemplate = "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
-
-// DefaultCSPNonceConfig returns a CSPNonceConfig using DefaultCSPTemplate.
-func DefaultCSPNonceConfig() CSPNonceConfig {
-	return CSPNonceConfig{CSPTemplate: DefaultCSPTemplate}
-}
-
-// CSPNonceConfig configures per-request Content-Security-Policy nonce injection.
-type CSPNonceConfig struct {
-	// CSPTemplate is the Content-Security-Policy header value template.
-	// The literal string "{nonce}" is replaced with a freshly generated
-	// base64url-encoded nonce on every request.
-	//
-	// Example:
-	//   "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'"
-	//
-	// When CSPTemplate is empty, no Content-Security-Policy header is set.
-	//
-	// Composition note: when using CSPNonce alongside the Headers middleware,
-	// set HeadersConfig.ContentSecurityPolicy to "" so the two middlewares
-	// do not conflict. CSPNonce must be placed AFTER Headers in the chain
-	// (outermost middleware runs first, so list CSPNonce before Headers when
-	// calling router.Use or web.Chain).
-	CSPTemplate string
-
-	// ScriptSrcExtra holds additional script-src tokens (e.g. CSP hashes for
-	// inline scripts) that are appended to the script-src directive at
-	// middleware init time. Each entry should be a complete CSP source
-	// expression such as "'sha256-abc123...'" .
-	ScriptSrcExtra []string
-}
-
-// WithScriptHashes returns a copy of cfg with the given CSP hash tokens
-// appended to ScriptSrcExtra.
-func (cfg CSPNonceConfig) WithScriptHashes(hashes ...string) CSPNonceConfig {
-	cfg.ScriptSrcExtra = append(cfg.ScriptSrcExtra, hashes...)
-	return cfg
-}
-
 type nonceContextKey struct{}
 
 // Nonce retrieves the CSP nonce from c. Returns "" if no nonce is present.

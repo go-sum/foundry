@@ -14,8 +14,8 @@ func (l *recordingErrorLog) Printf(format string, v ...any) {
 	l.lines = append(l.lines, fmt.Sprintf(format, v...))
 }
 
-func TestDefaultServerConfig(t *testing.T) {
-	got := DefaultServerConfig()
+func TestInitialServerConfig(t *testing.T) {
+	got := InitialServerConfig()
 	if got.Addr != ":8080" {
 		t.Fatalf("Addr = %q, want %q", got.Addr, ":8080")
 	}

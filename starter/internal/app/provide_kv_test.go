@@ -9,7 +9,7 @@ import (
 func TestNeedsKV_CookieProduction_True(t *testing.T) {
 	cfg := &configpkg.Config{
 		Env:          configpkg.Production,
-		SessionStore: "cookie",
+		Web: configpkg.WebConfig{SessionStore: "cookie"},
 	}
 	if !needsKV(cfg) {
 		t.Fatal("needsKV(cookie, production) = false, want true")
@@ -18,8 +18,8 @@ func TestNeedsKV_CookieProduction_True(t *testing.T) {
 
 func TestNeedsKV_KVProduction_True(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env:          configpkg.Production,
-		SessionStore: "kv",
+		Env: configpkg.Production,
+		Web: configpkg.WebConfig{SessionStore: "kv"},
 	}
 	if !needsKV(cfg) {
 		t.Fatal("needsKV(kv, production) = false, want true")
@@ -28,8 +28,8 @@ func TestNeedsKV_KVProduction_True(t *testing.T) {
 
 func TestNeedsKV_MemoryTesting_False(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env:          configpkg.Testing,
-		SessionStore: "memory",
+		Env: configpkg.Testing,
+		Web: configpkg.WebConfig{SessionStore: "memory"},
 	}
 	if needsKV(cfg) {
 		t.Fatal("needsKV(memory, testing) = true, want false")
@@ -38,8 +38,8 @@ func TestNeedsKV_MemoryTesting_False(t *testing.T) {
 
 func TestNeedsKV_EmptySessionStore_False(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env:          configpkg.Testing,
-		SessionStore: "",
+		Env: configpkg.Testing,
+		Web: configpkg.WebConfig{SessionStore: ""},
 	}
 	if needsKV(cfg) {
 		t.Fatal("needsKV(empty, testing) = true, want false")
@@ -48,8 +48,8 @@ func TestNeedsKV_EmptySessionStore_False(t *testing.T) {
 
 func TestNeedsKV_EmptySessionStore_Production_True(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env:          configpkg.Production,
-		SessionStore: "",
+		Env: configpkg.Production,
+		Web: configpkg.WebConfig{SessionStore: ""},
 	}
 	if !needsKV(cfg) {
 		t.Fatal("needsKV(empty, production) = false, want true")

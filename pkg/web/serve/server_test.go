@@ -17,9 +17,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/go-sum/foundry/pkg/web"
 	"golang.org/x/net/http2"
 )
+
+func validateServerConfig(cfg ServerConfig) error {
+	v := validator.New(validator.WithRequiredStructEnabled())
+	ValidationRules()(v)
+	return v.Struct(cfg)
+}
 
 func TestNewServer_DefaultTimeouts(t *testing.T) {
 	handler := func(_ *web.Context) (web.Response, error) {
@@ -552,12 +559,9 @@ func TestListenAndServe_H2C_TLS_MutuallyExclusive(t *testing.T) {
 	}
 }
 
-func TestDefaultServerConfigFromEnv_NoEnv_ReturnDefaults(t *testing.T) {
+func TestServerConfigFromEnv_NoEnv_ReturnDefaults(t *testing.T) {
 	t.Setenv("SERVER_TRUSTED_PROXIES", "")
-	cfg, err := DefaultServerConfigFromEnv()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := ServerConfigFromEnv()
 	if cfg.Addr != ":8080" {
 		t.Errorf("Addr = %q, want %q", cfg.Addr, ":8080")
 	}
@@ -566,12 +570,9 @@ func TestDefaultServerConfigFromEnv_NoEnv_ReturnDefaults(t *testing.T) {
 	}
 }
 
-func TestDefaultServerConfigFromEnv_ValidCIDRs_ParsedCorrectly(t *testing.T) {
+func TestServerConfigFromEnv_ValidCIDRs_ParsedCorrectly(t *testing.T) {
 	t.Setenv("SERVER_TRUSTED_PROXIES", " 192.0.2.0/24 , 10.0.0.0/8 ,, ")
-	cfg, err := DefaultServerConfigFromEnv()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	cfg := ServerConfigFromEnv()
 	if got, want := len(cfg.TrustedProxies), 2; got != want {
 		t.Fatalf("TrustedProxies length = %d, want %d", got, want)
 	}
@@ -583,13 +584,17 @@ func TestDefaultServerConfigFromEnv_ValidCIDRs_ParsedCorrectly(t *testing.T) {
 	}
 }
 
-func TestDefaultServerConfigFromEnv_InvalidCIDR_ReturnsError(t *testing.T) {
+func TestServerConfigFromEnv_InvalidCIDR_FailsValidation(t *testing.T) {
 	t.Setenv("SERVER_TRUSTED_PROXIES", "192.0.2.0/24,not-a-cidr")
-	_, err := DefaultServerConfigFromEnv()
-	if err == nil {
-		t.Fatal("expected error for invalid CIDR, got nil")
+	cfg := ServerConfigFromEnv()
+	if len(cfg.TrustedProxies) != 2 {
+		t.Fatalf("TrustedProxies length = %d, want 2", len(cfg.TrustedProxies))
 	}
-	if !strings.Contains(err.Error(), "invalid trusted proxy CIDR") {
-		t.Errorf("error = %q, want message containing 'invalid trusted proxy CIDR'", err)
+	err := validateServerConfig(cfg)
+	if err == nil {
+		t.Fatal("expected validation error for invalid CIDR, got nil")
+	}
+	if !strings.Contains(err.Error(), "TrustedProxies") {
+		t.Errorf("error = %q, want error mentioning TrustedProxies", err)
 	}
 }

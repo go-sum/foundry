@@ -103,9 +103,7 @@ func provideAuth(
 		Router:    rt,
 		Validator: val,
 		Logger:    logger,
-		Config: provider.Config{
-			Issuer: cfg.Auth.Provider.Issuer,
-		},
+		Config: cfg.Auth.Provider,
 		Clients:         providerStore,
 		Codes:           providerStore,
 		Tokens:          providerStore,
