@@ -7,31 +7,20 @@ import (
 	"github.com/go-sum/foundry/config"
 )
 
-func TestDefaultRateLimitsConfig_ContainsRequiredProfiles(t *testing.T) {
-	cfg := config.DefaultRateLimitsConfig()
-
-	if cfg.Auth.Profile != config.RateLimitRoutesAuth {
-		t.Errorf("Auth.Profile = %q, want %q", cfg.Auth.Profile, config.RateLimitRoutesAuth)
-	}
-	if cfg.ContactSubmit.Profile != config.RateLimitContactSubmitEmail {
-		t.Errorf("ContactSubmit.Profile = %q, want %q", cfg.ContactSubmit.Profile, config.RateLimitContactSubmitEmail)
-	}
-}
-
 func TestDefaultRateLimitsConfig_PoliciesAreValid(t *testing.T) {
 	cfg := config.DefaultRateLimitsConfig()
 
-	if cfg.Auth.Policy.Capacity < 1 {
-		t.Errorf("Auth.Policy.Capacity = %d, want >= 1", cfg.Auth.Policy.Capacity)
+	if cfg.Auth.Capacity < 1 {
+		t.Errorf("Auth.Capacity = %d, want >= 1", cfg.Auth.Capacity)
 	}
-	if cfg.Auth.Policy.RefillPer <= 0 {
-		t.Errorf("Auth.Policy.RefillPer = %v, want > 0", cfg.Auth.Policy.RefillPer)
+	if cfg.Auth.RefillPer <= 0 {
+		t.Errorf("Auth.RefillPer = %v, want > 0", cfg.Auth.RefillPer)
 	}
-	if cfg.ContactSubmit.Policy.Capacity < 1 {
-		t.Errorf("ContactSubmit.Policy.Capacity = %d, want >= 1", cfg.ContactSubmit.Policy.Capacity)
+	if cfg.ContactSubmit.Capacity < 1 {
+		t.Errorf("ContactSubmit.Capacity = %d, want >= 1", cfg.ContactSubmit.Capacity)
 	}
-	if cfg.ContactSubmit.Policy.RefillPer <= 0 {
-		t.Errorf("ContactSubmit.Policy.RefillPer = %v, want > 0", cfg.ContactSubmit.Policy.RefillPer)
+	if cfg.ContactSubmit.RefillPer <= 0 {
+		t.Errorf("ContactSubmit.RefillPer = %v, want > 0", cfg.ContactSubmit.RefillPer)
 	}
 }
 
@@ -46,8 +35,8 @@ func TestRateLimitsConfig_Profiles_ReturnsCorrectMap(t *testing.T) {
 	if !ok {
 		t.Fatalf("Profiles() missing %q", config.RateLimitRoutesAuth)
 	}
-	if authPolicy.Capacity != cfg.Auth.Policy.Capacity {
-		t.Errorf("auth policy capacity = %d, want %d", authPolicy.Capacity, cfg.Auth.Policy.Capacity)
+	if authPolicy.Capacity != cfg.Auth.Capacity {
+		t.Errorf("auth policy capacity = %d, want %d", authPolicy.Capacity, cfg.Auth.Capacity)
 	}
 
 	contactPolicy, ok := profiles[string(config.RateLimitContactSubmitEmail)]

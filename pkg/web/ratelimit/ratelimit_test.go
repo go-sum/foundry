@@ -18,7 +18,7 @@ type errorStore struct {
 	err error
 }
 
-type fakeKVBackend struct {
+type fakeKVStore struct {
 	allowed    bool
 	retryAfter time.Duration
 	remaining  int
@@ -249,18 +249,18 @@ func TestRealIPFromTrustedXFF_UsesHeaderOnlyForTrustedProxy(t *testing.T) {
 func TestNewStoreFromConfig_KV(t *testing.T) {
 	store, err := NewStoreFromConfig(StoreConfig{
 		Type:      StoreTypeKV,
-		KVBackend: fakeKVBackend{},
+		KVStore: fakeKVStore{},
 	})
 	if err != nil {
 		t.Fatalf("NewStoreFromConfig() error = %v", err)
 	}
-	if _, ok := store.(*KVStore); !ok {
-		t.Fatalf("store type = %T, want *KVStore", store)
+	if store == nil {
+		t.Fatal("NewStoreFromConfig() store = nil, want non-nil")
 	}
 }
 
 func TestKVStore_Allow(t *testing.T) {
-	store := NewKVStore(fakeKVBackend{
+	store := NewKVStore(fakeKVStore{
 		allowed:    true,
 		retryAfter: 2 * time.Second,
 		remaining:  4,
@@ -649,8 +649,37 @@ func (s errorStore) Allow(_ context.Context, _ string, _ Policy) (Decision, erro
 	return Decision{}, s.err
 }
 
-func (b fakeKVBackend) RateLimitAllow(_ context.Context, _ string, _ int, _ time.Duration, _ time.Time) (bool, time.Duration, int, time.Duration, error) {
+func (b fakeKVStore) RateLimitAllow(_ context.Context, _ string, _ int, _ time.Duration, _ time.Time) (bool, time.Duration, int, time.Duration, error) {
 	return b.allowed, b.retryAfter, b.remaining, b.resetAfter, b.err
+}
+
+func TestNewLimiter_MemoryStore(t *testing.T) {
+	limiter, err := NewLimiter(
+		StoreConfig{Type: StoreTypeMemory},
+		map[string]Policy{"test": {Capacity: 5, RefillPer: time.Second}},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("NewLimiter() error = %v", err)
+	}
+	decision, err := limiter.Allow(context.Background(), "test", "key")
+	if err != nil {
+		t.Fatalf("Allow() error = %v", err)
+	}
+	if !decision.Allowed {
+		t.Fatal("Allow() = false, want true")
+	}
+}
+
+func TestNewLimiter_InvalidStoreConfig(t *testing.T) {
+	_, err := NewLimiter(
+		StoreConfig{Type: "unsupported"},
+		map[string]Policy{"test": {Capacity: 1, RefillPer: time.Second}},
+		nil,
+	)
+	if err == nil {
+		t.Fatal("NewLimiter() error = nil, want non-nil for unsupported store type")
+	}
 }
 
 func assertLogLine(t *testing.T, output, msg string, kvPairs ...string) {

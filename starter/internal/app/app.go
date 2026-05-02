@@ -180,7 +180,8 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		return nil, fmt.Errorf("kv: %w", err)
 	}
 
-	limiter, err := provideRateLimiter(ctx, runtime, sharedKV)
+	rlCfg := runtime.Config.RateLimit
+	limiter, err := ratelimit.NewLimiter(rlCfg.Store.WithKVStore(sharedKV), rlCfg.Profiles(), runtime.Logger)
 	if err != nil {
 		if sharedKV != nil {
 			_ = sharedKV.Close()
