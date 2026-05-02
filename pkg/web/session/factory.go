@@ -28,8 +28,8 @@ type StoreConfig struct {
 	Settings Settings
 	// Codec is required when Type is "cookie".
 	Codec *cookiecodec.Codec
-	// KVBackend is required when Type is "kv".
-	KVBackend KVBackend
+	// KVStore is required when Type is "kv".
+	KVStore KVStore
 	// KVPrefix is an optional key prefix applied to all KV session keys.
 	KVPrefix string
 	// TestFactory overrides the memory store constructor. Used in tests to
@@ -54,10 +54,10 @@ func NewStoreFromConfig(cfg StoreConfig) (Config, Store, error) {
 		}
 		store = NewCookieStore(cfg.Codec)
 	case StoreTypeKV:
-		if cfg.KVBackend == nil {
-			return Config{}, nil, fmt.Errorf("session: kv store requires a non-nil KVBackend")
+		if cfg.KVStore == nil {
+			return Config{}, nil, fmt.Errorf("session: kv store requires a non-nil KVStore")
 		}
-		store = NewKVStore(cfg.KVBackend, KVStoreConfig{Prefix: cfg.KVPrefix})
+		store = NewKVStore(cfg.KVStore, KVStoreConfig{Prefix: cfg.KVPrefix})
 	case StoreTypeMemory:
 		if cfg.Env != testingEnv {
 			return Config{}, nil, fmt.Errorf("session: memory store is only permitted in the %q environment, got %q", testingEnv, cfg.Env)

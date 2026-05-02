@@ -13,21 +13,21 @@ type KVStoreConfig struct {
 	Prefix string
 }
 
-// KVBackend is the minimal session-specific contract required by KVStore.
+// KVStore is the minimal session-specific contract required by the KV-backed store.
 // It is consumer-owned by pkg/web/session rather than producer-owned by the
 // generic KV module.
-type KVBackend interface {
+type KVStore interface {
 	SessionRead(ctx context.Context, key string, now time.Time) (data []byte, version int64, found bool, err error)
 	SessionSave(ctx context.Context, key string, data []byte, absolute time.Time, idleTTL time.Duration, version int64, now time.Time) (nextVersion int64, conflict bool, expired bool, err error)
 	Delete(ctx context.Context, keys ...string) error
 }
 
-// KVStore persists session records in a shared KV backend. It exists for
+// kvStore persists session records in a shared KV store. It exists for
 // production deployments that need server-side session state without using
 // client-side cookie payloads.
-type KVStore struct {
-	backend KVBackend
-	prefix  string
+type kvStore struct {
+	kvs    KVStore
+	prefix string
 }
 
 // tokenEncodedLen is the base64.RawURLEncoding length of a 32-byte random token
@@ -40,27 +40,27 @@ func DefaultKVStoreConfig() KVStoreConfig {
 	return KVStoreConfig{Prefix: "session:"}
 }
 
-// NewKVStore builds a session store over a session-capable KV backend.
-func NewKVStore(backend KVBackend, cfgs ...KVStoreConfig) *KVStore {
-	if backend == nil {
-		panic("web/session: KVStore backend must not be nil")
+// NewKVStore builds a session store over a session-capable KV store.
+func NewKVStore(kvs KVStore, cfgs ...KVStoreConfig) Store {
+	if kvs == nil {
+		panic("web/session: KVStore must not be nil")
 	}
 	cfg := DefaultKVStoreConfig()
 	if len(cfgs) > 0 && cfgs[0].Prefix != "" {
 		cfg = cfgs[0]
 	}
-	return &KVStore{
-		backend: backend,
-		prefix:  cfg.Prefix,
+	return &kvStore{
+		kvs:    kvs,
+		prefix: cfg.Prefix,
 	}
 }
 
 // Read implements Store.
-func (s *KVStore) Read(ctx context.Context, token string) ([]byte, int64, error) {
+func (s *kvStore) Read(ctx context.Context, token string) ([]byte, int64, error) {
 	if !validKVSessionToken(token) {
 		return nil, 0, ErrSessionNotFound
 	}
-	data, version, found, err := s.backend.SessionRead(ctx, s.key(token), time.Now())
+	data, version, found, err := s.kvs.SessionRead(ctx, s.key(token), time.Now())
 	if err != nil {
 		return nil, 0, fmt.Errorf("web/session: kv store read: %w", err)
 	}
@@ -71,7 +71,7 @@ func (s *KVStore) Read(ctx context.Context, token string) ([]byte, int64, error)
 }
 
 // Save implements Store.
-func (s *KVStore) Save(ctx context.Context, token string, data []byte, absolute time.Time, idleTTL time.Duration, version int64) (string, error) {
+func (s *kvStore) Save(ctx context.Context, token string, data []byte, absolute time.Time, idleTTL time.Duration, version int64) (string, error) {
 	now := time.Now()
 
 	if token == "" {
@@ -80,7 +80,7 @@ func (s *KVStore) Save(ctx context.Context, token string, data []byte, absolute 
 			if err != nil {
 				return "", err
 			}
-			_, conflict, expired, err := s.backend.SessionSave(ctx, s.key(candidate), data, absolute, idleTTL, 0, now)
+			_, conflict, expired, err := s.kvs.SessionSave(ctx, s.key(candidate), data, absolute, idleTTL, 0, now)
 			if conflict {
 				continue
 			}
@@ -95,7 +95,7 @@ func (s *KVStore) Save(ctx context.Context, token string, data []byte, absolute 
 		return "", fmt.Errorf("web/session: kv store save: unable to allocate unique token")
 	}
 
-	_, conflict, expired, err := s.backend.SessionSave(ctx, s.key(token), data, absolute, idleTTL, version, now)
+	_, conflict, expired, err := s.kvs.SessionSave(ctx, s.key(token), data, absolute, idleTTL, version, now)
 	if conflict {
 		return "", ErrVersionConflict
 	}
@@ -109,17 +109,17 @@ func (s *KVStore) Save(ctx context.Context, token string, data []byte, absolute 
 }
 
 // Delete implements Store.
-func (s *KVStore) Delete(ctx context.Context, token string) error {
+func (s *kvStore) Delete(ctx context.Context, token string) error {
 	if token == "" {
 		return nil
 	}
-	if err := s.backend.Delete(ctx, s.key(token)); err != nil {
+	if err := s.kvs.Delete(ctx, s.key(token)); err != nil {
 		return fmt.Errorf("web/session: kv store delete: %w", err)
 	}
 	return nil
 }
 
-func (s *KVStore) key(token string) string {
+func (s *kvStore) key(token string) string {
 	return s.prefix + token
 }
 

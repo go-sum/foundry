@@ -79,11 +79,11 @@ func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() sessi
 		}
 		cfg.Codec = codec
 	case session.StoreTypeKV:
-		backend, ok := kvStore.(session.KVBackend)
+		kvs, ok := kvStore.(session.KVStore)
 		if !ok {
 			return session.Config{}, nil, config.ErrKVSessionStoreUnsupported
 		}
-		cfg.KVBackend = backend
+		cfg.KVStore = kvs
 		cfg.KVPrefix = runtime.Config.Session.KVPrefix
 	case session.StoreTypeMemory:
 		cfg.TestFactory = storeFactory
