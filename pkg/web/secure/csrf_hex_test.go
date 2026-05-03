@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
 
 func TestCSRFConfigFromHex(t *testing.T) {
@@ -60,5 +62,32 @@ func TestCSRFConfigFromHex_DefaultsPreserved(t *testing.T) {
 	}
 	if !cfg.CookieSecure {
 		t.Error("CookieSecure = false, want true")
+	}
+}
+
+func TestCSRFConfig_MissingKey_FailsValidation(t *testing.T) {
+	v := validator.New()
+	cfg := CSRFConfig{} // Key is nil
+	err := v.Struct(cfg)
+	if err == nil {
+		t.Fatal("expected validation error for nil Key, got nil")
+	}
+}
+
+func TestCSRFConfig_ShortKey_FailsValidation(t *testing.T) {
+	v := validator.New()
+	cfg := CSRFConfig{Key: make([]byte, 31)} // one byte short
+	err := v.Struct(cfg)
+	if err == nil {
+		t.Fatal("expected validation error for 31-byte Key, got nil")
+	}
+}
+
+func TestCSRFConfig_ValidKey_PassesValidation(t *testing.T) {
+	v := validator.New()
+	cfg := CSRFConfig{Key: make([]byte, 32)}
+	err := v.Struct(cfg)
+	if err != nil {
+		t.Fatalf("expected no error for 32-byte Key, got %v", err)
 	}
 }

@@ -3,6 +3,8 @@ package session
 import (
 	"testing"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
 
 func TestInitialSessionSettings(t *testing.T) {
@@ -71,5 +73,49 @@ func TestNewCookieCodec(t *testing.T) {
 	}
 	if codec == nil {
 		t.Fatal("CookieCodecFromSettings() = nil, want non-nil codec")
+	}
+}
+
+func TestValidationRules_KV_RequiresPasswordOutsideTesting(t *testing.T) {
+	for _, env := range []string{"production", "development"} {
+		t.Run(env, func(t *testing.T) {
+			v := validator.New()
+			ValidationRules(StoreTypeKV, env, "", nil)(v)
+			err := v.Struct(Settings{CookieName: "session"})
+			if err == nil {
+				t.Fatal("expected error for kv store without password, got nil")
+			}
+		})
+	}
+}
+
+func TestValidationRules_Memory_OnlyAllowedInTesting(t *testing.T) {
+	for _, env := range []string{"production", "development"} {
+		t.Run(env, func(t *testing.T) {
+			v := validator.New()
+			ValidationRules(StoreTypeMemory, env, "", nil)(v)
+			err := v.Struct(Settings{CookieName: "session"})
+			if err == nil {
+				t.Fatal("expected error for memory store outside testing, got nil")
+			}
+		})
+	}
+}
+
+func TestValidationRules_Memory_AllowedInTesting(t *testing.T) {
+	v := validator.New()
+	ValidationRules(StoreTypeMemory, "testing", "", nil)(v)
+	err := v.Struct(Settings{CookieName: "session"})
+	if err != nil {
+		t.Fatalf("expected no error for memory store in testing, got %v", err)
+	}
+}
+
+func TestValidationRules_Cookie_RequiresKey(t *testing.T) {
+	v := validator.New()
+	ValidationRules(StoreTypeCookie, "production", "", nil)(v) // nil / short cookieKey
+	err := v.Struct(Settings{CookieName: "session"})
+	if err == nil {
+		t.Fatal("expected error for cookie store without key, got nil")
 	}
 }
