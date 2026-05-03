@@ -1,26 +1,10 @@
 version: '3'
 
 vars:
-  PKG_MODULES: >-
-    pkg/assets
-    pkg/componentry
-    pkg/config
-    pkg/db
-    pkg/kv
-    pkg/notification
-    pkg/queue
-    pkg/web
-    pkg/docs
-    pkg/queue/pgstore
-    pkg/web/render
-    pkg/auth
-    pkg/web/authn
-    pkg/auth/pgstore
-    pkg/auth/provider
-    pkg/auth/provider/pgstore
-    pkg/auth/web
-    pkg/showcase
-    pkg/web/viewstate
+  # All ./pkg/* entries in the use block.
+  PKG_MODULES:
+    sh: awk '/^use \(/{p=1; next} /^\)/{p=0} p && /\.\/pkg\//{sub(/.*\.\//,"");
+      print}' go.work | tr '\n' ' '
 
 tasks:
   status:
@@ -36,7 +20,7 @@ tasks:
     cmd: git tag --list 'pkg/*' | sort -V
 
   release:dry-run:
-    desc: "Preview tags that would be created (task git:release:dry-run VERSION=v0.1.0)"
+    desc: "Previews tags to be created (task git:release:dry-run VERSION=v0.1.0)"
     requires:
       vars: [VERSION]
     preconditions:
