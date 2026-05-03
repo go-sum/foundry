@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
-	"github.com/go-sum/foundry/internal/view/page"
-	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
+	"github.com/go-sum/foundry/internal/views/pages"
+	"github.com/go-sum/foundry/internal/views/partials"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/render"
@@ -66,7 +66,7 @@ func TestHandler_Form_RendersPage(t *testing.T) {
 
 	vr := viewstate.NewRequest(c)
 	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
-	want := render.RenderNode(t, page.ContactPage(vr, submitURL, contactpartial.FormData{}))
+	want := render.RenderNode(t, pages.ContactPage(vr, submitURL, partials.ContactFormData{}))
 	if got != want {
 		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", got, want)
 	}
@@ -94,7 +94,7 @@ func TestHandler_Form_HTMXPartial(t *testing.T) {
 
 	vr := viewstate.NewRequest(c)
 	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
-	want := render.RenderNode(t, contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{}))
+	want := render.RenderNode(t, partials.ContactForm(vr, submitURL, partials.ContactFormData{}))
 	if got != want {
 		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", got, want)
 	}
@@ -136,7 +136,7 @@ func TestHandler_Submit_ValidationError(t *testing.T) {
 		"email":   {"is required"},
 		"message": {"is required"},
 	}
-	want := render.RenderNode(t, contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{
+	want := render.RenderNode(t, partials.ContactForm(vr, submitURL, partials.ContactFormData{
 		Errors: fieldErrors,
 	}))
 	if got != want {
@@ -176,7 +176,7 @@ func TestHandler_Submit_Success(t *testing.T) {
 
 	vr := viewstate.NewRequest(c)
 	submitURL := testContactRouter(t).MustReverse("contact.submit", nil)
-	want := render.RenderNode(t, contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{Sent: true}))
+	want := render.RenderNode(t, partials.ContactForm(vr, submitURL, partials.ContactFormData{Sent: true}))
 	if got != want {
 		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", got, want)
 	}

@@ -4,10 +4,12 @@ go 1.26.0
 
 
 require (
-	github.com/go-sum/foundry/pkg/auth v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/auth/provider v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.1
 )
+
+replace github.com/go-sum/foundry/pkg/auth/provider v0.0.0-00010101000000-000000000000 => ../
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect

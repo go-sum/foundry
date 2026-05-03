@@ -7,22 +7,21 @@ import (
 	"time"
 
 	"github.com/go-sum/foundry/pkg/auth"
-	"github.com/go-sum/foundry/pkg/auth/authui"
 	"github.com/go-sum/foundry/pkg/auth/provider"
+	authweb "github.com/go-sum/foundry/pkg/auth/web"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification/email"
-	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
 )
 
-func provideAuthModule(pc ProviderContext, store authStore, emailSender email.Sender) (*authn.Module, error) {
-	tokenCodec, err := authn.NewTokenCodec(pc.Runtime.Config.Auth.TokenKeys)
+func provideAuthModule(pc ProviderContext, store authStore, emailSender email.Sender) (*authweb.Module, error) {
+	tokenCodec, err := authweb.NewTokenCodec(pc.Runtime.Config.Auth.TokenKeys)
 	if err != nil {
 		return nil, fmt.Errorf("auth: token codec: %w", err)
 	}
 
-	return authn.NewModule(authn.ModuleConfig{
+	return authweb.NewModule(authweb.ModuleConfig{
 		Router:          pc.Router,
 		Validator:       pc.Validator,
 		Logger:          pc.Runtime.Logger,
@@ -33,8 +32,8 @@ func provideAuthModule(pc ProviderContext, store authStore, emailSender email.Se
 		Notifier:        newEmailNotifier(emailSender, pc.Runtime.Config.App.Email.From),
 		TokenCodec:      tokenCodec,
 		TokenNonceStore: newKVNonceStore(pc.KVStore),
-		Renderer:        authui.NewRenderer(authui.Config{Page: centeredAuthPageRenderer(pc.ViewOpts)}),
-		AdminRenderer:   authui.NewAdminRenderer(authui.Config{Page: centeredAuthPageRenderer(pc.ViewOpts)}),
+		Renderer:        authweb.NewRenderer(authweb.Config{Page: centeredAuthPageRenderer(pc.ViewOpts)}),
+		AdminRenderer:   authweb.NewAdminRenderer(authweb.Config{Page: centeredAuthPageRenderer(pc.ViewOpts)}),
 		AuthEntryPath:   router.NewResolver(pc.Router).Path("auth.connect"),
 	})
 }

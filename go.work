@@ -3,9 +3,10 @@ go 1.26.0
 use (
 	./pkg/assets
 	./pkg/auth
-	./pkg/auth/authui
 	./pkg/auth/pgstore
+	./pkg/auth/provider
 	./pkg/auth/provider/pgstore
+	./pkg/auth/web
 	./pkg/componentry
 	./pkg/config
 	./pkg/db
@@ -27,9 +28,10 @@ use (
 replace (
 	github.com/go-sum/foundry/pkg/assets v0.0.0-00010101000000-000000000000 => ./pkg/assets
 	github.com/go-sum/foundry/pkg/auth v0.0.0-00010101000000-000000000000 => ./pkg/auth
-	github.com/go-sum/foundry/pkg/auth/authui v0.0.0-00010101000000-000000000000 => ./pkg/auth/authui
 	github.com/go-sum/foundry/pkg/auth/pgstore v0.0.0-00010101000000-000000000000 => ./pkg/auth/pgstore
+	github.com/go-sum/foundry/pkg/auth/provider v0.0.0-00010101000000-000000000000 => ./pkg/auth/provider
 	github.com/go-sum/foundry/pkg/auth/provider/pgstore v0.0.0-00010101000000-000000000000 => ./pkg/auth/provider/pgstore
+	github.com/go-sum/foundry/pkg/auth/web v0.0.0-00010101000000-000000000000 => ./pkg/auth/web
 	github.com/go-sum/foundry/pkg/componentry v0.0.0-00010101000000-000000000000 => ./pkg/componentry
 	github.com/go-sum/foundry/pkg/config v0.0.0-00010101000000-000000000000 => ./pkg/config
 	github.com/go-sum/foundry/pkg/db v0.0.0-00010101000000-000000000000 => ./pkg/db

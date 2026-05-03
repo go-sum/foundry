@@ -97,6 +97,16 @@ func TestNewServer_CustomTimeouts(t *testing.T) {
 	}
 }
 
+func TestServerConfigFromEnv_ServerAddr(t *testing.T) {
+	t.Setenv("SERVER_ADDR", ":9090")
+
+	cfg := ServerConfigFromEnv()
+
+	if got, want := cfg.Addr, ":9090"; got != want {
+		t.Fatalf("Addr = %q, want %q", got, want)
+	}
+}
+
 func TestNewServer_HandlerNotNil(t *testing.T) {
 	handler := func(_ *web.Context) (web.Response, error) {
 		return web.Text(http.StatusOK, "ok"), nil

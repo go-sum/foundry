@@ -9,7 +9,7 @@ import (
 	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
 	"github.com/go-sum/foundry/pkg/componentry/ui/core"
 	"github.com/go-sum/foundry/pkg/web"
-	"github.com/go-sum/foundry/pkg/web/authn"
+	authweb "github.com/go-sum/foundry/pkg/auth/web"
 	"github.com/go-sum/foundry/pkg/web/router"
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 	g "maragu.dev/gomponents"
@@ -67,10 +67,10 @@ func primaryNav(rt *router.Router, authRoute string) viewstate.RequestOption {
 							Label: accountLabel,
 							Items: []compound.NavItem{
 								{Label: "Sign in", Href: rt.MustReverse(authRoute, nil), Visibility: compound.NavVisibilityGuest},
-								{Label: "Sign up", Href: rt.MustReverse(authn.DefaultRouteConfig().Signup.Name, nil), Visibility: compound.NavVisibilityGuest},
+								{Label: "Sign up", Href: rt.MustReverse(authweb.DefaultRouteConfig().Signup.Name, nil), Visibility: compound.NavVisibilityGuest},
 								{
 									Label:  "Sign out",
-									Action: rt.MustReverse(authn.DefaultRouteConfig().Signout.Name, nil),
+									Action: rt.MustReverse(authweb.DefaultRouteConfig().Signout.Name, nil),
 									Method: "POST",
 									HiddenFields: []compound.NavHiddenField{
 										{Name: r.CSRFFieldName, Value: r.CSRFToken},

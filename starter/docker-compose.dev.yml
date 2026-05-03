@@ -13,7 +13,7 @@ services:
         PG_VERSION: ${PG_VERSION}
     image: foundry-db:dev
 
-  app:
+  web:
     depends_on:
       db:
         condition: service_healthy
@@ -21,12 +21,23 @@ services:
         condition: service_healthy
     build:
       context: .
+      additional_contexts:
+        workspace: ..
       target: dev_target
       dockerfile: docker/app/Dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
         TOOLS_DEV_IMAGE: ${TOOLS_DEV:-foundry-tools:dev}
     image: foundry-dev
+    environment:
+      SERVER_ADDR: ":3000"
+      SITE_BASE_URL: "https://${PROJECT_NAME}.test"
+      SITE_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      LOG_LEVEL: "debug"
+      EMAIL_PROVIDER: "log"
+      SECURITY_HEADERS_COEP: ""
+      SECURITY_HEADERS_COOP: ""
+      SECURITY_CSP_EXTRA_SCRIPT_HASHES: "'sha256-y933zYNvpVe5f9j5A+OKECUXiWo8bKB5Yp5sLDD3d0I='"
     pids_limit: 512
     read_only: false
     mem_limit: 2g
@@ -43,6 +54,31 @@ services:
     networks:
       - app_net
       - proxy_net
+
+  worker:
+    depends_on:
+      db:
+        condition: service_healthy
+    image: foundry-dev
+    command: ["/usr/local/bin/worker"]
+    environment:
+      LOG_LEVEL: "debug"
+      EMAIL_PROVIDER: "log"
+    pids_limit: 512
+    read_only: false
+    mem_limit: 2g
+    memswap_limit: 2g
+    tmpfs: !reset []
+    security_opt: !reset []
+    cap_drop: !reset []
+    healthcheck:
+      disable: true
+    volumes:
+      - ../:/app
+    working_dir: /app/${PROJECT_NAME}
+    restart: on-failure:7
+    networks:
+      - app_net
 
 networks:
   app_net:

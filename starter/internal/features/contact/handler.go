@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-sum/foundry/internal/view/page"
-	"github.com/go-sum/foundry/internal/view/partial/contactpartial"
+	"github.com/go-sum/foundry/internal/views/pages"
+	"github.com/go-sum/foundry/internal/views/partials"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/render"
@@ -35,8 +35,8 @@ func NewHandler(rt *router.Router, svc Service, val validate.Validator, clientIP
 func (h *Handler) Form(c *web.Context) (web.Response, error) {
 	vr := viewstate.NewRequest(c, h.reqOpts...)
 	submitURL := h.rt.MustReverse("contact.submit", nil)
-	data := contactpartial.FormData{}
-	return viewstate.Render(vr, page.ContactPage(vr, submitURL, data), contactpartial.ContactForm(vr, submitURL, data))
+	data := partials.ContactFormData{}
+	return viewstate.Render(vr, pages.ContactPage(vr, submitURL, data), partials.ContactForm(vr, submitURL, data))
 }
 
 // Submit processes a contact form POST.
@@ -51,13 +51,13 @@ func (h *Handler) Submit(c *web.Context) (web.Response, error) {
 			for _, fe := range verrs {
 				fieldErrors[fe.Field] = append(fieldErrors[fe.Field], fe.Message)
 			}
-			data := contactpartial.FormData{
+			data := partials.ContactFormData{
 				Name:    input.Name,
 				Email:   input.Email,
 				Message: input.Message,
 				Errors:  fieldErrors,
 			}
-			return render.FragmentWithStatus(422, contactpartial.ContactForm(vr, submitURL, data))
+			return render.FragmentWithStatus(422, partials.ContactForm(vr, submitURL, data))
 		}
 		return web.Response{}, err
 	}
@@ -77,5 +77,5 @@ func (h *Handler) Submit(c *web.Context) (web.Response, error) {
 		return web.Response{}, web.ErrUnavailable("Unable to send your message right now. Please try again later.", err)
 	}
 
-	return render.Fragment(contactpartial.ContactForm(vr, submitURL, contactpartial.FormData{Sent: true}))
+	return render.Fragment(partials.ContactForm(vr, submitURL, partials.ContactFormData{Sent: true}))
 }

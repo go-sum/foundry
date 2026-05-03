@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
-	"github.com/go-sum/foundry/internal/view/page"
+	"github.com/go-sum/foundry/internal/views/pages"
 	"github.com/go-sum/foundry/pkg/web"
 	"github.com/go-sum/foundry/pkg/web/render"
 )
@@ -29,7 +29,7 @@ func TestHandlerShow_NoCheckers(t *testing.T) {
 		t.Fatalf("io.ReadAll: %v", err)
 	}
 	vr := viewstate.NewRequest(c)
-	want := render.RenderNode(t, page.HomePage(vr, nil))
+	want := render.RenderNode(t, pages.HomePage(vr, nil))
 	if string(body) != want {
 		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", string(body), want)
 	}
@@ -45,7 +45,7 @@ func TestHandlerShow_NoCheckers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("io.ReadAll: %v", err)
 	}
-	want = render.RenderNode(t, page.HomeContent(vr, nil))
+	want = render.RenderNode(t, pages.HomeContent(vr, nil))
 	if string(body) != want {
 		t.Fatalf("partial body mismatch\ngot:  %s\nwant: %s", string(body), want)
 	}
@@ -78,7 +78,7 @@ func TestHandlerShow_HealthyChecker(t *testing.T) {
 		t.Fatalf("io.ReadAll: %v", err)
 	}
 	vr := viewstate.NewRequest(c)
-	want := render.RenderNode(t, page.HomePage(vr, []page.ServiceStatus{{Name: "Database", Healthy: true}}))
+	want := render.RenderNode(t, pages.HomePage(vr, []pages.ServiceStatus{{Name: "Database", Healthy: true}}))
 	if string(body) != want {
 		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", string(body), want)
 	}
@@ -104,7 +104,7 @@ func TestHandlerShow_UnhealthyChecker(t *testing.T) {
 		t.Fatalf("io.ReadAll: %v", err)
 	}
 	vr := viewstate.NewRequest(c)
-	want := render.RenderNode(t, page.HomePage(vr, []page.ServiceStatus{{Name: "Database", Healthy: false}}))
+	want := render.RenderNode(t, pages.HomePage(vr, []pages.ServiceStatus{{Name: "Database", Healthy: false}}))
 	if string(body) != want {
 		t.Fatalf("body mismatch\ngot:  %s\nwant: %s", string(body), want)
 	}

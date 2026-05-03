@@ -8,10 +8,10 @@ import (
 	"github.com/go-sum/foundry/internal/features/home"
 	"github.com/go-sum/foundry/internal/features/oauthclient"
 	"github.com/go-sum/foundry/pkg/auth/provider"
+	authweb "github.com/go-sum/foundry/pkg/auth/web"
 	"github.com/go-sum/foundry/pkg/docs"
 	"github.com/go-sum/foundry/pkg/showcase"
 	"github.com/go-sum/foundry/pkg/web"
-	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/health"
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
@@ -119,7 +119,7 @@ func authRateLimitMiddleware(sec Security, svc Services) (web.Middleware, error)
 
 func authNodes(cfg RouteConfig, svc Services) []router.Node {
 	return router.Nodes(
-		routesFrom(svc.Auth, authn.Routes),
+		routesFrom(svc.Auth, authweb.Routes),
 		routesFrom(svc.OAuthProvider, provider.ProtectedRoutes),
 		oauthClientNodes(cfg, svc.OAuthClient),
 	)
@@ -135,7 +135,7 @@ func oauthClientNodes(cfg RouteConfig, h *oauthclient.Handler) []router.Node {
 	}
 }
 
-func protectedDocs(auth *authn.Module, publicDir string) []router.Node {
+func protectedDocs(auth *authweb.Module, publicDir string) []router.Node {
 	routes := docs.Routes(docs.DefaultConfig(publicDir))
 	if auth == nil {
 		return routes

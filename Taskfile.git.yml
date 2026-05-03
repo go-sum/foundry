@@ -1,0 +1,69 @@
+version: '3'
+
+vars:
+  PKG_MODULES: >-
+    pkg/assets
+    pkg/componentry
+    pkg/config
+    pkg/db
+    pkg/kv
+    pkg/notification
+    pkg/queue
+    pkg/web
+    pkg/docs
+    pkg/queue/pgstore
+    pkg/web/render
+    pkg/auth
+    pkg/web/authn
+    pkg/auth/pgstore
+    pkg/auth/provider
+    pkg/auth/provider/pgstore
+    pkg/auth/web
+    pkg/showcase
+    pkg/web/viewstate
+
+tasks:
+  status:
+    desc: "Show working-tree status"
+    cmd: git status --short
+
+  log:
+    desc: "Show last 20 commits (one-line)"
+    cmd: git log --oneline -20
+
+  tag:list:
+    desc: "List all pkg module version tags"
+    cmd: git tag --list 'pkg/*' | sort -V
+
+  release:dry-run:
+    desc: "Preview tags that would be created (task git:release:dry-run VERSION=v0.1.0)"
+    requires:
+      vars: [VERSION]
+    preconditions:
+      - sh: echo "{{.VERSION}}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+'
+        msg: "VERSION must be semver — e.g. v0.1.0"
+    cmd: |
+      echo "Dry-run — would create tags:"
+      for mod in {{.PKG_MODULES}}; do
+        echo "  $mod/{{.VERSION}}"
+      done
+
+  release:
+    desc: "Tag all pkg modules at VERSION (task git:release VERSION=v0.1.0)"
+    requires:
+      vars: [VERSION]
+    preconditions:
+      - sh: echo "{{.VERSION}}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+'
+        msg: "VERSION must be semver — e.g. v0.1.0"
+      - sh: git diff --quiet && git diff --staged --quiet
+        msg: "Working tree is not clean — commit or stash changes first"
+    cmd: |
+      for mod in {{.PKG_MODULES}}; do
+        echo "Tagging $mod/{{.VERSION}}"
+        git tag "$mod/{{.VERSION}}"
+      done
+      echo "Done. Run 'task git:release:push' to push tags."
+
+  release:push:
+    desc: "Push all module tags to origin"
+    cmd: git push origin --tags

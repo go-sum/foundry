@@ -11,13 +11,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/go-sum/foundry/pkg/auth/provider"
+	authweb "github.com/go-sum/foundry/pkg/auth/web"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/queue"
-	"github.com/go-sum/foundry/pkg/web/authn"
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
@@ -53,6 +53,7 @@ type Option func(*appOptions)
 type appOptions struct {
 	sessionStoreFactory func() session.Store
 	kvStoreFactory      func(context.Context, Runtime) (kv.Store, error)
+	webServicesFactory  func(context.Context, Runtime, Security, *router.Router, Presentation, kv.Store, *ratelimit.Limiter, validate.Validator) (Services, error)
 }
 
 // WithSessionStoreFactory overrides the factory used to create the test-only
@@ -66,6 +67,12 @@ func WithSessionStoreFactory(f func() session.Store) Option {
 // Intended for tests that need deterministic startup and shutdown behavior.
 func WithKVStoreFactory(f func(context.Context, Runtime) (kv.Store, error)) Option {
 	return func(o *appOptions) { o.kvStoreFactory = f }
+}
+
+// WithWebServicesFactory overrides the web-only services assembly. Intended for
+// tests that need deterministic startup without external infrastructure.
+func WithWebServicesFactory(f func(context.Context, Runtime, Security, *router.Router, Presentation, kv.Store, *ratelimit.Limiter, validate.Validator) (Services, error)) Option {
+	return func(o *appOptions) { o.webServicesFactory = f }
 }
 
 // Runtime holds cross-cutting infrastructure dependencies.
@@ -93,14 +100,14 @@ type Services struct {
 	DBPool         *pgxpool.Pool
 	KVStore        kv.Store
 	RateLimiter    *ratelimit.Limiter
+	QueueStore     queue.Store
 	Queue          *queue.Dispatcher
-	Processor      *queue.Processor
 	SchemaRegistry *db.Registry
 	EmailSender    email.Sender
 
 	// Application modules
 	Contact       *contact.Module
-	Auth          *authn.Module
+	Auth          *authweb.Module
 	OAuthProvider *provider.ProviderModule
 	OAuthClient   *oauthclient.Handler
 }
@@ -222,16 +229,26 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 	}
 	routing.Use(coreMw...)
 
-	services, err := provideServices(ctx, runtime, security, routing, pres, sharedKV, limiter, val)
+	webServicesFactory := o.webServicesFactory
+	if webServicesFactory == nil {
+		webServicesFactory = provideWebServices
+	}
+	services, err := webServicesFactory(ctx, runtime, security, routing, pres, sharedKV, limiter, val)
 	if err != nil {
 		return nil, fmt.Errorf("services: %w", err)
+	}
+	if services.KVStore == nil {
+		services.KVStore = sharedKV
+	}
+	if services.RateLimiter == nil {
+		services.RateLimiter = limiter
 	}
 	app.Services = services
 	if services.DBPool != nil {
 		app.closer.Add("db", func() error { services.DBPool.Close(); return nil })
 	}
-	if services.Processor != nil {
-		app.closer.Add("processor", services.Processor.Stop)
+	if services.Queue != nil {
+		app.closer.Add("queue-dispatcher", services.Queue.Close)
 	}
 
 	s := site.New(runtime.Config.Site)

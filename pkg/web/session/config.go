@@ -49,12 +49,9 @@ type Config struct {
 type StoreConfig struct {
 	// Type selects the backing store: "cookie", "kv", or "memory".
 	Type string
-	// Env is the application environment name. The "memory" store type is only
-	// permitted when Env equals TestingEnv; any other environment returns an error.
-	Env string
-	// TestingEnv is the environment name that permits the memory store.
-	// Defaults to "testing" if empty.
-	TestingEnv string
+	// AllowMemory explicitly permits the in-memory store type. Use only in
+	// tests or other intentionally non-production runtimes.
+	AllowMemory bool
 	// Settings provides cookie name, TTL, and other session settings.
 	Settings Settings
 	// Codec is required when Type is "cookie".
@@ -144,16 +141,16 @@ func NewConfig(s Settings, store Store) Config {
 }
 
 // ValidationRules returns a registrar that enforces session store constraints.
-// The memory store is only permitted in the testing environment; the kv store
-// requires a non-empty password outside testing; the cookie store requires a
-// key of at least 32 bytes.
-func ValidationRules(storeType, env, kvPassword string, cookieKey []byte) func(*validator.Validate) {
+// The memory store is only permitted when explicitly enabled; the kv store
+// requires a non-empty password; the cookie store requires a key of at least
+// 32 bytes.
+func ValidationRules(storeType, kvPassword string, cookieKey []byte, allowMemory bool) func(*validator.Validate) {
 	return func(v *validator.Validate) {
 		v.RegisterStructValidation(func(sl validator.StructLevel) {
-			if storeType == StoreTypeMemory && env != "testing" {
+			if storeType == StoreTypeMemory && !allowMemory {
 				sl.ReportError(storeType, "SessionStore", "SessionStore", "session_store_testing_only", "")
 			}
-			if storeType == StoreTypeKV && env != "testing" && kvPassword == "" {
+			if storeType == StoreTypeKV && kvPassword == "" {
 				sl.ReportError(kvPassword, "SessionStore", "SessionStore", "kv_password_required", "")
 			}
 			if storeType == StoreTypeCookie && len(cookieKey) < 32 {
@@ -165,13 +162,8 @@ func ValidationRules(storeType, env, kvPassword string, cookieKey []byte) func(*
 
 // NewStoreFromConfig constructs a session Store and its middleware Config from
 // a StoreConfig. It returns an error if required fields are missing or the
-// Type/Env combination is not permitted.
+// Type/AllowMemory combination is not permitted.
 func NewStoreFromConfig(cfg StoreConfig) (Config, Store, error) {
-	testingEnv := cfg.TestingEnv
-	if testingEnv == "" {
-		testingEnv = "testing"
-	}
-
 	var store Store
 	switch cfg.Type {
 	case StoreTypeCookie:
@@ -185,8 +177,8 @@ func NewStoreFromConfig(cfg StoreConfig) (Config, Store, error) {
 		}
 		store = NewKVStore(cfg.KVStore, KVStoreConfig{Prefix: cfg.KVPrefix})
 	case StoreTypeMemory:
-		if cfg.Env != testingEnv {
-			return Config{}, nil, fmt.Errorf("session: memory store is only permitted in the %q environment, got %q", testingEnv, cfg.Env)
+		if !cfg.AllowMemory {
+			return Config{}, nil, fmt.Errorf("session: memory store requires explicit AllowMemory=true")
 		}
 		if cfg.TestFactory != nil {
 			store = cfg.TestFactory()

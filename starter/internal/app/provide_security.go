@@ -41,10 +41,9 @@ func provideSecurity(_ context.Context, runtime Runtime, kvStore kv.Store, store
 
 func provideSession(runtime Runtime, kvStore kv.Store, storeFactory func() session.Store) (session.Config, session.Store, error) {
 	cfg := session.StoreConfig{
-		Type:       runtime.Config.Web.SessionStore,
-		Env:        string(runtime.Config.Env),
-		TestingEnv: string(config.Testing),
-		Settings:   runtime.Config.Web.Session,
+		Type:        runtime.Config.Web.SessionStore,
+		AllowMemory: runtime.Config.Web.AllowMemorySessionStore,
+		Settings:    runtime.Config.Web.Session,
 	}
 
 	switch runtime.Config.Web.SessionStore {

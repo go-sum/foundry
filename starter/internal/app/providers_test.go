@@ -35,7 +35,6 @@ func testAppContext(method, rawURL string) *web.Context {
 
 func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env: configpkg.Testing,
 		Web: configpkg.WebConfig{
 			Secure: secure.SecureConfig{
 				CSRF:    secure.InitialCSRFConfig(),
@@ -48,7 +47,8 @@ func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 				AbsoluteTTL:  12 * time.Hour,
 				CookieSecure: true,
 			},
-			SessionStore: "memory",
+			SessionStore:            "memory",
+			AllowMemorySessionStore: true,
 		},
 		Site: site.Config{
 			BaseURL:         "https://app.example.com",
@@ -101,7 +101,6 @@ func TestProvideSecurity_BuildsOriginsAndSessionConfig(t *testing.T) {
 
 func TestProvideSecurity_EmptySessionStoreFailsFast(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env: configpkg.Testing,
 		Web: configpkg.WebConfig{
 			Secure: secure.SecureConfig{
 				CSRF:    secure.InitialCSRFConfig(),
@@ -132,7 +131,6 @@ func TestProvideSecurity_EmptySessionStoreFailsFast(t *testing.T) {
 
 func TestProvideSecurity_InvalidTrustedProxyCIDR_ReturnsError(t *testing.T) {
 	cfg := &configpkg.Config{
-		Env: configpkg.Testing,
 		Web: configpkg.WebConfig{
 			Secure: secure.SecureConfig{
 				CSRF:    secure.InitialCSRFConfig(),
@@ -145,7 +143,8 @@ func TestProvideSecurity_InvalidTrustedProxyCIDR_ReturnsError(t *testing.T) {
 				AbsoluteTTL:  12 * time.Hour,
 				CookieSecure: true,
 			},
-			SessionStore: "memory",
+			SessionStore:            "memory",
+			AllowMemorySessionStore: true,
 			Server: serve.ServerConfig{
 				TrustedProxies: []string{"not-a-cidr"},
 			},
@@ -171,7 +170,7 @@ func TestProvideErrorBoundary_RendersFullAndPartialResponses(t *testing.T) {
 	}))
 
 	runtime := Runtime{
-		Config: &configpkg.Config{Env: configpkg.Testing},
+		Config: &configpkg.Config{App: configpkg.AppConfig{CaptureErrorStacks: false}},
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 

@@ -63,11 +63,14 @@ func InitialServerConfig() ServerConfig {
 // comma-separated list of CIDR prefixes. CIDR validity is deferred to ValidationRules.
 func ServerConfigFromEnv() ServerConfig {
 	cfg := InitialServerConfig()
+	if addr := strings.TrimSpace(os.Getenv("SERVER_ADDR")); addr != "" {
+		cfg.Addr = addr
+	}
 	raw := strings.TrimSpace(os.Getenv("SERVER_TRUSTED_PROXIES"))
 	if raw == "" {
 		return cfg
 	}
-	for _, part := range strings.Split(raw, ",") {
+	for part := range strings.SplitSeq(raw, ",") {
 		if cidr := strings.TrimSpace(part); cidr != "" {
 			cfg.TrustedProxies = append(cfg.TrustedProxies, cidr)
 		}

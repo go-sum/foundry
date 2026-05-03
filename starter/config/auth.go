@@ -47,6 +47,10 @@ func productionAuth(siteBaseURL string) AuthConfig {
 			},
 		},
 		Provider:    provider.Config{Issuer: issuer},
-		OAuthClient: provider.BuildOAuthClient(issuer, cfgpkg.ExpandEnv("AUTH_FIRST_PARTY_CLIENT_ID", "starter-app"), "/auth/callback"),
+		OAuthClient: buildOAuthClient(issuer, cfgpkg.ExpandEnv("AUTH_FIRST_PARTY_CLIENT_ID", "starter-app")),
 	}
+}
+
+func buildOAuthClient(issuer, clientID string) webauth.ProviderConfig {
+	return provider.BuildOAuthClient(issuer, clientID, "/auth/callback")
 }

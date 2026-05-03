@@ -5,7 +5,7 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
-  app:
+  web:
     image: ${APP_IMAGE:-foundry:latest}
     read_only: true
     tmpfs:
@@ -20,7 +20,6 @@ services:
     env_file:
       - .env
     environment:
-      APP_ENV: ${APP_ENV:-production}
       SERVER_TRUSTED_PROXIES: ${SERVER_TRUSTED_PROXIES:-}
     secrets:
       - DATABASE_URL
@@ -43,6 +42,39 @@ services:
     networks:
       - app_net
       - proxy_net
+
+  worker:
+    image: ${APP_IMAGE:-foundry:latest}
+    command: ["/opt/server/worker"]
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 128
+    env_file:
+      - .env
+    secrets:
+      - DATABASE_URL
+    depends_on:
+      db:
+        condition: service_healthy
+      kv:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/opt/server/worker", "check"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - app_net
 
 secrets:
   DATABASE_URL:

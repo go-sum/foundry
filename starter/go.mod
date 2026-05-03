@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/go-sum/foundry/pkg/assets v0.0.0-00010101000000-000000000000
 	github.com/go-sum/foundry/pkg/auth v0.0.0-00010101000000-000000000000
-	github.com/go-sum/foundry/pkg/auth/authui v0.0.0-00010101000000-000000000000
+	github.com/go-sum/foundry/pkg/auth/web v0.0.0-00010101000000-000000000000
 	github.com/go-sum/foundry/pkg/auth/pgstore v0.0.0-00010101000000-000000000000
 	github.com/go-sum/foundry/pkg/auth/provider/pgstore v0.0.0-00010101000000-000000000000
 	github.com/go-sum/foundry/pkg/componentry v0.0.0-00010101000000-000000000000

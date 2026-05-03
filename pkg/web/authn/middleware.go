@@ -1,17 +1,24 @@
 package authn
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strings"
 
-	"github.com/go-sum/foundry/pkg/auth"
 	"github.com/go-sum/foundry/pkg/web"
 	webauth "github.com/go-sum/foundry/pkg/web/auth"
 	"github.com/go-sum/foundry/pkg/web/htmx"
 	"github.com/go-sum/foundry/pkg/web/session"
 	"github.com/google/uuid"
 )
+
+// ErrRoleNotFound is returned by RoleReaderFunc when the user does not exist.
+// LoadUserRole maps this to a 401 Unauthorized response.
+var ErrRoleNotFound = errors.New("authn: role not found")
+
+// RoleReaderFunc resolves the role string for an authenticated user ID.
+type RoleReaderFunc func(ctx context.Context, id uuid.UUID) (string, error)
 
 // LoadSession reads user identity from the session and sets context values.
 // It is non-destructive: if no session or no user ID is present, the request
@@ -63,7 +70,7 @@ func RequireAuth(signinPath func() string) web.Middleware {
 
 // LoadUserRole resolves the authenticated user's role from the database and
 // stores it in the request context for downstream authorization checks.
-func LoadUserRole(users auth.UserReader) web.Middleware {
+func LoadUserRole(fn RoleReaderFunc) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
 			uid := UserID(c)
@@ -74,14 +81,14 @@ func LoadUserRole(users auth.UserReader) web.Middleware {
 			if err != nil {
 				return web.Response{}, web.ErrUnauthorized("Invalid session")
 			}
-			user, err := users.GetUserByID(c.Context(), id)
+			role, err := fn(c.Context(), id)
 			if err != nil {
-				if errors.Is(err, auth.ErrUserNotFound) {
+				if errors.Is(err, ErrRoleNotFound) {
 					return web.Response{}, web.ErrUnauthorized("Account not found")
 				}
 				return web.Response{}, web.ErrUnavailable("Unable to authorize", err)
 			}
-			SetUserRole(c, string(user.Role))
+			SetUserRole(c, role)
 			return next(c)
 		}
 	}
@@ -91,7 +98,7 @@ func LoadUserRole(users auth.UserReader) web.Middleware {
 func RequireAdmin() web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(c *web.Context) (web.Response, error) {
-			if UserRole(c) != string(auth.RoleAdmin) {
+			if UserRole(c) != "admin" {
 				return web.Response{}, web.ErrForbidden("Admin access required")
 			}
 			return next(c)

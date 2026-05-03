@@ -15,10 +15,12 @@ import (
 	"github.com/go-sum/foundry/pkg/auth/provider"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/web"
+	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/serve"
 	"github.com/go-sum/foundry/pkg/web/session"
+	"github.com/go-sum/foundry/pkg/web/validate"
 )
 
 type stubSessionStore struct {
@@ -39,23 +41,42 @@ const (
 
 func setupTestEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv("APP_ENV", "testing")
 	t.Setenv("SECURITY_CSRF_KEY", testCSRFHexKey)
 	t.Setenv("SECURITY_AUTH_TOKEN_KEY", testAuthTokenHexKey)
 	t.Setenv("SECURITY_SESSION_KEY", testSessionHexKey)
 	t.Setenv("SITE_BASE_URL", "http://test.local")
+	t.Setenv("EMAIL_PROVIDER", "log")
+	t.Setenv("RATELIMIT_STORE", "memory")
+	t.Setenv("SECURITY_CSRF_ALLOW_MISSING_ORIGIN", "true")
+	t.Setenv("SECURITY_CSRF_COOKIE_SECURE", "false")
+	t.Setenv("SESSION_COOKIE_SECURE", "false")
+	t.Setenv("KV_URL", "redis://:test-password@kv:6379")
 
 	dir, err := os.MkdirTemp("", "static-*")
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) }) //nolint:errcheck // cleanup: best-effort removal, failure is non-fatal in tests
-	t.Setenv("TEST_STATIC_DIR", dir)
+	t.Setenv("ASSETS_PUBLIC_DIR", dir)
 }
 
-func mustNew(t *testing.T) *App {
+func stubWebServicesFactory(context.Context, Runtime, Security, *router.Router, Presentation, kv.Store, *ratelimit.Limiter, validate.Validator) (Services, error) {
+	return Services{}, nil
+}
+
+func testOptions(opts ...Option) []Option {
+	baseOpts := []Option{
+		WithKVStoreFactory(func(context.Context, Runtime) (kv.Store, error) {
+			return &stubKVStore{}, nil
+		}),
+		WithWebServicesFactory(stubWebServicesFactory),
+	}
+	return append(baseOpts, opts...)
+}
+
+func mustNew(t *testing.T, opts ...Option) *App {
 	t.Helper()
-	a, err := New(context.Background())
+	a, err := New(context.Background(), testOptions(opts...)...)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -217,7 +238,7 @@ func TestApp_CookieSessionStore_MissingKey_ReturnsError(t *testing.T) {
 	setupTestEnv(t)
 	t.Setenv("SECURITY_SESSION_KEY", "")
 
-	_, err := New(context.Background())
+	_, err := New(context.Background(), testOptions()...)
 	if err == nil {
 		t.Fatal("expected error for missing SECURITY_SESSION_KEY, got nil")
 	}
@@ -226,6 +247,7 @@ func TestApp_CookieSessionStore_MissingKey_ReturnsError(t *testing.T) {
 func TestApp_MemorySessionStore_AllowedInTesting(t *testing.T) {
 	setupTestEnv(t)
 	t.Setenv("SESSION_STORE", "memory")
+	t.Setenv("SESSION_STORE_ALLOW_MEMORY", "true")
 
 	h := serve.ToHTTPHandler(mustNew(t).router.Serve)
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
@@ -243,9 +265,9 @@ func TestApp_KVSessionStore_AllowedInTesting(t *testing.T) {
 	t.Setenv("SESSION_STORE", "kv")
 
 	store := &stubKVStore{}
-	a, err := New(context.Background(), WithKVStoreFactory(func(context.Context, Runtime) (kv.Store, error) {
+	a, err := New(context.Background(), testOptions(WithKVStoreFactory(func(context.Context, Runtime) (kv.Store, error) {
 		return store, nil
-	}))
+	}))...)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -270,9 +292,9 @@ func TestApp_KVSessionStore_UnreachableKV_ReturnsError(t *testing.T) {
 	setupTestEnv(t)
 	t.Setenv("SESSION_STORE", "kv")
 
-	_, err := New(context.Background(), WithKVStoreFactory(func(context.Context, Runtime) (kv.Store, error) {
+	_, err := New(context.Background(), testOptions(WithKVStoreFactory(func(context.Context, Runtime) (kv.Store, error) {
 		return &stubKVStore{pingErr: errors.New("dial tcp: connection refused")}, nil
-	}))
+	}))...)
 	if err == nil {
 		t.Fatal("expected error for unreachable KV, got nil")
 	}
@@ -587,10 +609,11 @@ func TestApp_APIMiddleware_OriginGuardSkipsTokenRoute(t *testing.T) {
 func TestNew_CleansUpSessionStoreOnRouteRegistrationError(t *testing.T) {
 	setupTestEnv(t)
 	t.Setenv("SESSION_STORE", "memory")
-	t.Setenv("TEST_STATIC_DIR", filepath.Join(t.TempDir(), "missing"))
+	t.Setenv("SESSION_STORE_ALLOW_MEMORY", "true")
+	t.Setenv("ASSETS_PUBLIC_DIR", filepath.Join(t.TempDir(), "missing"))
 
 	store := &stubSessionStore{}
-	_, err := New(context.Background(), WithSessionStoreFactory(func() session.Store { return store }))
+	_, err := New(context.Background(), testOptions(WithSessionStoreFactory(func() session.Store { return store }))...)
 	if err == nil {
 		t.Fatal("New() error = nil, want non-nil")
 	}

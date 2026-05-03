@@ -5,7 +5,7 @@ import (
 	"context"
 
 	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
-	"github.com/go-sum/foundry/internal/view/page"
+	"github.com/go-sum/foundry/internal/views/pages"
 	"github.com/go-sum/foundry/pkg/web"
 )
 
@@ -28,13 +28,13 @@ func NewHandler(checkers []Checker, opts ...viewstate.RequestOption) *Handler {
 
 // Show renders the home page with live health status for each configured service.
 func (h *Handler) Show(c *web.Context) (web.Response, error) {
-	var statuses []page.ServiceStatus
+	var statuses []pages.ServiceStatus
 	for _, ch := range h.checkers {
-		statuses = append(statuses, page.ServiceStatus{
+		statuses = append(statuses, pages.ServiceStatus{
 			Name:    ch.Name,
 			Healthy: ch.Fn(c.Context()) == nil,
 		})
 	}
 	vr := viewstate.NewRequest(c, h.reqOpts...)
-	return viewstate.Render(vr, page.HomePage(vr, statuses), page.HomeContent(vr, statuses))
+	return viewstate.Render(vr, pages.HomePage(vr, statuses), pages.HomeContent(vr, statuses))
 }

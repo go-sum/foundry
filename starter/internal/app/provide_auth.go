@@ -6,12 +6,12 @@ import (
 	authpgstore "github.com/go-sum/foundry/pkg/auth/pgstore"
 	"github.com/go-sum/foundry/pkg/auth/provider"
 	providerpgstore "github.com/go-sum/foundry/pkg/auth/provider/pgstore"
+	authweb "github.com/go-sum/foundry/pkg/auth/web"
 	"github.com/go-sum/foundry/pkg/notification/email"
-	"github.com/go-sum/foundry/pkg/web/authn"
 )
 
 // provideAuth wires the auth identity module and the OAuth 2.0 Authorization Server.
-func provideAuth(pc ProviderContext, sec Security, emailSender email.Sender) (*authn.Module, *provider.ProviderModule, error) {
+func provideAuth(pc ProviderContext, sec Security, emailSender email.Sender) (*authweb.Module, *provider.ProviderModule, error) {
 	authStore := authpgstore.New(pc.Pool)
 	authMod, err := provideAuthModule(pc, authStore, emailSender)
 	if err != nil {

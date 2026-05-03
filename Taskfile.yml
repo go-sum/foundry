@@ -5,6 +5,9 @@ dotenv:
   - 'starter/.versions'
 
 includes:
+  git:
+    taskfile: ./Taskfile.git.yml
+    flatten: false
   app:
     dir: ./starter
     taskfile: ./starter/Taskfile.yml

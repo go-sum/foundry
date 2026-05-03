@@ -31,11 +31,11 @@ ${DOMAIN} {
 	${TLS_CONFIG}
 
 	@sse path /__air_internal/*
-	reverse_proxy @sse app:8080 {
+	reverse_proxy @sse web:8080 {
 		flush_interval -1
 	}
 
-	reverse_proxy app:8080
+	reverse_proxy web:8080
 }
 EOF
 else
@@ -50,7 +50,7 @@ ${DOMAIN} {
 	# Strip inbound X-Forwarded-Host — always rebuilt from the Host header.
 	# For Cloudflare deployments, add: trusted_proxies cloudflare
 	# inside the reverse_proxy block below.
-	reverse_proxy app:8080 {
+	reverse_proxy web:8080 {
 		header_up -X-Forwarded-Host
 	}
 }

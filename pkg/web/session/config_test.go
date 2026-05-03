@@ -76,44 +76,36 @@ func TestNewCookieCodec(t *testing.T) {
 	}
 }
 
-func TestValidationRules_KV_RequiresPasswordOutsideTesting(t *testing.T) {
-	for _, env := range []string{"production", "development"} {
-		t.Run(env, func(t *testing.T) {
-			v := validator.New()
-			ValidationRules(StoreTypeKV, env, "", nil)(v)
-			err := v.Struct(Settings{CookieName: "session"})
-			if err == nil {
-				t.Fatal("expected error for kv store without password, got nil")
-			}
-		})
-	}
-}
-
-func TestValidationRules_Memory_OnlyAllowedInTesting(t *testing.T) {
-	for _, env := range []string{"production", "development"} {
-		t.Run(env, func(t *testing.T) {
-			v := validator.New()
-			ValidationRules(StoreTypeMemory, env, "", nil)(v)
-			err := v.Struct(Settings{CookieName: "session"})
-			if err == nil {
-				t.Fatal("expected error for memory store outside testing, got nil")
-			}
-		})
-	}
-}
-
-func TestValidationRules_Memory_AllowedInTesting(t *testing.T) {
+func TestValidationRules_KV_RequiresPassword(t *testing.T) {
 	v := validator.New()
-	ValidationRules(StoreTypeMemory, "testing", "", nil)(v)
+	ValidationRules(StoreTypeKV, "", nil, false)(v)
+	err := v.Struct(Settings{CookieName: "session"})
+	if err == nil {
+		t.Fatal("expected error for kv store without password, got nil")
+	}
+}
+
+func TestValidationRules_Memory_RequiresExplicitEnable(t *testing.T) {
+	v := validator.New()
+	ValidationRules(StoreTypeMemory, "", nil, false)(v)
+	err := v.Struct(Settings{CookieName: "session"})
+	if err == nil {
+		t.Fatal("expected error for memory store without AllowMemory, got nil")
+	}
+}
+
+func TestValidationRules_Memory_AllowedWhenEnabled(t *testing.T) {
+	v := validator.New()
+	ValidationRules(StoreTypeMemory, "", nil, true)(v)
 	err := v.Struct(Settings{CookieName: "session"})
 	if err != nil {
-		t.Fatalf("expected no error for memory store in testing, got %v", err)
+		t.Fatalf("expected no error for memory store when enabled, got %v", err)
 	}
 }
 
 func TestValidationRules_Cookie_RequiresKey(t *testing.T) {
 	v := validator.New()
-	ValidationRules(StoreTypeCookie, "production", "", nil)(v) // nil / short cookieKey
+	ValidationRules(StoreTypeCookie, "", nil, false)(v) // nil / short cookieKey
 	err := v.Struct(Settings{CookieName: "session"})
 	if err == nil {
 		t.Fatal("expected error for cookie store without key, got nil")

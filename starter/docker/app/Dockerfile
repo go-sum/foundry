@@ -30,6 +30,12 @@ ENV GONOSUMDB=*
 
 RUN git config --global --add safe.directory /app
 
+WORKDIR /workspace
+COPY --from=workspace . .
+RUN cd /workspace/starter && \
+    GONOSUMDB='github.com/go-sum/*' GOPRIVATE='github.com/go-sum/foundry' \
+    go build -o /usr/local/bin/worker ./cmd/worker
+
 WORKDIR /app
 
 CMD ["air", "-c", "docker/app/.air.toml"]
@@ -87,6 +93,8 @@ COPY static/ ./static/
 ARG APP_VERSION
 RUN GONOSUMDB='github.com/go-sum/*' GOPRIVATE='github.com/go-sum/foundry' \
     CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${APP_VERSION}" -o /bin/server ./cmd/server
+RUN GONOSUMDB='github.com/go-sum/*' GOPRIVATE='github.com/go-sum/foundry' \
+    CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${APP_VERSION}" -o /bin/worker ./cmd/worker
 
 # ──────────────────────────────────────────────────────── production_target ───
 FROM cgr.dev/chainguard/static:latest AS production_target
@@ -96,6 +104,7 @@ ENV APP_FOLDER=${APP_FOLDER} \
     PUBLIC_DIR=${APP_FOLDER}/public \
     PUBLIC_PREFIX=/public
 COPY --from=production_builder  --chown=nonroot:nonroot /bin/server         ${APP_FOLDER}/server
+COPY --from=production_builder  --chown=nonroot:nonroot /bin/worker         ${APP_FOLDER}/worker
 COPY --from=healthcheck_builder --chown=nonroot:nonroot /healthcheck         /opt/healthcheck
 COPY --from=assets_builder      --chown=nonroot:nonroot /app/public/         ${APP_FOLDER}/public/
 COPY --from=production_builder  --chown=nonroot:nonroot /app/config/*.yaml  ${APP_FOLDER}/config/

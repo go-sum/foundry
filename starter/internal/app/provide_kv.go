@@ -40,11 +40,7 @@ func provideKVStore(ctx context.Context, runtime Runtime, factory func(context.C
 		return nil, fmt.Errorf("%w: no store returned", ErrKVStoreUnavailable)
 	}
 
-	attempts := 3
-	if runtime.Config.Env == config.Testing {
-		attempts = 1
-	}
-	if err := cfgpkg.ConnectWithRetry(ctx, "kv", runtime.Logger, attempts, func() error {
+	if err := cfgpkg.ConnectWithRetry(ctx, "kv", runtime.Logger, 3, func() error {
 		return store.Ping(ctx)
 	}); err != nil {
 		_ = store.Close() // secondary error during startup failure; primary error returned below
@@ -53,15 +49,10 @@ func provideKVStore(ctx context.Context, runtime Runtime, factory func(context.C
 	return store, nil
 }
 
-// needsKV reports whether the application requires the shared KV dependency at
-// startup. Outside testing, starter services such as auth nonce storage and
-// the production rate-limit store depend on the configured KV service
-// regardless of which session store implementation is selected. In testing,
-// only the explicit kv session store path requires bringing up the shared KV
-// dependency because rate limiting falls back to an in-memory store.
+// needsKV reports whether the web application requires the shared KV
+// dependency at startup. The current web runtime always depends on KV for auth
+// token nonces, and may also use it for sessions and rate limiting.
 func needsKV(cfg *config.Config) bool {
-	if cfg.Env != config.Testing {
-		return true
-	}
-	return cfg.Web.SessionStore == "kv"
+	_ = cfg
+	return true
 }

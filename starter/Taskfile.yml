@@ -62,7 +62,7 @@ tasks:
     desc: "Stop data containers and remove volumes"
     cmd: "{{.DCOMP_DATA}} down -v"
 
-  # ── Dev stack (data + app + caddy) ────────────────────────────────────────────
+  # ── Dev stack (data + web + worker + caddy) ───────────────────────────────────
 
   dev:
     desc: "Rebuild and attach to the full dev stack"
@@ -89,7 +89,7 @@ tasks:
     cmd: "{{.DCOMP_ALL}} up --build --detach {{.CLI_ARGS}}"
 
   dev:down:
-    desc: "Stop app and caddy (data containers keep running)"
+    desc: "Stop web, worker, and caddy (data containers keep running)"
     cmds:
       - "{{.DCOMP_ALL}} down {{.CLI_ARGS}}"
       - docker network rm "${PROXY_NETWORK:-caddy_net}" 2>/dev/null || true

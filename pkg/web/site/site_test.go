@@ -78,29 +78,20 @@ func TestBuildAllowedHosts(t *testing.T) {
 	}
 }
 
-func TestValidationRules_EmptyAllowedHosts_InProduction_ReturnsError(t *testing.T) {
+func TestValidationRules_EmptyAllowedHosts_ReturnsError(t *testing.T) {
 	v := validator.New()
-	ValidationRules("production")(v)
+	ValidationRules()(v)
 	err := v.Struct(Config{BaseURL: "https://example.com", AllowedHosts: nil})
 	if err == nil {
 		t.Fatal("expected error for empty AllowedHosts in production, got nil")
 	}
 }
 
-func TestValidationRules_NonEmptyAllowedHosts_InProduction_Passes(t *testing.T) {
+func TestValidationRules_NonEmptyAllowedHosts_Passes(t *testing.T) {
 	v := validator.New()
-	ValidationRules("production")(v)
+	ValidationRules()(v)
 	err := v.Struct(Config{BaseURL: "https://example.com", AllowedHosts: []string{"example.com"}})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
-	}
-}
-
-func TestValidationRules_EmptyAllowedHosts_InDevelopment_Passes(t *testing.T) {
-	v := validator.New()
-	ValidationRules("development")(v)
-	err := v.Struct(Config{BaseURL: "https://example.com", AllowedHosts: nil})
-	if err != nil {
-		t.Fatalf("expected no error for empty AllowedHosts in dev, got %v", err)
 	}
 }
