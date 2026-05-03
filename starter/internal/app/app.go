@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-sum/foundry/pkg/auth/provider"
 	"github.com/go-sum/foundry/pkg/componentry/icons"
+	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/db"
 	"github.com/go-sum/foundry/pkg/kv"
 	"github.com/go-sum/foundry/pkg/notification/email"
@@ -37,6 +38,7 @@ type App struct {
 	Runtime
 	Security
 	Services
+	closer       cfgpkg.Closer
 	router       *router.Router
 	sessionStore session.Store
 }
@@ -87,19 +89,20 @@ type Security struct {
 
 // Services holds application-level service instances.
 type Services struct {
-	DBPool      *pgxpool.Pool
-	KVStore     kv.Store
-	RateLimiter *ratelimit.Limiter
-	Queue       *queue.Dispatcher
-	Processor   *queue.Processor
-	EmailSender email.Sender
-	Contact     *contact.Module
-	Auth        *authn.Module
-	// OAuthProvider is the built-in OAuth 2.0 Authorization Server.
-	OAuthProvider *provider.ProviderModule
-	// OAuthClient is the first-party OAuth 2.1 client handler.
-	OAuthClient    *oauthclient.Handler
+	// Infrastructure
+	DBPool         *pgxpool.Pool
+	KVStore        kv.Store
+	RateLimiter    *ratelimit.Limiter
+	Queue          *queue.Dispatcher
+	Processor      *queue.Processor
 	SchemaRegistry *db.Registry
+	EmailSender    email.Sender
+
+	// Application modules
+	Contact       *contact.Module
+	Auth          *authn.Module
+	OAuthProvider *provider.ProviderModule
+	OAuthClient   *oauthclient.Handler
 }
 
 // Presentation consolidates view-layer dependencies assembled at the composition root.
@@ -108,38 +111,32 @@ type Presentation struct {
 	Icons    *icons.Registry
 }
 
-// Close shuts down background services and releases resources.
-func (s Services) Close() error {
-	var errs []error
-	if s.Processor != nil {
-		if err := s.Processor.Stop(); err != nil {
-			errs = append(errs, fmt.Errorf("processor: %w", err))
-		}
-	}
-	if s.RateLimiter != nil {
-		if err := s.RateLimiter.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("rate limiter: %w", err))
-		}
-	}
-	if s.KVStore != nil {
-		if err := s.KVStore.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("kv: %w", err))
-		}
-	}
-	if s.DBPool != nil {
-		s.DBPool.Close()
-	}
-	return errors.Join(errs...)
+// ProviderContext holds infrastructure dependencies shared across module providers.
+type ProviderContext struct {
+	Runtime   Runtime
+	Pool      *pgxpool.Pool
+	KVStore   kv.Store
+	Router    *router.Router
+	Validator validate.Validator
+	ViewOpts  []viewstate.RequestOption
 }
 
-// Close shuts down background services and stops any stoppable session store.
+// Close shuts down background services and releases resources.
+// Resources registered via closer are shut down in LIFO order.
+// Session store and KV store are handled directly to support App structs
+// constructed outside of New (e.g. in tests).
 func (a *App) Close() error {
 	var errs []error
-	if err := a.Services.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("services: %w", err))
-	}
 	if store, ok := a.sessionStore.(stoppableSessionStore); ok {
 		store.Stop()
+	}
+	if err := a.closer.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	if a.Services.KVStore != nil {
+		if err := a.Services.KVStore.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("kv: %w", err))
+		}
 	}
 	return errors.Join(errs...)
 }
@@ -209,6 +206,7 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 			RateLimiter: limiter,
 		},
 	}
+	app.closer.Add("rate-limiter", limiter.Close)
 	defer func() {
 		if err == nil {
 			return
@@ -229,6 +227,12 @@ func New(ctx context.Context, opts ...Option) (_ *App, err error) {
 		return nil, fmt.Errorf("services: %w", err)
 	}
 	app.Services = services
+	if services.DBPool != nil {
+		app.closer.Add("db", func() error { services.DBPool.Close(); return nil })
+	}
+	if services.Processor != nil {
+		app.closer.Add("processor", services.Processor.Stop)
+	}
 
 	s := site.New(runtime.Config.Site)
 	publicDir := filepath.Dir(runtime.Config.Assets.PublicDir)

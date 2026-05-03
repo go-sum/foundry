@@ -6,6 +6,7 @@ import (
 	"github.com/go-sum/foundry/pkg/componentry/interactive/theme"
 	cfgpkg "github.com/go-sum/foundry/pkg/config"
 	"github.com/go-sum/foundry/pkg/db"
+	"github.com/go-sum/foundry/pkg/notification/email"
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/secure"
 	"github.com/go-sum/foundry/pkg/web/serve"
@@ -66,6 +67,7 @@ func Load() (*Config, error) {
 			site.ValidationRules(string(cfg.Env)),
 			serve.ValidationRules(),
 			session.ValidationRules(cfg.Web.SessionStore, string(cfg.Env), cfg.KV.Password, cfg.Web.Session.CookieKey),
+			emailProviderRules(cfg.App.Email.Provider, string(cfg.Env)),
 		}
 	}
 	return cfgpkg.Load[Config](p)
@@ -129,6 +131,7 @@ func developmentOverlay(cfg *Config) {
 	// (github.com/air-verse/air v1.65.0 runner/proxy.js).
 	cfg.Web.Secure.CSP = cfg.Web.Secure.CSP.WithScriptHashes("'sha256-y933zYNvpVe5f9j5A+OKECUXiWo8bKB5Yp5sLDD3d0I='")
 	cfg.LogLevel = cfgpkg.ExpandEnv("LOG_LEVEL", "debug")
+	cfg.App.Email.Provider = email.ProviderLog
 }
 
 func testingOverlay(cfg *Config) {
@@ -139,6 +142,7 @@ func testingOverlay(cfg *Config) {
 	cfg.Web.Secure.CSRF.CookieSecure = false
 	cfg.Web.Session.CookieSecure = false
 	cfg.RateLimit.Store.Type = ratelimit.StoreTypeMemory
+	cfg.App.Email.Provider = email.ProviderLog
 	if dir := cfgpkg.ExpandEnv("TEST_STATIC_DIR", ""); dir != "" {
 		cfg.Assets.PublicDir = dir
 	}

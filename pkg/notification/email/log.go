@@ -23,8 +23,8 @@ func (s *logSender) Send(_ context.Context, msg Message) error {
 		slog.String("to", msg.To),
 		slog.String("from", msg.From),
 		slog.String("subject", msg.Subject),
+		slog.String("text", msg.Text),
 		slog.Bool("has_html", msg.HTML != ""),
-		slog.Bool("has_text", msg.Text != ""),
 	)
 	return nil
 }

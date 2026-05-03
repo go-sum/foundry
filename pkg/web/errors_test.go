@@ -594,3 +594,22 @@ func TestErrTransient_IsNotDependencyTimeout(t *testing.T) {
 		t.Error("errors.Is(ErrTransient, ErrDependencyTimeout) = true, want false — sentinels must be distinct")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// UnavailableHandler
+// ---------------------------------------------------------------------------
+
+func TestUnavailableHandler(t *testing.T) {
+	h := UnavailableHandler("foo")
+	_, err := h(nil)
+	if err == nil {
+		t.Fatal("UnavailableHandler returned nil error, want non-nil")
+	}
+	e := ErrorFrom(err)
+	if e == nil {
+		t.Fatal("ErrorFrom returned nil, want *Error")
+	}
+	if e.Status != http.StatusServiceUnavailable {
+		t.Errorf("Status = %d, want %d", e.Status, http.StatusServiceUnavailable)
+	}
+}

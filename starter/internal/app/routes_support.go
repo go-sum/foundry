@@ -43,11 +43,5 @@ func contactHandlers(svc Services) (web.Handler, web.Handler) {
 	if svc.Contact != nil && svc.Contact.Handler != nil {
 		return svc.Contact.Handler.Form, svc.Contact.Handler.Submit
 	}
-	return unavailableHandler("contact"), unavailableHandler("contact")
-}
-
-func unavailableHandler(feature string) web.Handler {
-	return func(*web.Context) (web.Response, error) {
-		return web.Response{}, web.ErrUnavailable(feature+" feature unavailable", nil)
-	}
+	return web.UnavailableHandler("contact"), web.UnavailableHandler("contact")
 }

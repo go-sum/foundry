@@ -201,7 +201,7 @@ func TestAuthRateLimitNodes_FailsClosed(t *testing.T) {
 }
 
 func TestUnavailableHandler_ReturnsUnavailableError(t *testing.T) {
-	h := unavailableHandler("contact")
+	h := web.UnavailableHandler("contact")
 	c := testRouteContext(http.MethodGet, "/contact")
 	_, err := h(c)
 	if err == nil {

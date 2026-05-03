@@ -163,6 +163,14 @@ func ErrUnavailable(message string, cause error) *Error {
 	return NewError(http.StatusServiceUnavailable, CodeUnavailable, "Service Unavailable", message, cause)
 }
 
+// UnavailableHandler returns a Handler that always returns a 503 Service Unavailable error.
+// Use it as a placeholder for features that are not yet available in the current configuration.
+func UnavailableHandler(feature string) Handler {
+	return func(*Context) (Response, error) {
+		return Response{}, ErrUnavailable(feature+" feature unavailable", nil)
+	}
+}
+
 // ErrBreakerOpenResponse returns a 503 Service Unavailable error indicating
 // that the circuit breaker for an upstream is open.
 func ErrBreakerOpenResponse(retryAfter time.Duration) *Error {

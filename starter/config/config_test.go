@@ -184,6 +184,42 @@ func TestLoad_Development_AllowedHosts_DefaultBaseURL_IncludesForgeTest(t *testi
 	}
 }
 
+func TestLoad_Production_RejectsLogEmailProvider(t *testing.T) {
+	setValidSecrets(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("SITE_BASE_URL", "https://example.com")
+	t.Setenv("EMAIL_PROVIDER", "log")
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want validation error for log email provider in production")
+	}
+}
+
+func TestLoad_Production_RejectsEmptyEmailProvider(t *testing.T) {
+	setValidSecrets(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("SITE_BASE_URL", "https://example.com")
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want validation error for empty email provider in production")
+	}
+}
+
+func TestLoad_Development_EmailProviderIsLog(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	setValidSecrets(t)
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.App.Email.Provider != "log" {
+		t.Errorf("App.Email.Provider = %q, want %q", cfg.App.Email.Provider, "log")
+	}
+}
+
 func TestLoad_SessionKVPrefix_Override(t *testing.T) {
 	t.Setenv("APP_ENV", "testing")
 	setValidSecrets(t)

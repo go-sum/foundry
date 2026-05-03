@@ -17,7 +17,6 @@ import (
 	"github.com/go-sum/foundry/pkg/web/ratelimit"
 	"github.com/go-sum/foundry/pkg/web/router"
 	"github.com/go-sum/foundry/pkg/web/validate"
-	viewstate "github.com/go-sum/foundry/pkg/web/viewstate"
 
 	config "github.com/go-sum/foundry/config"
 	appdb "github.com/go-sum/foundry/db"
@@ -40,6 +39,15 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 		return Services{}, fmt.Errorf("services: kv: missing shared store")
 	}
 
+	pc := ProviderContext{
+		Runtime:   runtime,
+		Pool:      pool,
+		KVStore:   kvStore,
+		Router:    rt,
+		Validator: val,
+		ViewOpts:  pres.ViewOpts,
+	}
+
 	qStore, qDispatcher := provideQueue(pool, runtime.Logger)
 	emailSender, err := provideEmailSender(runtime.Config.App.Email, runtime.Logger)
 	if err != nil {
@@ -47,9 +55,9 @@ func provideServices(ctx context.Context, runtime Runtime, sec Security, rt *rou
 		return Services{}, fmt.Errorf("services: email: %w", err)
 	}
 
-	contactMod := provideContactModule(pool, limiter, qDispatcher, emailSender, rt, val, sec.RateLimitKey, runtime.Config.App.Contact, pres.ViewOpts, runtime.Logger)
+	contactMod := provideContactModule(pc, limiter, qDispatcher, emailSender, sec.RateLimitKey, runtime.Config.App.Contact)
 
-	authMod, oauthProvider, err := provideAuth(runtime.Config, runtime.Logger, pool, kvStore, rt, pres.ViewOpts, val)
+	authMod, oauthProvider, err := provideAuth(pc, sec, emailSender)
 	if err != nil {
 		pool.Close()
 		return Services{}, fmt.Errorf("services: %w", err)
@@ -110,14 +118,14 @@ func provideEmailSender(cfg email.Config, logger *slog.Logger) (email.Sender, er
 	return email.New(cfg, logger)
 }
 
-func provideContactModule(pool *pgxpool.Pool, limiter *ratelimit.Limiter, qDispatcher *queue.Dispatcher, emailSender email.Sender, rt *router.Router, val validate.Validator, rateLimitKey ratelimit.KeyFunc, cfg config.ContactConfig, viewOpts []viewstate.RequestOption, logger *slog.Logger) *contact.Module {
+func provideContactModule(pc ProviderContext, limiter *ratelimit.Limiter, qDispatcher *queue.Dispatcher, emailSender email.Sender, rateLimitKey ratelimit.KeyFunc, cfg config.ContactConfig) *contact.Module {
 	return contact.NewModule(contact.ModuleConfig{
-		Pool:         pool,
+		Pool:         pc.Pool,
 		RateLimiter:  limiter,
 		Queue:        qDispatcher,
 		EmailSender:  emailSender,
-		Router:       rt,
-		Validator:    val,
+		Router:       pc.Router,
+		Validator:    pc.Validator,
 		ClientIPFunc: rateLimitKey,
 		Service: contact.ServiceConfig{
 			RateLimitProfile: config.RateLimitContactSubmitEmail,
@@ -127,8 +135,8 @@ func provideContactModule(pool *pgxpool.Pool, limiter *ratelimit.Limiter, qDispa
 			SendTo:   cfg.SendTo,
 			SendFrom: cfg.SendFrom,
 		},
-		ViewOpts: viewOpts,
-		Logger:   logger,
+		ViewOpts: pc.ViewOpts,
+		Logger:   pc.Runtime.Logger,
 	})
 }
 

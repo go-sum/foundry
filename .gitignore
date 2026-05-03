@@ -4,11 +4,11 @@
 .codex
 .mcp.json
 .projects/
+.plans
+.task/
 
 bin/
 tmp/
-.plans
-.task/
 
 *.test
 *.out
